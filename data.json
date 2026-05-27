@@ -1,0 +1,226 @@
+{
+  "colors": [
+    {
+      "name": "BLACK 2RC",
+      "rate": 355
+    },
+    {
+      "name": "BLACK E",
+      "rate": 140
+    },
+    {
+      "name": "BLACK EMRD",
+      "rate": 328
+    },
+    {
+      "name": "BLACK RX-EX CONC",
+      "rate": 437
+    },
+    {
+      "name": "BLUE 2RX",
+      "rate": 1225
+    },
+    {
+      "name": "BLUE ER",
+      "rate": 629
+    },
+    {
+      "name": "BOURDEX BW",
+      "rate": 210
+    },
+    {
+      "name": "BRILL BLUE DBR CONC",
+      "rate": 539
+    },
+    {
+      "name": "BRILL BLUE GSL 400%",
+      "rate": 840
+    },
+    {
+      "name": "BRILL BLUE SR",
+      "rate": 796
+    },
+    {
+      "name": "BRILL BLUE X BRSL",
+      "rate": 509
+    },
+    {
+      "name": "BRILL RED 6B",
+      "rate": 540
+    },
+    {
+      "name": "BRILL RED BS",
+      "rate": 364
+    },
+    {
+      "name": "BRILL RED F3BL",
+      "rate": 447
+    },
+    {
+      "name": "BROWN 3REL N",
+      "rate": 268
+    },
+    {
+      "name": "BROWN MR",
+      "rate": 240
+    },
+    {
+      "name": "DARK RED 2B",
+      "rate": 247
+    },
+    {
+      "name": "GOLDEN YELLOW 2GNN",
+      "rate": 318
+    },
+    {
+      "name": "GOLDEN YELLOW HER",
+      "rate": 115
+    },
+    {
+      "name": "GREEN B",
+      "rate": 190
+    },
+    {
+      "name": "LIQUID BLACK SER",
+      "rate": 288
+    },
+    {
+      "name": "LUMINOUS PINK 5BN",
+      "rate": 820
+    },
+    {
+      "name": "LUMINOUS RED G",
+      "rate": 641
+    },
+    {
+      "name": "LUMINOUS YELLOW 10GN",
+      "rate": 840
+    },
+    {
+      "name": "MAROON R",
+      "rate": 380
+    },
+    {
+      "name": "NAVY BLUE 3G 200%",
+      "rate": 392
+    },
+    {
+      "name": "NAVY BLUE RX",
+      "rate": 130
+    },
+    {
+      "name": "ORANGE BRO",
+      "rate": 135
+    },
+    {
+      "name": "ORANGE RL",
+      "rate": 260
+    },
+    {
+      "name": "RED HE3B",
+      "rate": 235
+    },
+    {
+      "name": "RED HE8B",
+      "rate": 180
+    },
+    {
+      "name": "RED VIOLET FBL 200%",
+      "rate": 1015
+    },
+    {
+      "name": "RUBINE 5BH CONC",
+      "rate": 261
+    },
+    {
+      "name": "SCARLET 4BS",
+      "rate": 370
+    },
+    {
+      "name": "SCARLET CRR",
+      "rate": 233
+    },
+    {
+      "name": "SKY BLUE FF",
+      "rate": 135
+    },
+    {
+      "name": "TURQUOISE BLUE H5G",
+      "rate": 490
+    },
+    {
+      "name": "VIOLET 3R",
+      "rate": 378
+    },
+    {
+      "name": "VOILET BB",
+      "rate": 230
+    },
+    {
+      "name": "WHITE R",
+      "rate": 716
+    },
+    {
+      "name": "YELLOW 5 GLL",
+      "rate": 220
+    },
+    {
+      "name": "YELLOW 7GE",
+      "rate": 324
+    },
+    {
+      "name": "YELLOW BROWN",
+      "rate": 252
+    },
+    {
+      "name": "YELLOW HE68",
+      "rate": 285
+    },
+    {
+      "name": "YELLOW M7G",
+      "rate": 394
+    }
+  ],
+  "recipes": [
+    {
+      "recipeNo": "283",
+      "colorName": "DARK NAVY BLUE",
+      "hexCode": "NA",
+      "recipeThans": "20",
+      "dyes": [
+        {
+          "name": "NAVY BLUE 3G 200%",
+          "qty": 2200
+        },
+        {
+          "name": "VIOLET 3R",
+          "qty": 510
+        },
+        {
+          "name": "BLACK RX-EX CONC",
+          "qty": 340
+        },
+        {
+          "name": "RUBINE 5BH CONC",
+          "qty": 340
+        },
+        {
+          "name": "NAVY BLUE RX",
+          "qty": 4070
+        },
+        {
+          "name": "BLACK E",
+          "qty": 510
+        },
+        {
+          "name": "VOILET BB",
+          "qty": 880
+        },
+        {
+          "name": "RED HE8B",
+          "qty": 680
+        }
+      ]
+    }
+  ]
+}
