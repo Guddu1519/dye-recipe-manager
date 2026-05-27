@@ -6,9 +6,12 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     body{font-family:Arial;margin:0;background:#f4f6fb;color:#111}
-header{background:#0f172a;color:white;padding:18px;text-align:center}
+header{background:#0f172a;color:white;padding:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
 h1{margin:0;font-size:24px}
-.companyHeader{text-align:center;margin-bottom:10px}
+.appTitle{text-align:left}
+.appTitle p{margin:8px 0 0}
+header > p{display:none}
+.companyHeader{text-align:right;margin-left:auto}
 .companyHeader .companyName{font-size:28px;font-weight:bold;margin:0}
 .companyHeader .companyAddress{font-size:14px;margin:4px 0 0;color:#cbd5e1}
 nav{display:flex;gap:10px;padding:12px;background:#e5e7eb;flex-wrap:wrap}
@@ -68,7 +71,7 @@ th{background:#dbeafe}
 .logout{margin-left:auto;background:#dc2626;color:white}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
-    @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}.auth-card{padding:18px}.logout{margin-left:0}}
+    @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}}
   </style>
 </head>
 <body>
@@ -87,11 +90,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="appShell">
 <header>
+  <div class="appTitle">
+    <h1>Dye Recipe & Costing Manager</h1>
+    <p>Recipe Master &bull; Batch Costing &bull; Price Master</p>
+  </div>
   <div class="companyHeader">
     <p class="companyName">MONICA TEXTILE MILLS</p>
     <p class="companyAddress">F238 MANDIA ROAD PALI RAJ 306-401</p>
   </div>
-  <h1>Dye Recipe & Costing Manager</h1>
   <p> Recipe Master • Batch Costing • Price Master</p>
 </header>
 
