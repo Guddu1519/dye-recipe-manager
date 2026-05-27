@@ -6,9 +6,12 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     body{font-family:Arial;margin:0;background:#f4f6fb;color:#111}
-    header{background:#0f172a;color:white;padding:18px}
-    h1{margin:0;font-size:24px}
-    nav{display:flex;gap:10px;padding:12px;background:#e5e7eb;flex-wrap:wrap}
+header{background:#0f172a;color:white;padding:18px}
+h1{margin:0;font-size:24px}
+.companyHeader{text-align:right;margin-bottom:10px}
+.companyHeader .companyName{font-size:28px;font-weight:bold;margin:0}
+.companyHeader .companyAddress{font-size:14px;margin:4px 0 0;color:#cbd5e1}
+nav{display:flex;gap:10px;padding:12px;background:#e5e7eb;flex-wrap:wrap}
     nav button,.btn{padding:12px 16px;border:0;border-radius:8px;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
     nav button{background:#fff;color:#111}
     nav button.active{background:#2563eb;color:white}
@@ -84,9 +87,12 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="appShell">
 <header>
-  <p><b>MONICA TEXTILE MILLS ADD F238 MANDIA ROAD PALI RAJ 306-401</b></p>
+  <div class="companyHeader">
+    <p class="companyName">MONICA TEXTILE MILLS</p>
+    <p class="companyAddress">F238 MANDIA ROAD PALI RAJ 306-401</p>
+  </div>
   <h1>Dye Recipe & Costing Manager</h1>
-  <p>Price Master • Recipe Master • Batch Costing</p>
+  <p> Recipe Master • Batch Costing • Price Master</p>
 </header>
 
 <nav>
