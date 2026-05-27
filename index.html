@@ -89,14 +89,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </header>
 
 <nav>
-  <button class="active" onclick="showTab('price',this)">Price Master</button>
-  <button onclick="showTab('recipe',this)">Recipe Master</button>
+  <button class="active" onclick="showTab('recipe',this)">Recipe Master</button>
   <button onclick="showTab('costing',this)">Batch Costing</button>
+  <button onclick="showTab('price',this)">Price Master</button>
   <button onclick="loadDataFromJson()">Refresh Cloud Data</button>
-  <button onclick="exportData()">Export Backup</button>
-  <button onclick="document.getElementById('importFile').click()">Import Backup</button>
+  <button onclick="exportData()">Data Export</button>
+  <button onclick="document.getElementById('importFile').click()">Backup Import</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
-  <button onclick="document.getElementById('excelFile').click()">Import Excel Rate List</button>
+  <button onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
 
 <input type="file"
        id="excelFile"
@@ -107,7 +107,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
-<section id="price" class="active">
+<section id="price">
   <div class="card">
     <h2>Price Master</h2>
     <input id="colorName" placeholder="Dye / Color Name">
@@ -126,7 +126,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 </section>
 
-<section id="recipe">
+<section id="recipe" class="active">
   <div class="card">
     <h2>Recipe Master</h2>
     <div class="row">
