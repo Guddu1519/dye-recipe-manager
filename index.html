@@ -460,7 +460,7 @@ async function saveRecipeRecord(recipe){
     recipe_no: recipe.recipeNo || "",
     color_name: recipe.colorName || "",
     than_count: recipe.recipeThans || 0,
-    hex_code: recipe.hexCode || "",
+    hex_code: recipe.hexCode || "N/A",
     dyes: recipe.dyes || []
   };
 
@@ -696,7 +696,7 @@ async function saveRecipe(){
 
   let recipeNo = document.getElementById("recipeNo").value.trim();
   let colorName = document.getElementById("recipeColor").value.trim();
-  let hexCode = document.getElementById("hexCode").value.trim();
+  let hexCode = document.getElementById("hexCode").value.trim() || "N/A";
   let recipeThans = document.getElementById("recipeThans").value;
 
   let dyes = [];
@@ -782,7 +782,7 @@ function renderRecipes(){
       <tr>
         <td>${r.recipeNo || ""}</td>
         <td>${r.colorName || ""}</td>
-        <td>${r.hexCode || ""}</td>
+        <td>${r.hexCode || "N/A"}</td>
         <td>${r.recipeThans || ""}</td>
         <td>${dyeText}</td>
         <td>
@@ -808,7 +808,7 @@ function editRecipe(i){
 
   document.getElementById("recipeNo").value = r.recipeNo;
   document.getElementById("recipeColor").value = r.colorName;
-  document.getElementById("hexCode").value = r.hexCode;
+  document.getElementById("hexCode").value = r.hexCode || "N/A";
   document.getElementById("recipeThans").value = r.recipeThans || "";
   document.getElementById("dyeLines").innerHTML = "";
 
@@ -1023,7 +1023,7 @@ console.log("SUPABASE RECIPES:", recipeData);
     recipeNo: r.recipe_no,
     colorName: r.color_name,
     recipeThans: r.than_count,
-    hexCode: r.hex_code,
+    hexCode: r.hex_code || "N/A",
     dyes: r.dyes || []
   }));
 
