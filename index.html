@@ -105,19 +105,20 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:1" class="active" onclick="showTab('recipe',this)">Recipe Master</button>
   <button style="order:2" onclick="showTab('costing',this)">Batch Costing</button>
   <button style="order:3" onclick="showTab('price',this)">Price Master</button>
-  <button style="order:4" onclick="loadDataFromJson()">Refresh Cloud Data</button>
-  <button style="order:5" onclick="exportData()">Data Export</button>
-  <button style="order:6" onclick="document.getElementById('importFile').click()">Backup Import</button>
+  <button style="order:4" onclick="showTab('program',this)">Program</button>
+  <button style="order:5" onclick="loadDataFromJson()">Refresh Cloud Data</button>
+  <button style="order:6" onclick="exportData()">Data Export</button>
+  <button style="order:7" onclick="document.getElementById('importFile').click()">Backup Import</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
-  <button style="order:7" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
+  <button style="order:8" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
 
 <input type="file"
        id="excelFile"
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:8" id="roleBadge" class="role-badge"></span>
-  <button style="order:9" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:9" id="roleBadge" class="role-badge"></span>
+  <button style="order:10" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="price">
@@ -177,11 +178,46 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
   <div class="card" id="costResult"></div>
 </section>
+
+<section id="program">
+  <div class="card">
+    <h2>Program</h2>
+    <h3 id="programRecipeCount">You have saved 0 recipes.</h3>
+    <div class="row">
+      <input id="programDate" type="date">
+      <input id="programRecipeNumbers" placeholder="Enter recipe numbers for program e.g. 1,2,5,8,12,18">
+    </div>
+    <button class="btn green" onclick="createProgram()">Create Program</button>
+  </div>
+
+  <div class="card">
+    <h3>Saved Recipes</h3>
+    <table>
+      <thead>
+        <tr><th>Select</th><th>Recipe No</th><th>Color Name</th><th>Batch Thans</th></tr>
+      </thead>
+      <tbody id="programRecipeTable"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Program History</h3>
+    <table>
+      <thead>
+        <tr><th>Program No</th><th>Date</th><th>Number of Recipes</th><th>View</th><th>Export PDF</th><th>Delete</th></tr>
+      </thead>
+      <tbody id="programHistoryTable"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="programView"></div>
+</section>
 </div>
 
 <script>
 let colors = [];
 let recipes = [];
+let programs = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let currentUser = null;
@@ -246,10 +282,11 @@ function applyRolePermissions(){
     let text = (el.textContent || "").trim();
     let isSearch = id === "priceSearch" || id === "recipeSearch";
     let isCosting = id === "recipeSelect" || id === "thanCount" || text === "Calculate Cost";
-    let isNavigation = text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Refresh Cloud Data";
+    let isProgramView = text === "View" || text === "Export PDF";
+    let isNavigation = text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Refresh Cloud Data";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
-    let isAllowedViewerControl = isSearch || isCosting || isNavigation || isLogout || isLogin;
+    let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
 
     if(viewer){
       el.disabled = !isAllowedViewerControl;
@@ -911,6 +948,241 @@ function calculateCost(){
     <h3>Cost for ${askedThans} Thans: ₹${askedBatchCost.toFixed(2)}</h3>
   `;
 }
+function getNextProgramNo(){
+  let nums = programs
+    .map(p => Number(p.programNo || p.program_no))
+    .filter(n => !Number.isNaN(n));
+  return nums.length ? Math.max(...nums) + 1 : 1;
+}
+
+function parseProgramNumbers(){
+  let typed = document.getElementById("programRecipeNumbers")?.value || "";
+  let fromInput = typed.split(",").map(v => v.trim()).filter(Boolean);
+  let fromChecks = Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => cb.value);
+  return Array.from(new Set([...fromInput, ...fromChecks]));
+}
+
+function makeRecipeSnapshot(recipe){
+  return {
+    recipeNo: recipe.recipeNo || "",
+    colorName: recipe.colorName || "",
+    hexCode: recipe.hexCode || "N/A",
+    recipeThans: recipe.recipeThans || "",
+    dyes: recipe.dyes || []
+  };
+}
+
+async function createProgram(){
+  if(!requireAdmin()) return;
+
+  let selectedNos = parseProgramNumbers();
+  if(selectedNos.length === 0){
+    alert("Enter or select recipe numbers for program");
+    return;
+  }
+
+  let selectedRecipes = selectedNos
+    .map(no => recipes.find(r => String(r.recipeNo) === String(no)))
+    .filter(Boolean);
+
+  if(selectedRecipes.length === 0){
+    alert("No matching recipes found");
+    return;
+  }
+
+  if(selectedRecipes.length !== selectedNos.length){
+    alert("Some recipe numbers were not found. Program will use matching recipes only.");
+  }
+
+  let programDate = document.getElementById("programDate").value || new Date().toISOString().slice(0, 10);
+  let createdAt = new Date().toISOString();
+  let programNo = getNextProgramNo();
+  let snapshot = selectedRecipes.map(makeRecipeSnapshot);
+
+  const { error } = await supabaseClient.from("programs").insert({
+    program_no: programNo,
+    program_date: programDate,
+    created_at: createdAt,
+    selected_recipe_numbers: snapshot.map(r => r.recipeNo),
+    recipe_snapshot: snapshot
+  });
+
+  if(error){
+    alert("Program save failed: " + error.message);
+    return;
+  }
+
+  document.getElementById("programRecipeNumbers").value = "";
+  document.querySelectorAll(".programRecipeCheck").forEach(cb => cb.checked = false);
+  await loadProgramsFromSupabase();
+  renderPrograms();
+  alert("Program " + programNo + " created");
+}
+
+async function loadProgramsFromSupabase(){
+  if(!supabaseClient || !isLoggedIn()) return;
+
+  const { data, error } = await supabaseClient
+    .from("programs")
+    .select("*")
+    .order("created_at", {ascending:false});
+
+  if(error){
+    console.warn("Program load skipped", error);
+    programs = [];
+    return;
+  }
+
+  programs = (data || []).map(p => ({
+    id: p.id,
+    programNo: p.program_no,
+    programDate: p.program_date,
+    createdAt: p.created_at,
+    selectedRecipeNumbers: p.selected_recipe_numbers || [],
+    recipeSnapshot: p.recipe_snapshot || []
+  }));
+}
+
+function renderPrograms(){
+  let count = document.getElementById("programRecipeCount");
+  if(count) count.textContent = "You have saved " + recipes.length + " recipes.";
+
+  let dateInput = document.getElementById("programDate");
+  if(dateInput && !dateInput.value){
+    dateInput.value = new Date().toISOString().slice(0, 10);
+  }
+
+  let recipeTable = document.getElementById("programRecipeTable");
+  if(recipeTable){
+    recipeTable.innerHTML = recipes.map(r => `
+      <tr>
+        <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${isAdmin() ? "" : "disabled"}></td>
+        <td>${r.recipeNo || ""}</td>
+        <td>${r.colorName || ""}</td>
+        <td>${r.recipeThans || ""}</td>
+      </tr>
+    `).join("");
+  }
+
+  let historyTable = document.getElementById("programHistoryTable");
+  if(historyTable){
+    historyTable.innerHTML = programs.map((p, index) => `
+      <tr>
+        <td>${p.programNo || ""}</td>
+        <td>${p.programDate || ""}</td>
+        <td>${(p.recipeSnapshot || []).length}</td>
+        <td><button onclick="viewProgram(${index})">View</button></td>
+        <td><button onclick="exportProgramPdf(${index})">Export PDF</button></td>
+        <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
+      </tr>
+    `).join("");
+  }
+
+  applyRolePermissions();
+}
+
+function getRecipeCostRows(recipe){
+  let baseBatchCost = 0;
+  let rows = "";
+
+  (recipe.dyes || []).forEach(d => {
+    let price = colors.find(c => c.name === d.name);
+    let rate = price ? Number(price.rate) : 0;
+    let qtyKg = Number(d.qty) / 1000;
+    let itemCost = qtyKg * rate;
+    baseBatchCost += itemCost;
+
+    rows += `
+      <tr>
+        <td>${d.name}</td>
+        <td>${d.qty} g</td>
+        <td>${qtyKg.toFixed(3)} kg</td>
+        <td>₹${rate}</td>
+        <td>₹${itemCost.toFixed(2)}</td>
+      </tr>`;
+  });
+
+  let recipeThans = Number(recipe.recipeThans) || 0;
+  let perThanCost = recipeThans > 0 ? baseBatchCost / recipeThans : 0;
+  return {rows, baseBatchCost, perThanCost};
+}
+
+function renderProgramHtml(program){
+  let recipesHtml = (program.recipeSnapshot || []).map(r => {
+    let cost = getRecipeCostRows(r);
+    return `
+      <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}</h3>
+      <p><b>Hex Code:</b> ${r.hexCode || "N/A"} &nbsp; <b>Batch Thans:</b> ${r.recipeThans || ""}</p>
+      <table>
+        <thead>
+          <tr><th>Dye Name</th><th>Recipe Qty</th><th>Qty in KG</th><th>Rate/kg</th><th>Batch Cost</th></tr>
+        </thead>
+        <tbody>${cost.rows}</tbody>
+      </table>
+      <p><b>Per Batch Cost:</b> ₹${cost.baseBatchCost.toFixed(2)} &nbsp; <b>Per Than Cost:</b> ₹${cost.perThanCost.toFixed(2)}</p>
+    `;
+  }).join("");
+
+  return `
+    <h2>Program ${program.programNo || ""}</h2>
+    <p><b>Program Date:</b> ${program.programDate || ""}</p>
+    <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
+    <p><b>Selected Recipes:</b> ${(program.selectedRecipeNumbers || []).join(", ")}</p>
+    ${recipesHtml}
+  `;
+}
+
+function viewProgram(index){
+  let program = programs[index];
+  if(!program) return;
+  document.getElementById("programView").innerHTML = renderProgramHtml(program);
+}
+
+function exportProgramPdf(index){
+  let program = programs[index];
+  if(!program) return;
+
+  let win = window.open("", "_blank");
+  win.document.write(`
+    <html>
+      <head>
+        <title>Program ${program.programNo || ""}</title>
+        <style>
+          body{font-family:Arial;padding:20px;color:#111}
+          table{width:100%;border-collapse:collapse;margin:10px 0 18px}
+          th,td{border:1px solid #999;padding:7px;text-align:left}
+          th{background:#dbeafe}
+          h2,h3{margin-bottom:8px}
+          @media print{button{display:none}}
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print()">Print / Save PDF</button>
+        ${renderProgramHtml(program)}
+      </body>
+    </html>
+  `);
+  win.document.close();
+  win.focus();
+}
+
+async function deleteProgram(index){
+  if(!requireAdmin()) return;
+
+  let program = programs[index];
+  if(!program || !program.id) return;
+  if(!confirm("Delete Program " + program.programNo + "?")) return;
+
+  const { error } = await supabaseClient.from("programs").delete().eq("id", program.id);
+  if(error){
+    alert("Program delete failed: " + error.message);
+    return;
+  }
+
+  await loadProgramsFromSupabase();
+  renderPrograms();
+}
+
 function exportData(){
   if(!requireAdmin()) return;
 
@@ -997,6 +1269,7 @@ function renderAll(){
   renderColors();
   renderRecipes();
   renderRecipeSelect();
+  renderPrograms();
 } 
 
 async function loadDataFromJson(){
@@ -1040,6 +1313,7 @@ console.log("SUPABASE RECIPES:", recipeData);
     dyes: r.dyes || []
   }));
 
+  await loadProgramsFromSupabase();
   renderAll();
 
   console.log("Loaded from Supabase");
