@@ -54,11 +54,32 @@
   color:#16a34a;
   font-weight:bold;
 }
-    @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}}
+.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
+.auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
+.auth-card h2{margin:0 0 8px}
+.auth-card p{margin:0 0 18px;color:#475569}
+.auth-error{display:none;margin:0 0 12px;color:#b91c1c;background:#fee2e2;padding:10px;border-radius:8px}
+.auth-meta{font-size:13px;color:#64748b;margin-top:12px}
+#appShell{display:none}
+.logout{margin-left:auto;background:#dc2626;color:white}
+    @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}.auth-card{padding:18px}.logout{margin-left:0}}
   </style>
 </head>
 <body>
 
+<div id="loginPage" class="auth-page">
+  <div class="auth-card">
+    <h2>Dye Recipe Manager</h2>
+    <p>Login to view and manage your cloud recipes.</p>
+    <div id="loginError" class="auth-error"></div>
+    <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
+    <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn green" style="width:100%" onclick="loginUser()">Login</button>
+    <div class="auth-meta">Your session stays active on this device until you logout.</div>
+  </div>
+</div>
+
+<div id="appShell">
 <header>
   <h1>Dye Recipe & Costing Manager</h1>
   <p>Price Master • Recipe Master • Batch Costing</p>
@@ -79,6 +100,7 @@
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
+  <button class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="price" class="active">
@@ -138,16 +160,128 @@
 
   <div class="card" id="costResult"></div>
 </section>
+</div>
 
 <script>
 let colors = [];
 let recipes = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
+let currentUser = null;
+let refreshTimer = null;
 
 let dataLoaded = false;
 
+function isLoggedIn(){
+  return !!currentUser;
+}
+
+function requireLogin(){
+  if(isLoggedIn()) return true;
+  alert("Please login first.");
+  return false;
+}
+
+function showLoginError(message){
+  let box = document.getElementById("loginError");
+  box.textContent = message;
+  box.style.display = "block";
+}
+
+async function loginUser(){
+  if(!supabaseClient){
+    showLoginError("Supabase is not connected. Please check your internet connection.");
+    return;
+  }
+
+  let email = document.getElementById("loginEmail").value.trim();
+  let password = document.getElementById("loginPassword").value;
+
+  if(!email || !password){
+    showLoginError("Email and password are required.");
+    return;
+  }
+
+  let { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error){
+    showLoginError(error.message);
+    return;
+  }
+
+  currentUser = data.user;
+  await showDashboard();
+}
+
+async function logoutUser(){
+  if(supabaseClient){
+    await supabaseClient.auth.signOut();
+  }
+
+  currentUser = null;
+  colors = [];
+  recipes = [];
+
+  if(refreshTimer){
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+
+  document.getElementById("appShell").style.display = "none";
+  document.getElementById("loginPage").style.display = "flex";
+}
+
+async function showDashboard(){
+  document.getElementById("loginPage").style.display = "none";
+  document.getElementById("appShell").style.display = "block";
+
+  if(document.querySelectorAll(".dyeRow").length === 0){
+    addDyeLine();
+    addDyeLine();
+  }
+
+  await loadDataFromJson();
+
+  if(refreshTimer){
+    clearInterval(refreshTimer);
+  }
+
+  refreshTimer = setInterval(function(){
+    if(isLoggedIn()) loadDataFromJson();
+  }, 30000);
+}
+
+async function initAuth(){
+  if(!supabaseClient){
+    showLoginError("Supabase is not connected. Please check your internet connection.");
+    return;
+  }
+
+  let { data, error } = await supabaseClient.auth.getSession();
+  if(error){
+    showLoginError(error.message);
+    return;
+  }
+
+  currentUser = data.session?.user || null;
+  if(currentUser){
+    await showDashboard();
+  }
+
+  supabaseClient.auth.onAuthStateChange(async function(event, session){
+    currentUser = session?.user || null;
+    if(currentUser && event === "SIGNED_IN"){
+      await showDashboard();
+    }
+  });
+}
+
 async function saveAll(){
+  if(!requireLogin()) return false;
+
   if(!supabaseClient){
     alert("Supabase is not connected. Data was not saved.");
     return false;
@@ -168,6 +302,8 @@ async function saveAll(){
 }
 
 async function saveColorRecord(color){
+  if(!requireLogin()) return false;
+
   if(!supabaseClient){
     alert("Supabase is not connected. Data was not saved.");
     return false;
@@ -221,6 +357,8 @@ async function saveColorRecord(color){
 }
 
 async function deleteColorRecord(color){
+  if(!requireLogin()) return false;
+
   if(!color.id){
     alert("Please refresh cloud data before deleting this color.");
     return false;
@@ -235,6 +373,8 @@ async function deleteColorRecord(color){
 }
 
 async function saveRecipeRecord(recipe){
+  if(!requireLogin()) return false;
+
   const payload = {
     recipe_no: recipe.recipeNo || "",
     color_name: recipe.colorName || "",
@@ -289,6 +429,8 @@ async function saveRecipeRecord(recipe){
 }
 
 async function deleteRecipeRecord(recipe){
+  if(!requireLogin()) return false;
+
   if(!recipe.id){
     alert("Please refresh cloud data before deleting this recipe.");
     return false;
@@ -749,6 +891,8 @@ function renderAll(){
 } 
 
 async function loadDataFromJson(){
+  if(!requireLogin()) return;
+
   if(!supabaseClient){
     alert("Supabase is not connected. Please check your internet connection.");
     return;
@@ -811,10 +955,7 @@ if(window.supabase){
   console.warn("Supabase library not loaded.");
 }
 window.addEventListener("load", function(){
-addDyeLine();
-addDyeLine();
-loadDataFromJson();
-setInterval(loadDataFromJson, 30000);
+initAuth();
 });
 </script>
 </body>
