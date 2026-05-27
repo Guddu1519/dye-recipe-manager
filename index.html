@@ -781,17 +781,7 @@ function renderRecipes(){
       <tr>
         <td>${r.recipeNo || ""}</td>
         <td>${r.colorName || ""}</td>
-        <td>
-          <span style="
-            display:inline-block;
-            width:24px;
-            height:16px;
-            border:1px solid #ccc;
-            vertical-align:middle;
-            background:${r.hexCode || "#ffffff"};
-          "></span>
-          ${r.hexCode || ""}
-        </td>
+        <td>${r.hexCode || ""}</td>
         <td>${r.recipeThans || ""}</td>
         <td>${dyeText}</td>
         <td>
