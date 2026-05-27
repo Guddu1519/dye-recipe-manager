@@ -153,54 +153,132 @@ async function saveAll(){
     return false;
   }
 
-  const { error: colorDeleteError } =
-    await supabaseClient.from("colors").delete().neq("id", 0);
-
-  if(colorDeleteError){
-    console.error("Supabase color save failed", colorDeleteError);
-    alert("Supabase color save failed: " + colorDeleteError.message);
-    return false;
-  }
-
   for(const c of colors){
-    const { error } = await supabaseClient.from("colors").insert({
-      name: c.name,
-      rate: c.rate
-    });
-
-    if(error){
-      console.error("Supabase color insert failed", error);
-      alert("Supabase color insert failed: " + error.message);
-      return false;
-    }
-  }
-
-  const { error: recipeDeleteError } =
-    await supabaseClient.from("recipes").delete().neq("id", 0);
-
-  if(recipeDeleteError){
-    console.error("Supabase recipe save failed", recipeDeleteError);
-    alert("Supabase recipe save failed: " + recipeDeleteError.message);
-    return false;
+    const saved = await saveColorRecord(c);
+    if(!saved) return false;
   }
 
   for(const r of recipes){
-    const { error } = await supabaseClient.from("recipes").insert({
-      recipe_no: r.recipeNo || "",
-      color_name: r.colorName || "",
-      than_count: r.recipeThans || 0,
-      hex_code: r.hexCode || "",
-      dyes: r.dyes || []
-    });
+    const saved = await saveRecipeRecord(r);
+    if(!saved) return false;
+  }
 
-    if(error){
-      console.error("Supabase recipe insert failed", error);
-      alert("Supabase recipe insert failed: " + error.message);
+  console.log("Saved to Supabase");
+  return true;
+}
+
+async function saveColorRecord(color, oldName=""){
+  if(!supabaseClient){
+    alert("Supabase is not connected. Data was not saved.");
+    return false;
+  }
+
+  if(oldName && oldName !== color.name){
+    const { error: renameError } =
+      await supabaseClient.from("colors").delete().eq("name", oldName);
+
+    if(renameError){
+      alert("Old color rename cleanup failed: " + renameError.message);
       return false;
     }
   }
 
-  console.log("Saved to Supabase");
+  const { data: existing, error: selectError } =
+    await supabaseClient.from("colors").select("id").eq("name", color.name).limit(1);
+
+  if(selectError){
+    alert("Color lookup failed: " + selectError.message);
+    return false;
+  }
+
+  if(existing && existing.length){
+    const { error } = await supabaseClient
+      .from("colors")
+      .update({name: color.name, rate: color.rate})
+      .eq("id", existing[0].id);
+
+    if(error){
+      alert("Color update failed: " + error.message);
+      return false;
+    }
+  } else {
+    const { error } = await supabaseClient
+      .from("colors")
+      .insert({name: color.name, rate: color.rate});
+
+    if(error){
+      alert("Color insert failed: " + error.message);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function deleteColorRecord(name){
+  const { error } = await supabaseClient.from("colors").delete().eq("name", name);
+  if(error){
+    alert("Color delete failed: " + error.message);
+    return false;
+  }
+  return true;
+}
+
+async function saveRecipeRecord(recipe, oldRecipeNo=""){
+  if(oldRecipeNo && oldRecipeNo !== recipe.recipeNo){
+    const { error: renameError } =
+      await supabaseClient.from("recipes").delete().eq("recipe_no", oldRecipeNo);
+
+    if(renameError){
+      alert("Old recipe rename cleanup failed: " + renameError.message);
+      return false;
+    }
+  }
+
+  const payload = {
+    recipe_no: recipe.recipeNo || "",
+    color_name: recipe.colorName || "",
+    than_count: recipe.recipeThans || 0,
+    hex_code: recipe.hexCode || "",
+    dyes: recipe.dyes || []
+  };
+
+  const { data: existing, error: selectError } =
+    await supabaseClient.from("recipes").select("id").eq("recipe_no", payload.recipe_no).limit(1);
+
+  if(selectError){
+    alert("Recipe lookup failed: " + selectError.message);
+    return false;
+  }
+
+  if(existing && existing.length){
+    const { error } = await supabaseClient
+      .from("recipes")
+      .update(payload)
+      .eq("id", existing[0].id);
+
+    if(error){
+      alert("Recipe update failed: " + error.message);
+      return false;
+    }
+  } else {
+    const { error } = await supabaseClient.from("recipes").insert(payload);
+
+    if(error){
+      alert("Recipe insert failed: " + error.message);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function deleteRecipeRecord(recipeNo){
+  const { error } = await supabaseClient.from("recipes").delete().eq("recipe_no", recipeNo);
+  if(error){
+    alert("Recipe delete failed: " + error.message);
+    return false;
+  }
   return true;
 }
 
@@ -222,20 +300,23 @@ async function saveColor(){
   }
 
   let obj = {name, rate};
+  let oldName = "";
 
   if(editColorIndex !== null){
-    colors[editColorIndex] = obj;
+    oldName = colors[editColorIndex].name;
+    if(oldName !== name && colors.some(c=>c.name === name)){
+      alert("Color already exists");
+      return;
+    }
     editColorIndex = null;
   } else {
     if(colors.some(c=>c.name === name)){
       alert("Color already exists");
       return;
     }
-    colors.push(obj);
   }
 
-  colors.sort((a,b)=>a.name.localeCompare(b.name));
-  const saved = await saveAll();
+  const saved = await saveColorRecord(obj, oldName);
   if(!saved) return;
 
   document.getElementById("colorName").value = "";
@@ -278,8 +359,7 @@ function editColor(i){
 
 async function deleteColor(i){
   if(confirm("Delete this color?")){
-    colors.splice(i,1);
-    const saved = await saveAll();
+    const saved = await deleteColorRecord(colors[i].name);
     if(saved) await loadDataFromJson();
   }
 }
@@ -388,14 +468,23 @@ async function saveRecipe(){
   dyes
 };
 
+let oldRecipeNo = "";
+
   if(editRecipeIndex !== null){
-  recipes[editRecipeIndex] = obj;
+  oldRecipeNo = recipes[editRecipeIndex].recipeNo;
+  if(oldRecipeNo !== recipeNo && recipes.some(r=>r.recipeNo === recipeNo)){
+    alert("Recipe No already exists");
+    return;
+  }
   editRecipeIndex = null;
 } else {
-  recipes.push(obj);
+  if(recipes.some(r=>r.recipeNo === recipeNo)){
+    alert("Recipe No already exists");
+    return;
+  }
 }
 
-const saved = await saveAll();
+const saved = await saveRecipeRecord(obj, oldRecipeNo);
 if(!saved) return;
 
 clearRecipeForm();
@@ -478,8 +567,7 @@ function editRecipe(i){
 
 async function deleteRecipe(i){
   if(confirm("Delete this recipe?")){
-    recipes.splice(i,1);
-    const saved = await saveAll();
+    const saved = await deleteRecipeRecord(recipes[i].recipeNo);
     if(saved) await loadDataFromJson();
   }
 }
