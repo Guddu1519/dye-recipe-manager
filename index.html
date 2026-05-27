@@ -62,6 +62,8 @@
 .auth-meta{font-size:13px;color:#64748b;margin-top:12px}
 #appShell{display:none}
 .logout{margin-left:auto;background:#dc2626;color:white}
+button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
+.role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
     @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}.auth-card{padding:18px}.logout{margin-left:0}}
   </style>
 </head>
@@ -100,6 +102,7 @@
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
+  <span id="roleBadge" class="role-badge"></span>
   <button class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
@@ -168,6 +171,7 @@ let recipes = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let currentUser = null;
+let currentRole = "viewer";
 let refreshTimer = null;
 
 let dataLoaded = false;
@@ -180,6 +184,76 @@ function requireLogin(){
   if(isLoggedIn()) return true;
   alert("Please login first.");
   return false;
+}
+
+function isAdmin(){
+  return currentRole === "admin";
+}
+
+function requireAdmin(){
+  if(!requireLogin()) return false;
+  if(isAdmin()) return true;
+  alert("Viewers can only search, view recipes, and calculate costing.");
+  return false;
+}
+
+async function loadUserRole(){
+  currentRole = "viewer";
+  if(!currentUser) return;
+
+  try{
+    let { data, error } = await supabaseClient
+      .from("profiles")
+      .select("role")
+      .eq("id", currentUser.id)
+      .single();
+
+    if(!error && data && (data.role === "admin" || data.role === "viewer")){
+      currentRole = data.role;
+      return;
+    }
+  }catch(err){
+    console.warn("Role lookup failed. Defaulting to viewer.", err);
+  }
+
+  let metaRole = currentUser.user_metadata?.role || currentUser.app_metadata?.role;
+  if(metaRole === "admin" || metaRole === "viewer"){
+    currentRole = metaRole;
+  }
+}
+
+function applyRolePermissions(){
+  let viewer = !isAdmin();
+  let badge = document.getElementById("roleBadge");
+  if(badge) badge.textContent = "Role: " + currentRole.toUpperCase();
+
+  document.querySelectorAll("input, select, button").forEach(el=>{
+    let id = el.id || "";
+    let text = (el.textContent || "").trim();
+    let isSearch = id === "priceSearch" || id === "recipeSearch";
+    let isCosting = id === "recipeSelect" || id === "thanCount" || text === "Calculate Cost";
+    let isNavigation = text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Refresh Cloud Data";
+    let isLogout = text === "Logout";
+    let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
+    let isAllowedViewerControl = isSearch || isCosting || isNavigation || isLogout || isLogin;
+
+    if(viewer){
+      el.disabled = !isAllowedViewerControl;
+      if(el.tagName === "INPUT" && !isAllowedViewerControl){
+        el.readOnly = true;
+      }
+    } else {
+      el.disabled = false;
+      if(el.tagName === "INPUT"){
+        el.readOnly = false;
+      }
+    }
+  });
+
+  document.querySelectorAll(".dyeName,.dyeQty").forEach(input=>{
+    input.disabled = viewer;
+    input.readOnly = viewer;
+  });
 }
 
 function showLoginError(message){
@@ -213,6 +287,7 @@ async function loginUser(){
   }
 
   currentUser = data.user;
+  await loadUserRole();
   await showDashboard();
 }
 
@@ -222,6 +297,7 @@ async function logoutUser(){
   }
 
   currentUser = null;
+  currentRole = "viewer";
   colors = [];
   recipes = [];
 
@@ -235,15 +311,17 @@ async function logoutUser(){
 }
 
 async function showDashboard(){
+  await loadUserRole();
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("appShell").style.display = "block";
 
   if(document.querySelectorAll(".dyeRow").length === 0){
-    addDyeLine();
-    addDyeLine();
+    addDyeLine("", "", true);
+    addDyeLine("", "", true);
   }
 
   await loadDataFromJson();
+  applyRolePermissions();
 
   if(refreshTimer){
     clearInterval(refreshTimer);
@@ -268,19 +346,21 @@ async function initAuth(){
 
   currentUser = data.session?.user || null;
   if(currentUser){
+    await loadUserRole();
     await showDashboard();
   }
 
   supabaseClient.auth.onAuthStateChange(async function(event, session){
     currentUser = session?.user || null;
     if(currentUser && event === "SIGNED_IN"){
+      await loadUserRole();
       await showDashboard();
     }
   });
 }
 
 async function saveAll(){
-  if(!requireLogin()) return false;
+  if(!requireAdmin()) return false;
 
   if(!supabaseClient){
     alert("Supabase is not connected. Data was not saved.");
@@ -302,7 +382,7 @@ async function saveAll(){
 }
 
 async function saveColorRecord(color){
-  if(!requireLogin()) return false;
+  if(!requireAdmin()) return false;
 
   if(!supabaseClient){
     alert("Supabase is not connected. Data was not saved.");
@@ -357,7 +437,7 @@ async function saveColorRecord(color){
 }
 
 async function deleteColorRecord(color){
-  if(!requireLogin()) return false;
+  if(!requireAdmin()) return false;
 
   if(!color.id){
     alert("Please refresh cloud data before deleting this color.");
@@ -373,7 +453,7 @@ async function deleteColorRecord(color){
 }
 
 async function saveRecipeRecord(recipe){
-  if(!requireLogin()) return false;
+  if(!requireAdmin()) return false;
 
   const payload = {
     recipe_no: recipe.recipeNo || "",
@@ -429,7 +509,7 @@ async function saveRecipeRecord(recipe){
 }
 
 async function deleteRecipeRecord(recipe){
-  if(!requireLogin()) return false;
+  if(!requireAdmin()) return false;
 
   if(!recipe.id){
     alert("Please refresh cloud data before deleting this recipe.");
@@ -453,6 +533,8 @@ function showTab(id,btn){
 }
 
 async function saveColor(){
+  if(!requireAdmin()) return;
+
   let name = document.getElementById("colorName").value.trim().toUpperCase();
   let rate = Number(document.getElementById("colorRate").value);
 
@@ -498,8 +580,8 @@ function renderColors(){
         <td>${c.name}</td>
         <td>₹${c.rate}</td>
         <td>
-          <button onclick="editColor(${realIndex})">Edit</button>
-          <button class="danger" onclick="deleteColor(${realIndex})">Delete</button>
+          <button ${isAdmin() ? "" : "disabled"} onclick="editColor(${realIndex})">Edit</button>
+          <button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteColor(${realIndex})">Delete</button>
         </td>
       </tr>`;
   });
@@ -512,22 +594,29 @@ if(dl){
     `<option value="${c.name}">`
   ).join("");
 }
+  applyRolePermissions();
 }
 
 function editColor(i){
+  if(!requireAdmin()) return;
+
   document.getElementById("colorName").value = colors[i].name;
   document.getElementById("colorRate").value = colors[i].rate;
   editColorIndex = i;
 }
 
 async function deleteColor(i){
+  if(!requireAdmin()) return;
+
   if(confirm("Delete only this color: " + colors[i].name + "?")){
     const saved = await deleteColorRecord(colors[i]);
     if(saved) await loadDataFromJson();
   }
 }
 
-function addDyeLine(name="", qty=""){
+function addDyeLine(name="", qty="", force=false){
+  if(!force && !requireAdmin()) return;
+
   if(document.querySelectorAll(".dyeRow").length >= 20){
     alert("Maximum 20 dyes allowed");
     return;
@@ -555,6 +644,7 @@ function addDyeLine(name="", qty=""){
   `;
 
   document.getElementById("dyeLines").appendChild(div);
+  applyRolePermissions();
 }
 function showDyeSuggestions(input){
   let text = input.value.trim().toUpperCase();
@@ -601,6 +691,8 @@ function hideSuggestionsLater(input){
 }
 
 async function saveRecipe(){
+  if(!requireAdmin()) return;
+
   let recipeNo = document.getElementById("recipeNo").value.trim();
   let colorName = document.getElementById("recipeColor").value.trim();
   let hexCode = document.getElementById("hexCode").value.trim();
@@ -666,8 +758,9 @@ function clearRecipeForm(){
 
   document.getElementById("dyeLines").innerHTML = "";
 
-  addDyeLine();
-  addDyeLine();
+  addDyeLine("", "", true);
+  addDyeLine("", "", true);
+  applyRolePermissions();
 }
 
 function renderRecipes(){
@@ -702,20 +795,23 @@ function renderRecipes(){
         <td>${r.recipeThans || ""}</td>
         <td>${dyeText}</td>
         <td>
-          <button onclick="editRecipe(${index})">
+          <button ${isAdmin() ? "" : "disabled"} onclick="editRecipe(${index})">
             Edit
           </button>
 
-          <button onclick="deleteRecipe(${index})">
+          <button ${isAdmin() ? "" : "disabled"} onclick="deleteRecipe(${index})">
             Delete
           </button>
         </td>
       </tr>
     `;
   });
+  applyRolePermissions();
 }
 
 function editRecipe(i){
+  if(!requireAdmin()) return;
+
   let r = recipes[i];
   editRecipeIndex = i;
 
@@ -725,10 +821,13 @@ function editRecipe(i){
   document.getElementById("recipeThans").value = r.recipeThans || "";
   document.getElementById("dyeLines").innerHTML = "";
 
-  r.dyes.forEach(d=>addDyeLine(d.name,d.qty));
+  r.dyes.forEach(d=>addDyeLine(d.name,d.qty,true));
+  applyRolePermissions();
 }
 
 async function deleteRecipe(i){
+  if(!requireAdmin()) return;
+
   if(confirm("Delete only this recipe: " + recipes[i].recipeNo + "?")){
     const saved = await deleteRecipeRecord(recipes[i]);
     if(saved) await loadDataFromJson();
@@ -809,6 +908,8 @@ function calculateCost(){
   `;
 }
 function exportData(){
+  if(!requireAdmin()) return;
+
   let data = {colors, recipes};
   let blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
   let a = document.createElement("a");
@@ -818,6 +919,8 @@ function exportData(){
 }
 
 function importData(e){
+  if(!requireAdmin()) return;
+
   let file = e.target.files[0];
   if(!file) return;
 
@@ -841,6 +944,8 @@ function importData(e){
 }
 
 function importExcelRates(e){
+  if(!requireAdmin()) return;
+
   let file = e.target.files[0];
   if(!file) return;
 

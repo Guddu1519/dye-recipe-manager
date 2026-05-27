@@ -1,0 +1,154 @@
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'viewer' check (role in ('admin', 'viewer'))
+);
+
+alter table public.profiles enable row level security;
+alter table public.colors enable row level security;
+alter table public.recipes enable row level security;
+
+drop policy if exists "profiles can read own role" on public.profiles;
+drop policy if exists "admins can manage profiles" on public.profiles;
+drop policy if exists "authenticated users can read colors" on public.colors;
+drop policy if exists "allow public select colors" on public.colors;
+drop policy if exists "allow public insert colors" on public.colors;
+drop policy if exists "allow public update colors" on public.colors;
+drop policy if exists "allow public delete colors" on public.colors;
+drop policy if exists "admins can insert colors" on public.colors;
+drop policy if exists "admins can update colors" on public.colors;
+drop policy if exists "admins can delete colors" on public.colors;
+drop policy if exists "authenticated users can read recipes" on public.recipes;
+drop policy if exists "allow public select recipes" on public.recipes;
+drop policy if exists "allow public insert recipes" on public.recipes;
+drop policy if exists "allow public update recipes" on public.recipes;
+drop policy if exists "allow public delete recipes" on public.recipes;
+drop policy if exists "admins can insert recipes" on public.recipes;
+drop policy if exists "admins can update recipes" on public.recipes;
+drop policy if exists "admins can delete recipes" on public.recipes;
+
+create policy "profiles can read own role"
+on public.profiles
+for select
+to authenticated
+using (id = auth.uid());
+
+create policy "admins can manage profiles"
+on public.profiles
+for all
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+create policy "authenticated users can read colors"
+on public.colors
+for select
+to authenticated
+using (true);
+
+create policy "admins can insert colors"
+on public.colors
+for insert
+to authenticated
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+create policy "admins can update colors"
+on public.colors
+for update
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+create policy "admins can delete colors"
+on public.colors
+for delete
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+create policy "authenticated users can read recipes"
+on public.recipes
+for select
+to authenticated
+using (true);
+
+create policy "admins can insert recipes"
+on public.recipes
+for insert
+to authenticated
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+create policy "admins can update recipes"
+on public.recipes
+for update
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+create policy "admins can delete recipes"
+on public.recipes
+for delete
+to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+    and p.role = 'admin'
+  )
+);
+
+-- After running the policies, add one row per user:
+-- insert into public.profiles (id, role) values ('USER_UUID_HERE', 'admin');
+-- insert into public.profiles (id, role) values ('USER_UUID_HERE', 'viewer');
