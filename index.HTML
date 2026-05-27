@@ -68,6 +68,7 @@
   <button class="active" onclick="showTab('price',this)">Price Master</button>
   <button onclick="showTab('recipe',this)">Recipe Master</button>
   <button onclick="showTab('costing',this)">Batch Costing</button>
+  <button onclick="loadDataFromJson()">Refresh Cloud Data</button>
   <button onclick="exportData()">Export Backup</button>
   <button onclick="document.getElementById('importFile').click()">Import Backup</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
@@ -118,7 +119,7 @@
     <input id="recipeSearch" oninput="renderRecipes()" placeholder="Search recipe">
     <table>
       <thead>
-        <tr><th>Recipe No</th><th>Color</th><th>Hex</th><th>Dyes</th><th>Action</th></tr>
+        <tr><th>Recipe No</th><th>Color</th><th>Hex</th><th>Thans</th><th>Dyes</th><th>Action</th></tr>
       </thead>
       <tbody id="recipeTable"></tbody>
     </table>
@@ -146,23 +147,61 @@ let editRecipeIndex = null;
 
 let dataLoaded = false;
 
-function saveAll(){
-
-  if(!dataLoaded){
-    console.log("Skipping early save");
-    return;
+async function saveAll(){
+  if(!supabaseClient){
+    alert("Supabase is not connected. Data was not saved.");
+    return false;
   }
 
-  fetch("/api/data", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      colors: colors,
-      recipes: recipes
-    })
-  });
+  const { error: colorDeleteError } =
+    await supabaseClient.from("colors").delete().neq("id", 0);
+
+  if(colorDeleteError){
+    console.error("Supabase color save failed", colorDeleteError);
+    alert("Supabase color save failed: " + colorDeleteError.message);
+    return false;
+  }
+
+  for(const c of colors){
+    const { error } = await supabaseClient.from("colors").insert({
+      name: c.name,
+      rate: c.rate
+    });
+
+    if(error){
+      console.error("Supabase color insert failed", error);
+      alert("Supabase color insert failed: " + error.message);
+      return false;
+    }
+  }
+
+  const { error: recipeDeleteError } =
+    await supabaseClient.from("recipes").delete().neq("id", 0);
+
+  if(recipeDeleteError){
+    console.error("Supabase recipe save failed", recipeDeleteError);
+    alert("Supabase recipe save failed: " + recipeDeleteError.message);
+    return false;
+  }
+
+  for(const r of recipes){
+    const { error } = await supabaseClient.from("recipes").insert({
+      recipe_no: r.recipeNo || "",
+      color_name: r.colorName || "",
+      than_count: r.recipeThans || 0,
+      hex_code: r.hexCode || "",
+      dyes: r.dyes || []
+    });
+
+    if(error){
+      console.error("Supabase recipe insert failed", error);
+      alert("Supabase recipe insert failed: " + error.message);
+      return false;
+    }
+  }
+
+  console.log("Saved to Supabase");
+  return true;
 }
 
 function showTab(id,btn){
@@ -173,7 +212,7 @@ function showTab(id,btn){
   renderAll();
 }
 
-function saveColor(){
+async function saveColor(){
   let name = document.getElementById("colorName").value.trim().toUpperCase();
   let rate = Number(document.getElementById("colorRate").value);
 
@@ -196,10 +235,12 @@ function saveColor(){
   }
 
   colors.sort((a,b)=>a.name.localeCompare(b.name));
-  saveAll();
+  const saved = await saveAll();
+  if(!saved) return;
+
   document.getElementById("colorName").value = "";
   document.getElementById("colorRate").value = "";
-  renderAll();
+  await loadDataFromJson();
 }
 
 function renderColors(){
@@ -235,11 +276,11 @@ function editColor(i){
   editColorIndex = i;
 }
 
-function deleteColor(i){
+async function deleteColor(i){
   if(confirm("Delete this color?")){
     colors.splice(i,1);
-    saveAll();
-    renderAll();
+    const saved = await saveAll();
+    if(saved) await loadDataFromJson();
   }
 }
 
@@ -316,7 +357,7 @@ function hideSuggestionsLater(input){
   }, 200);
 }
 
-function saveRecipe(){
+async function saveRecipe(){
   let recipeNo = document.getElementById("recipeNo").value.trim();
   let colorName = document.getElementById("recipeColor").value.trim();
   let hexCode = document.getElementById("hexCode").value.trim();
@@ -354,9 +395,11 @@ function saveRecipe(){
   recipes.push(obj);
 }
 
-saveAll();
+const saved = await saveAll();
+if(!saved) return;
+
 clearRecipeForm();
-renderAll();
+await loadDataFromJson();
 }
 
 function clearRecipeForm(){
@@ -395,7 +438,11 @@ function renderRecipes(){
         <td>${r.colorName || ""}</td>
         <td>
           <span style="
-            display:inlinXe-block; #NO NEED
+            display:inline-block;
+            width:24px;
+            height:16px;
+            border:1px solid #ccc;
+            vertical-align:middle;
             background:${r.hexCode || "#ffffff"};
           "></span>
           ${r.hexCode || ""}
@@ -429,11 +476,11 @@ function editRecipe(i){
   r.dyes.forEach(d=>addDyeLine(d.name,d.qty));
 }
 
-function deleteRecipe(i){
+async function deleteRecipe(i){
   if(confirm("Delete this recipe?")){
     recipes.splice(i,1);
-    saveAll();
-    renderAll();
+    const saved = await saveAll();
+    if(saved) await loadDataFromJson();
   }
 }
 
@@ -529,9 +576,12 @@ function importData(e){
       let data = JSON.parse(reader.result);
       colors = data.colors || [];
       recipes = data.recipes || [];
-      saveAll();
-      renderAll();
-      alert("Backup imported successfully");
+      saveAll().then(saved=>{
+        if(saved){
+          loadDataFromJson();
+          alert("Backup imported successfully");
+        }
+      });
     }catch{
       alert("Invalid JSON file");
     }
@@ -539,43 +589,122 @@ function importData(e){
   reader.readAsText(file);
 }
 
+function importExcelRates(e){
+  let file = e.target.files[0];
+  if(!file) return;
+
+  let reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      let workbook = XLSX.read(evt.target.result, {type:"array"});
+      let sheet = workbook.Sheets[workbook.SheetNames[0]];
+      let rows = XLSX.utils.sheet_to_json(sheet, {header:1});
+      let imported = 0;
+
+      rows.forEach(row=>{
+        let name = String(row[0] || "").trim().toUpperCase();
+        let rate = Number(row[1]);
+
+        if(!name || !rate || name === "COLOR NAME" || name === "DYE / COLOR NAME"){
+          return;
+        }
+
+        let existing = colors.find(c=>c.name === name);
+        if(existing){
+          existing.rate = rate;
+        } else {
+          colors.push({name, rate});
+        }
+        imported++;
+      });
+
+      colors.sort((a,b)=>a.name.localeCompare(b.name));
+      saveAll().then(saved=>{
+        if(saved){
+          loadDataFromJson();
+          alert(imported + " rates imported");
+        }
+      });
+    }catch(err){
+      console.error(err);
+      alert("Could not import Excel rate list");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function renderAll(){
   renderColors();
   renderRecipes();
   renderRecipeSelect();
-}
+} 
 
 async function loadDataFromJson(){
-  try{
-
-    const res = await fetch("/api/data?time=" + Date.now());
-
-    const data = await res.json();
-
-    colors = Array.isArray(data.colors)
-      ? data.colors
-      : [];
-
-    recipes = Array.isArray(data.recipes)
-      ? data.recipes
-      : [];
-
-    dataLoaded = true;
-
-    renderAll();
-    clearRecipeForm();
-
-  }catch(error){
-
-    console.error("LOAD ERROR:", error);
-
-    alert("Load failed");
+  if(!supabaseClient){
+    alert("Supabase is not connected. Please check your internet connection.");
+    return;
   }
-}
 
-loadDataFromJson();
+  const { data: colorData, error: colorError } =
+    await supabaseClient.from("colors").select("*");
+
+  if(colorError){
+    alert("Color load error");
+    console.error(colorError);
+    return;
+  }
+console.log("SUPABASE COLORS:", colorData);
+  colors = (colorData || []).map(c => ({
+    name: c.name,
+    rate: c.rate
+  }));
+
+  const { data: recipeData, error: recipeError } =
+    await supabaseClient.from("recipes").select("*");
+
+  if(recipeError){
+    alert("Recipe load error");
+    console.error(recipeError);
+    return;
+  }
+console.log("SUPABASE RECIPES:", recipeData);
+  recipes = (recipeData || []).map(r => ({
+    recipeNo: r.recipe_no,
+    colorName: r.color_name,
+    recipeThans: r.than_count,
+    hexCode: r.hex_code,
+    dyes: r.dyes || []
+  }));
+
+  renderAll();
+
+  console.log("Loaded from Supabase");
+}
 </script>
 
 <datalist id="dyeSuggestions"></datalist>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<script>
+const SUPABASE_URL = "https://dgxrkymrestwrcwgntdu.supabase.co";
+const SUPABASE_KEY = "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil";
+
+let supabaseClient = null;
+if(window.supabase){
+  supabaseClient = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+  );
+  console.log("Supabase Connected");
+} else {
+  console.warn("Supabase library not loaded.");
+}
+window.addEventListener("load", function(){
+addDyeLine();
+addDyeLine();
+loadDataFromJson();
+setInterval(loadDataFromJson, 30000);
+});
+</script>
 </body>
 </html>
