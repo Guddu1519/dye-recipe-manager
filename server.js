@@ -10,7 +10,16 @@ const DATA_FILE = path.join(__dirname, "data.json");
 
 app.use(express.static(__dirname));
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  const html1 = path.join(__dirname, "index.html");
+  const html2 = path.join(__dirname, "index.HTML");
+
+  if (fs.existsSync(html1)) {
+    res.sendFile(html1);
+  } else if (fs.existsSync(html2)) {
+    res.sendFile(html2);
+  } else {
+    res.send("index file not found");
+  }
 });
 
 function readData(){
