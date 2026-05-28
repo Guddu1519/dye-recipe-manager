@@ -2343,6 +2343,31 @@ async function restoreProgramStock(program){
   return true;
 }
 
+async function deleteProgramStockUsage(program){
+  if(!supabaseClient || !program) return true;
+  let queries = [];
+  if(program.id){
+    queries.push(supabaseClient.from("program_stock_usage").delete().eq("program_id", program.id));
+  }
+  if(program.programNo){
+    queries.push(supabaseClient.from("program_stock_usage").delete().eq("program_no", String(program.programNo)));
+  }
+
+  for(const query of queries){
+    let { error } = await query;
+    if(error){
+      alert("Program stock usage cleanup failed: " + error.message);
+      return false;
+    }
+  }
+  programStockUsage = programStockUsage.filter(row => {
+    return !((program.id && String(row.program_id || "") === String(program.id)) ||
+      String(row.program_no || "") === String(program.programNo || ""));
+  });
+  renderStock();
+  return true;
+}
+
 async function deleteProgram(index){
   if(!requireAdmin()) return;
 
@@ -2352,6 +2377,9 @@ async function deleteProgram(index){
 
   let restored = await restoreProgramStock(program);
   if(!restored) return;
+
+  let usageDeleted = await deleteProgramStockUsage(program);
+  if(!usageDeleted) return;
 
   const { error } = await supabaseClient.from("programs").delete().eq("id", program.id);
   if(error){
