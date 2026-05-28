@@ -126,6 +126,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h2>Price Master</h2>
     <input id="colorName" placeholder="Dye / Color Name">
     <input id="colorRate" type="number" placeholder="Price per kg ₹">
+    <select id="colorType">
+      <option value="">Select Color Type</option>
+      <option value="COTTON">Cotton</option>
+      <option value="POLYSTER">Polyster</option>
+    </select>
     <button class="btn green" onclick="saveColor()">Save Color</button>
   </div>
 
@@ -133,7 +138,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="priceSearch" oninput="renderColors()" placeholder="Search color by first 2-3 letters">
     <table>
       <thead>
-        <tr><th>Color Name</th><th>Rate/kg ₹</th><th>Action</th></tr>
+        <tr><th>Color Name</th><th>Type</th><th>Rate/kg ₹</th><th>Action</th></tr>
       </thead>
       <tbody id="colorTable"></tbody>
     </table>
@@ -223,6 +228,29 @@ let currentRole = "viewer";
 let refreshTimer = null;
 
 let dataLoaded = false;
+
+const COTTON_COLORS = new Set([
+  "BLACK E","BOURDEX BW","BROWN MR","GOLDEN YELLOW HER","GREEN B","MAROON R",
+  "NAVY BLUE RX","ORANGE BRO","RED HE3B","RED HE8B","SCARLET 4BS","SKY BLUE FF",
+  "TURQUOISE BLUE H5G","VOILET BB","YELLOW 5 GLL","YELLOW HE68"
+]);
+
+const POLYSTER_COLORS = new Set([
+  "BLACK 2RC","BLACK EMRD","BLACK RX-EX CONC","BLUE 2RX","BLUE ER",
+  "BRILL BLUE DBR CONC","BRILL BLUE GSL 400%","BRILL BLUE SR","BRILL BLUE X BRSL",
+  "BRILL RED 6B","BRILL RED BS","BRILL RED F3BL","BROWN 3REL N","DARK RED 2B",
+  "GOLDEN YELLOW 2GNN","LIQUID BLACK SER","LUMINOUS PINK 5BN","LUMINOUS RED G",
+  "LUMINOUS YELLOW 10GN","NAVY BLUE 3G 200%","ORANGE RL","RED VIOLET FBL 200%",
+  "RUBINE 5BH CONC","SCARLET CRR","VIOLET 3R","WHITE R","YELLOW 7GE",
+  "YELLOW BROWN","YELLOW M7G"
+]);
+
+function getDefaultColorType(name){
+  let clean = String(name || "").trim().toUpperCase();
+  if(COTTON_COLORS.has(clean)) return "COTTON";
+  if(POLYSTER_COLORS.has(clean)) return "POLYSTER";
+  return "";
+}
 
 function isLoggedIn(){
   return !!currentUser;
@@ -441,7 +469,7 @@ async function saveColorRecord(color){
   if(color.id){
     const { error } = await supabaseClient
       .from("colors")
-      .update({name: color.name, rate: color.rate})
+      .update({name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)})
       .eq("id", color.id);
 
     if(error){
@@ -460,7 +488,7 @@ async function saveColorRecord(color){
     if(existing && existing.length){
       const { error } = await supabaseClient
         .from("colors")
-        .update({name: color.name, rate: color.rate})
+        .update({name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)})
         .eq("id", existing[0].id);
 
       if(error){
@@ -474,7 +502,7 @@ async function saveColorRecord(color){
 
     const { error } = await supabaseClient
       .from("colors")
-      .insert({name: color.name, rate: color.rate});
+      .insert({name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)});
 
     if(error){
       alert("Color insert failed: " + error.message);
@@ -586,13 +614,14 @@ async function saveColor(){
 
   let name = document.getElementById("colorName").value.trim().toUpperCase();
   let rate = Number(document.getElementById("colorRate").value);
+  let colorType = document.getElementById("colorType").value || getDefaultColorType(name);
 
-  if(!name || rate <= 0){
-    alert("Color name and rate required");
+  if(!name || rate <= 0 || !colorType){
+    alert("Color name, type and rate required");
     return;
   }
 
-  let obj = {name, rate};
+  let obj = {name, rate, colorType};
 
   if(editColorIndex !== null){
     let oldColor = colors[editColorIndex];
@@ -615,6 +644,7 @@ async function saveColor(){
 
   document.getElementById("colorName").value = "";
   document.getElementById("colorRate").value = "";
+  document.getElementById("colorType").value = "";
   await loadDataFromJson();
 }
 
@@ -627,6 +657,7 @@ function renderColors(){
     html += `
       <tr>
         <td>${c.name}</td>
+        <td>${c.colorType || getDefaultColorType(c.name)}</td>
         <td>₹${c.rate}</td>
         <td>
           <button ${isAdmin() ? "" : "disabled"} onclick="editColor(${realIndex})">Edit</button>
@@ -651,6 +682,7 @@ function editColor(i){
 
   document.getElementById("colorName").value = colors[i].name;
   document.getElementById("colorRate").value = colors[i].rate;
+  document.getElementById("colorType").value = colors[i].colorType || getDefaultColorType(colors[i].name);
   editColorIndex = i;
 }
 
@@ -1283,7 +1315,8 @@ console.log("SUPABASE COLORS:", colorData);
   colors = (colorData || []).map(c => ({
     id: c.id,
     name: c.name,
-    rate: c.rate
+    rate: c.rate,
+    colorType: c.color_type || getDefaultColorType(c.name)
   }));
 
   const { data: recipeData, error: recipeError } =
