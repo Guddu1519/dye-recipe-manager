@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Dye Recipe & Costing Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    body{font-family:Arial;margin:0;background:#f4f6fb;color:#111}
+    header{background:#0f172a;color:white;padding:18px}
+    h1{margin:0;font-size:24px}
+    nav{display:flex;gap:10px;padding:12px;background:#e5e7eb;flex-wrap:wrap}
+    nav button,.btn{padding:12px 16px;border:0;border-radius:8px;background:#2563eb;color:white;font-weight:bold;cursor:pointer}
+    nav button{background:#fff;color:#111}
+    nav button.active{background:#2563eb;color:white}
+    section{display:none;padding:15px}
+    section.active{display:block}
+    .card{background:white;padding:15px;border-radius:12px;margin-bottom:15px;box-shadow:0 2px 10px #0001}
+    input,select{padding:11px;width:100%;margin:6px 0 12px;border:1px solid #ccc;border-radius:8px;box-sizing:border-box}
+    table{width:100%;border-collapse:collapse;background:white}
+    th,td{border:1px solid #ccc;padding:9px;text-align:left}
+    th{background:#dbeafe}
+    .danger{background:#dc2626}
+    .green{background:#16a34a}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .dyeRow{display:grid;grid-template-columns:1fr 120px 50px;gap:8px;align-items:center}
+    .suggestionBox{
+  display:none;
+  position:absolute;
+  top:47px;
+  left:0;
+  right:0;
+  background:white;
+  border:1px solid #2563eb;
+  border-radius:8px;
+  max-height:220px;
+  overflow-y:auto;
+  z-index:9999;
+  box-shadow:0 6px 20px #0002;
+}
+
+.suggestionItem{
+  padding:10px;
+  cursor:pointer;
+  border-bottom:1px solid #eee;
+  font-size:14px;
+}
+
+.suggestionItem:hover{
+  background:#dbeafe;
+}
+
+.suggestionItem span{
+  float:right;
+  color:#16a34a;
+  font-weight:bold;
+}
+    @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}}
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Dye Recipe & Costing Manager</h1>
+  <p>Price Master • Recipe Master • Batch Costing</p>
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('price',this)">Price Master</button>
+  <button onclick="showTab('recipe',this)">Recipe Master</button>
+  <button onclick="showTab('costing',this)">Batch Costing</button>
+  <button onclick="exportData()">Export Backup</button>
+  <button onclick="document.getElementById('importFile').click()">Import Backup</button>
+  <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+  <button onclick="document.getElementById('excelFile').click()">Import Excel Rate List</button>
+
+<input type="file"
+       id="excelFile"
+       accept=".xlsx,.xls,.csv"
+       style="display:none"
+       onchange="importExcelRates(event)">
+</nav>
+
+<section id="price" class="active">
+  <div class="card">
+    <h2>Price Master</h2>
+    <input id="colorName" placeholder="Dye / Color Name">
+    <input id="colorRate" type="number" placeholder="Price per kg ₹">
+    <button class="btn green" onclick="saveColor()">Save Color</button>
+  </div>
+
+  <div class="card">
+    <input id="priceSearch" oninput="renderColors()" placeholder="Search color by first 2-3 letters">
+    <table>
+      <thead>
+        <tr><th>Color Name</th><th>Rate/kg ₹</th><th>Action</th></tr>
+      </thead>
+      <tbody id="colorTable"></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="recipe">
+  <div class="card">
+    <h2>Recipe Master</h2>
+    <div class="row">
+      <input id="recipeNo" placeholder="Recipe No">
+      <input id="recipeColor" placeholder="Color Name">
+    </div>
+    <input id="hexCode" placeholder="Hex Code e.g. #6A4F22">
+    <input id="recipeThans" type="number" placeholder="Batch Thans (20/22/24)">
+    <h3>Dyes</h3>
+    <div id="dyeLines"></div>
+    <button class="btn" onclick="addDyeLine()">Add Dye</button>
+    <button class="btn green" onclick="saveRecipe()">Save Recipe</button>
+  </div>
+
+  <div class="card">
+    <input id="recipeSearch" oninput="renderRecipes()" placeholder="Search recipe">
+    <table>
+      <thead>
+        <tr><th>Recipe No</th><th>Color</th><th>Hex</th><th>Dyes</th><th>Action</th></tr>
+      </thead>
+      <tbody id="recipeTable"></tbody>
+    </table>
+  </div>
+</section>
+
+<section id="costing">
+  <div class="card">
+    <h2>Batch Costing</h2>
+    <select id="recipeSelect"></select>
+    <div class="row">
+      <input id="thanCount" type="number" placeholder="Enter thans for costing e.g. 30">
+    </div>
+    <button class="btn green" onclick="calculateCost()">Calculate Cost</button>
+  </div>
+
+  <div class="card" id="costResult"></div>
+</section>
+
+<script>
+let colors = [];
+let recipes = [];
+let editColorIndex = null;
+let editRecipeIndex = null;
+
+let dataLoaded = false;
+
+async function saveAll(){
+
+  await supabaseClient.from("colors").delete().neq("id", 0);
+
+  for(const c of colors){
+    await supabaseClient.from("colors").insert({
+      name: c.name,
+      rate: c.rate
+    });
+  }
+
+  await supabaseClient.from("recipes").delete().neq("id", 0);
+
+  for(const r of recipes){
+    await supabaseClient.from("recipes").insert({
+      recipe_no: r.recipeNo || "",
+      color_name: r.colorName || "",
+      than_count: r.recipeThans || 0,
+      hex_code: r.hexCode || "",
+      dyes: r.dyes || []
+    });
+  }
+
+  console.log("Saved to Supabase");
+}
+
+function showTab(id,btn){
+  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  renderAll();
+}
+
+function saveColor(){
+  let name = document.getElementById("colorName").value.trim().toUpperCase();
+  let rate = Number(document.getElementById("colorRate").value);
+
+  if(!name || rate <= 0){
+    alert("Color name and rate required");
+    return;
+  }
+
+  let obj = {name, rate};
+
+  if(editColorIndex !== null){
+    colors[editColorIndex] = obj;
+    editColorIndex = null;
+  } else {
+    if(colors.some(c=>c.name === name)){
+      alert("Color already exists");
+      return;
+    }
+    colors.push(obj);
+  }
+
+  colors.sort((a,b)=>a.name.localeCompare(b.name));
+  saveAll();
+  document.getElementById("colorName").value = "";
+  document.getElementById("colorRate").value = "";
+  renderAll();
+}
+
+function renderColors(){
+  let q = document.getElementById("priceSearch")?.value.toUpperCase() || "";
+  let html = "";
+
+  colors.filter(c=>c.name.includes(q)).forEach((c,i)=>{
+    let realIndex = colors.indexOf(c);
+    html += `
+      <tr>
+        <td>${c.name}</td>
+        <td>₹${c.rate}</td>
+        <td>
+          <button onclick="editColor(${realIndex})">Edit</button>
+          <button class="danger" onclick="deleteColor(${realIndex})">Delete</button>
+        </td>
+      </tr>`;
+  });
+
+  document.getElementById("colorTable").innerHTML = html;
+  let dl = document.getElementById("dyeSuggestions");
+
+if(dl){
+  dl.innerHTML = colors.map(c =>
+    `<option value="${c.name}">`
+  ).join("");
+}
+}
+
+function editColor(i){
+  document.getElementById("colorName").value = colors[i].name;
+  document.getElementById("colorRate").value = colors[i].rate;
+  editColorIndex = i;
+}
+
+function deleteColor(i){
+  if(confirm("Delete this color?")){
+    colors.splice(i,1);
+    saveAll();
+    renderAll();
+  }
+}
+
+function addDyeLine(name="", qty=""){
+  if(document.querySelectorAll(".dyeRow").length >= 20){
+    alert("Maximum 20 dyes allowed");
+    return;
+  }
+
+  let div = document.createElement("div");
+  div.className = "dyeRow";
+
+  div.innerHTML = `
+    <div style="position:relative">
+      <input 
+        class="dyeName" 
+        placeholder="Type dye name" 
+        value="${name}"
+        oninput="showDyeSuggestions(this)"
+        onblur="hideSuggestionsLater(this)"
+        autocomplete="off"
+      >
+      <div class="suggestionBox"></div>
+    </div>
+
+    <input class="dyeQty" type="number" placeholder="Qty grams" value="${qty}">
+
+    <button class="danger" onclick="this.parentElement.remove()">X</button>
+  `;
+
+  document.getElementById("dyeLines").appendChild(div);
+}
+function showDyeSuggestions(input){
+  let text = input.value.trim().toUpperCase();
+  let box = input.parentElement.querySelector(".suggestionBox");
+
+  box.innerHTML = "";
+
+  if(text.length < 1){
+    box.style.display = "none";
+    return;
+  }
+
+  let matches = colors
+    .filter(c => c.name.includes(text))
+    .sort((a,b) => a.name.localeCompare(b.name))
+    .slice(0, 20);
+
+  if(matches.length === 0){
+    box.style.display = "none";
+    return;
+  }
+
+  matches.forEach(c => {
+    let item = document.createElement("div");
+    item.className = "suggestionItem";
+    item.innerHTML = `${c.name} <span>₹${c.rate}/kg</span>`;
+
+    item.onclick = function(){
+      input.value = c.name;
+      box.style.display = "none";
+    };
+
+    box.appendChild(item);
+  });
+
+  box.style.display = "block";
+}
+
+function hideSuggestionsLater(input){
+  setTimeout(function(){
+    let box = input.parentElement.querySelector(".suggestionBox");
+    if(box) box.style.display = "none";
+  }, 200);
+}
+
+function saveRecipe(){
+  let recipeNo = document.getElementById("recipeNo").value.trim();
+  let colorName = document.getElementById("recipeColor").value.trim();
+  let hexCode = document.getElementById("hexCode").value.trim();
+  let recipeThans = document.getElementById("recipeThans").value;
+
+  let dyes = [];
+  document.querySelectorAll(".dyeRow").forEach(row=>{
+    let name = row.querySelector(".dyeName").value.trim().toUpperCase();
+    let qty = Number(row.querySelector(".dyeQty").value);
+    if(name && qty > 0) dyes.push({name, qty});
+  });
+
+  if(!recipeNo || !colorName || dyes.length < 2){
+    alert("Recipe No, Color Name and minimum 2 dyes required");
+    return;
+  }
+
+  if(dyes.length > 20){
+    alert("Maximum 20 dyes allowed");
+    return;
+  }
+
+  let obj = {
+  recipeNo,
+  colorName,
+  hexCode,
+  recipeThans,
+  dyes
+};
+
+  if(editRecipeIndex !== null){
+  recipes[editRecipeIndex] = obj;
+  editRecipeIndex = null;
+} else {
+  recipes.push(obj);
+}
+
+saveAll();
+clearRecipeForm();
+renderAll();
+}
+
+function clearRecipeForm(){
+
+  document.getElementById("recipeNo").value = "";
+  document.getElementById("recipeColor").value = "";
+  document.getElementById("hexCode").value = "";
+
+  if(document.getElementById("recipeThans")){
+    document.getElementById("recipeThans").value = "";
+  }
+
+  document.getElementById("dyeLines").innerHTML = "";
+
+  addDyeLine();
+  addDyeLine();
+}
+
+function renderRecipes(){
+
+  let table = document.getElementById("recipeTable");
+
+  if(!table) return;
+
+  table.innerHTML = "";
+
+  recipes.forEach((r,index)=>{
+
+    let dyeText = r.dyes
+      .map(d => d.name + " - (" + d.qty + " g)")
+      .join("<br>");
+
+    table.innerHTML += `
+      <tr>
+        <td>${r.recipeNo || ""}</td>
+        <td>${r.colorName || ""}</td>
+        <td>
+          <span style="
+            display:inlinXe-block; #NO NEED
+            background:${r.hexCode || "#ffffff"};
+          "></span>
+          ${r.hexCode || ""}
+        </td>
+        <td>${r.recipeThans || ""}</td>
+        <td>${dyeText}</td>
+        <td>
+          <button onclick="editRecipe(${index})">
+            Edit
+          </button>
+
+          <button onclick="deleteRecipe(${index})">
+            Delete
+          </button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+function editRecipe(i){
+  let r = recipes[i];
+  editRecipeIndex = i;
+
+  document.getElementById("recipeNo").value = r.recipeNo;
+  document.getElementById("recipeColor").value = r.colorName;
+  document.getElementById("hexCode").value = r.hexCode;
+  document.getElementById("recipeThans").value = r.recipeThans || "";
+  document.getElementById("dyeLines").innerHTML = "";
+
+  r.dyes.forEach(d=>addDyeLine(d.name,d.qty));
+}
+
+function deleteRecipe(i){
+  if(confirm("Delete this recipe?")){
+    recipes.splice(i,1);
+    saveAll();
+    renderAll();
+  }
+}
+
+function renderRecipeSelect(){
+  let select = document.getElementById("recipeSelect");
+  select.innerHTML = `<option value="">Select Recipe</option>`;
+  recipes.forEach((r,i)=>{
+    select.innerHTML += `<option value="${i}">${r.recipeNo} - ${r.colorName}</option>`;
+  });
+}
+
+function calculateCost(){
+  let i = document.getElementById("recipeSelect").value;
+  let askedThans = Number(document.getElementById("thanCount").value);
+
+  if(i === "" || askedThans <= 0){
+    alert("Select recipe and enter thans for costing");
+    return;
+  }
+
+  let recipe = recipes[i];
+  let recipeThans = Number(recipe.recipeThans);
+
+  if(!recipeThans || recipeThans <= 0){
+    alert("This recipe does not have Batch Thans saved. Edit recipe and add Batch Thans first.");
+    return;
+  }
+
+  let baseBatchCost = 0;
+  let rows = "";
+
+  recipe.dyes.forEach(d=>{
+    let price = colors.find(c=>c.name === d.name);
+    let rate = price ? Number(price.rate) : 0;
+
+    let qtyKg = Number(d.qty) / 1000;
+    let itemCost = qtyKg * rate;
+    baseBatchCost += itemCost;
+
+    rows += `
+      <tr>
+        <td>${d.name}</td>
+        <td>${d.qty} g</td>
+        <td>${qtyKg.toFixed(3)} kg</td>
+        <td>₹${rate}</td>
+        <td>₹${itemCost.toFixed(2)}</td>
+      </tr>`;
+  });
+
+  let perThanCost = baseBatchCost / recipeThans;
+  let askedBatchCost = perThanCost * askedThans;
+
+  document.getElementById("costResult").innerHTML = `
+    <h2>Costing Result</h2>
+    <p><b>Recipe:</b> ${recipe.recipeNo} - ${recipe.colorName}</p>
+    <p><b>Recipe Batch:</b> ${recipeThans} thans</p>
+    <p><b>Costing Asked For:</b> ${askedThans} thans</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Dye Name</th>
+          <th>Recipe Qty</th>
+          <th>Qty in KG</th>
+          <th>Rate/kg</th>
+          <th>Recipe Batch Cost</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    <h3>Per Batch Cost (${recipeThans} Thans): ₹${baseBatchCost.toFixed(2)}</h3>
+    <h3>Per Than Cost: ₹${perThanCost.toFixed(2)}</h3>
+    <h3>Cost for ${askedThans} Thans: ₹${askedBatchCost.toFixed(2)}</h3>
+  `;
+}
+function exportData(){
+  let data = {colors, recipes};
+  let blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "dye-recipe-backup.json";
+  a.click();
+}
+
+function importData(e){
+  let file = e.target.files[0];
+  if(!file) return;
+
+  let reader = new FileReader();
+  reader.onload = function(){
+    try{
+      let data = JSON.parse(reader.result);
+      colors = data.colors || [];
+      recipes = data.recipes || [];
+      saveAll();
+      renderAll();
+      alert("Backup imported successfully");
+    }catch{
+      alert("Invalid JSON file");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderAll(){
+  renderColors();
+  renderRecipes();
+  updateRecipeDropdown();
+  renderRecipeSelect();
+}
+
+async function loadDataFromJson(){
+
+  const { data: colorData, error: colorError } =
+    await supabaseClient.from("colors").select("*");
+
+  if(colorError){
+    alert("Color load error");
+    console.error(colorError);
+    return;
+  }
+console.log("SUPABASE COLORS:", colorData);
+  colors = (colorData || []).map(c => ({
+    name: c.name,
+    rate: c.rate
+  }));
+
+  const { data: recipeData, error: recipeError } =
+    await supabaseClient.from("recipes").select("*");
+
+  if(recipeError){
+    alert("Recipe load error");
+    console.error(recipeError);
+    return;
+  }
+console.log("SUPABASE RECIPES:", recipeData);
+  recipes = (recipeData || []).map(r => ({
+    recipeNo: r.recipe_no,
+    colorName: r.color_name,
+    recipeThans: r.than_count,
+    hexCode: r.hex_code,
+    dyes: r.dyes || []
+  }));
+
+  renderAll();
+
+  console.log("Loaded from Supabase");
+}
+
+loadDataFromJson();
+</script>
+
+<datalist id="dyeSuggestions"></datalist>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<script>
+const SUPABASE_URL = "https://dgxrkymrestwrcwgntdu.supabase.co";
+const SUPABASE_KEY = "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil";
+
+const supabaseClient = supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
+
+console.log("Supabase Connected");
+window.addEventListener("load", function(){
+loadDataFromJson();
+});
+</script>
+</body>
+</html>
