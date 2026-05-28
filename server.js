@@ -6,6 +6,10 @@ const app = express();
 
 app.use(express.json());
 
+app.get("/api/health", (req, res) => {
+  res.json({ ok: true, message: "API working" });
+});
+
 const DATA_FILE = path.join(__dirname, "data.json");
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
