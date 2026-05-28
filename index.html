@@ -365,7 +365,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -2086,6 +2086,7 @@ function renderPrograms(){
         <td>${p.programDate || ""}</td>
         <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
         <td><input id="programBatchThans_${index}" type="number" min="1" value="${p.requiredThans || ""}" placeholder="Batch thans"></td>
+        <td>${p.stockDeducted ? `<span class="stockLowBadge" style="background:#16a34a">Stock Deducted</span>` : `<button ${isAdmin() ? "" : "disabled"} onclick="deductExistingProgramStock(${index})">Deduct Stock</button>`}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
@@ -2243,12 +2244,114 @@ async function updateProgramStatus(index, status){
   await loadDataFromJson();
 }
 
+async function deductExistingProgramStock(index){
+  if(!requireAdmin()) return;
+  let program = programs[index];
+  if(!program || !program.id) return;
+  if(program.stockDeducted){
+    alert("Stock is already deducted for this program.");
+    return;
+  }
+
+  let requiredThans = getProgramRequiredThans(program, index);
+  if(!requiredThans || requiredThans <= 0){
+    let entered = prompt("Batch = How many thans?");
+    requiredThans = Number(entered);
+    if(!requiredThans || requiredThans <= 0){
+      alert("Required thans must be greater than 0");
+      return;
+    }
+    let input = document.getElementById("programBatchThans_" + index);
+    if(input) input.value = requiredThans;
+  }
+
+  let stockOk = await confirmProgramStock(program.recipeSnapshot || [], requiredThans);
+  if(!stockOk) return;
+
+  let updatedProgram = {...program, requiredThans, stockDeducted:false};
+  if(program.id){
+    let { error } = await supabaseClient.from("programs").update({required_thans: requiredThans}).eq("id", program.id);
+    if(error && !String(error.message || "").includes("required_thans")){
+      alert("Program batch thans update failed: " + error.message);
+      return;
+    }
+  }
+
+  let deducted = await deductStockForProgram(updatedProgram);
+  if(deducted){
+    await logAudit("stock deduct", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans});
+    await loadDataFromJson();
+    alert("Stock deducted for Program " + (program.programNo || ""));
+  }
+}
+
+async function restoreProgramStock(program){
+  if(!supabaseClient || !program || !program.stockDeducted) return true;
+
+  let usageRows = (programStockUsage || []).filter(row => {
+    return (program.id && String(row.program_id || "") === String(program.id)) ||
+      String(row.program_no || "") === String(program.programNo || "");
+  });
+
+  if(!usageRows.length){
+    let requiredThans = Number(program.requiredThans);
+    if(!requiredThans || requiredThans <= 0){
+      alert("Cannot restore stock because program stock usage history is missing and batch thans is blank.");
+      return false;
+    }
+    let usageMap;
+    try{
+      usageMap = getProgramUsageMap(program.recipeSnapshot || [], requiredThans);
+    }catch(err){
+      alert(err.message || "Cannot restore stock for this program.");
+      return false;
+    }
+    let stockRows = getStockRows();
+    usageRows = Object.entries(usageMap).map(([name, qty]) => {
+      let before = stockRows.find(row => row.name === name)?.balance || 0;
+      return {
+        chemical_name: name,
+        quantity_used_grams: qty,
+        before_stock_grams: before,
+        after_stock_grams: before + qty
+      };
+    });
+  }
+
+  let now = new Date().toISOString();
+  let restoreRows = usageRows.map(row => ({
+    chemical_name: normalizeName(row.chemical_name),
+    entry_type: "program_delete_restore",
+    qty_delta_grams: Number(row.quantity_used_grams) || 0,
+    program_id: program.id || null,
+    program_no: String(program.programNo || ""),
+    note: "Stock restored after deleting Program " + (program.programNo || "") + " - " + (program.programName || ""),
+    created_at: now
+  })).filter(row => row.chemical_name && row.qty_delta_grams > 0);
+
+  if(!restoreRows.length) return true;
+
+  let { error } = await supabaseClient.from("chemical_stock_ledger").insert(restoreRows);
+  if(error){
+    alert("Stock restore failed: " + error.message + ". Program was not deleted.");
+    return false;
+  }
+
+  await logAudit("stock restore", "Program", program.programNo + " - " + program.programName, program, {restored: restoreRows});
+  await loadStockFromSupabase();
+  renderStock();
+  return true;
+}
+
 async function deleteProgram(index){
   if(!requireAdmin()) return;
 
   let program = programs[index];
   if(!program || !program.id) return;
   if(!confirm("Delete Program " + program.programNo + "?")) return;
+
+  let restored = await restoreProgramStock(program);
+  if(!restored) return;
 
   const { error } = await supabaseClient.from("programs").delete().eq("id", program.id);
   if(error){
@@ -2393,8 +2496,12 @@ function getStockRows(){
     }
     let delta = Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0);
     let type = entry.entryType || entry.entry_type || "";
-    if(delta > 0) map[name].purchased += delta;
-    if(delta < 0 || type === "program_usage") map[name].used += Math.abs(delta);
+    if(type === "program_delete_restore"){
+      map[name].used = Math.max(0, map[name].used - Math.abs(delta));
+    } else {
+      if(delta > 0) map[name].purchased += delta;
+      if(delta < 0 || type === "program_usage") map[name].used += Math.abs(delta);
+    }
     map[name].balance += delta;
   });
   return Object.values(map).sort((a,b) => a.name.localeCompare(b.name));
