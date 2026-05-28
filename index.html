@@ -1894,20 +1894,9 @@ async function saveProcessHouse(){
   }
 
   let existing = processHouses.find(h => normalizeName(h.name) === normalizeName(payload.name));
-  if(processHouseLocalOnly){
-    if(existing){
-      Object.assign(existing, payload);
-    } else {
-      processHouses.push({...payload, id: "local-" + Date.now()});
-    }
-    saveLocalProcessHouses();
-    renderProcessHouses();
-    alert("Process house saved locally. Run updated Supabase SQL to save it in cloud.");
-    return;
-  }
-
   let error;
-  if(existing){
+  let cloudExisting = existing && !String(existing.id || "").startsWith("local-");
+  if(cloudExisting){
     ({ error } = await supabaseClient.from("process_houses").update(payload).eq("id", existing.id));
   } else {
     ({ error } = await supabaseClient.from("process_houses").insert(payload));
@@ -1921,7 +1910,7 @@ async function saveProcessHouse(){
     processHouseLocalOnly = true;
     saveLocalProcessHouses();
     renderProcessHouses();
-    alert("Process house saved locally. Run updated Supabase SQL to save it in cloud.");
+    alert("Process house saved locally. Cloud save failed: " + error.message);
     return;
   }
   await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);

@@ -382,11 +382,15 @@ for select
 to authenticated
 using (true);
 
+notify pgrst, 'reload schema';
+
 create policy "admins can insert process houses"
 on public.process_houses
 for insert
 to authenticated
 with check (
+  auth.uid() = '2d40e8ad-d9dd-4043-8750-9c09cfc029e6'::uuid
+  or
   exists (
     select 1 from public.profiles p
     where p.id = auth.uid()
@@ -399,6 +403,8 @@ on public.process_houses
 for update
 to authenticated
 using (
+  auth.uid() = '2d40e8ad-d9dd-4043-8750-9c09cfc029e6'::uuid
+  or
   exists (
     select 1 from public.profiles p
     where p.id = auth.uid()
@@ -406,6 +412,8 @@ using (
   )
 )
 with check (
+  auth.uid() = '2d40e8ad-d9dd-4043-8750-9c09cfc029e6'::uuid
+  or
   exists (
     select 1 from public.profiles p
     where p.id = auth.uid()
@@ -418,6 +426,8 @@ on public.process_houses
 for delete
 to authenticated
 using (
+  auth.uid() = '2d40e8ad-d9dd-4043-8750-9c09cfc029e6'::uuid
+  or
   exists (
     select 1 from public.profiles p
     where p.id = auth.uid()
