@@ -6,8 +6,10 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     body{font-family:Arial;margin:0;background:#f4f6fb;color:#111}
-header{background:#0f172a;color:white;padding:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+header{background:#0f172a;color:white;padding:18px;display:flex;justify-content:space-between;align-items:center;gap:20px}
 h1{margin:0;font-size:24px}
+.brandLeft{display:flex;align-items:center;gap:14px}
+.siteLogo{width:64px;height:64px;border-radius:14px;background:white;object-fit:contain;padding:4px;box-shadow:0 10px 30px #0004}
 .appTitle{text-align:left}
 .appTitle p{margin:8px 0 0}
 header > p{display:none}
@@ -29,9 +31,26 @@ th{background:#dbeafe}
 .danger{background:#dc2626}
     .green{background:#16a34a}
     .muted{color:#64748b;font-size:13px}
+    .dashboardHero{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:white;border-radius:14px;padding:20px;display:grid;grid-template-columns:1.3fr .7fr;gap:18px;align-items:center;box-shadow:0 14px 40px #0f172a26}
+    .dashboardHero h2{font-size:30px;margin:0 0 8px}
+    .dashboardHero p{margin:0;color:#dbeafe}
+    .dashboardLogoBox{display:flex;align-items:center;justify-content:flex-end;gap:14px;text-align:right}
+    .dashboardLogo{width:90px;height:90px;border-radius:18px;background:white;object-fit:contain;padding:6px}
+    .dashboardCompany{font-size:24px;font-weight:bold;line-height:1.1}
+    .dashboardAddress{font-size:13px;color:#dbeafe;margin-top:6px}
     .statGrid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:12px}
-    .stat{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:10px;padding:14px}
-    .stat b{display:block;font-size:26px;margin-top:6px;color:#1d4ed8}
+    .stat{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:10px;padding:14px;position:relative;overflow:hidden}
+    .stat:after{content:"";position:absolute;right:-20px;top:-25px;width:70px;height:70px;background:#dbeafe;border-radius:999px;opacity:.75}
+    .stat span{position:relative;z-index:1;color:#475569;font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em}
+    .stat b{position:relative;z-index:1;display:block;font-size:28px;margin-top:6px;color:#1d4ed8}
+    .dashboardGrid{display:grid;grid-template-columns:1.2fr .8fr;gap:15px;margin-top:15px}
+    .dashPanel{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:15px;box-shadow:0 2px 10px #0001}
+    .dashPanel h3{margin:0 0 10px}
+    .dashList{display:grid;gap:8px}
+    .dashItem{display:flex;justify-content:space-between;gap:12px;padding:10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0}
+    .dashItem b{color:#0f172a}
+    .quickActions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .quickActions .btn{text-align:center;text-decoration:none}
     .warningBox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:10px;margin-top:10px}
     .dangerBox{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
     .exportBar{display:flex;gap:10px;flex-wrap:wrap}
@@ -82,8 +101,8 @@ th{background:#dbeafe}
 .logout{margin-left:auto;background:#dc2626;color:white}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
-    @media(max-width:900px){.statGrid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}}
+    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}}
   </style>
 </head>
 <body>
@@ -102,9 +121,12 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="appShell">
 <header>
-  <div class="appTitle">
-    <h1>Dye Recipe & Costing Manager</h1>
-    <p>Recipe Master &bull; Batch Costing &bull; Price Master</p>
+  <div class="brandLeft">
+    <img class="siteLogo" src="logo.svg" alt="Monica Textile Mills Logo">
+    <div class="appTitle">
+      <h1>Dye Recipe & Costing Manager</h1>
+      <p>Recipe Master &bull; Batch Costing &bull; Price Master</p>
+    </div>
   </div>
   <div class="companyHeader">
     <p class="companyName">MONICA TEXTILE MILLS</p>
@@ -135,21 +157,54 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </nav>
 
 <section id="dashboard" class="active">
-  <div class="card">
-    <h2>Dashboard</h2>
-    <div class="statGrid">
-      <div class="stat">Saved Recipes<b id="dashRecipeCount">0</b></div>
-      <div class="stat">Dye / Colors<b id="dashColorCount">0</b></div>
-      <div class="stat">Programs<b id="dashProgramCount">0</b></div>
-      <div class="stat">Missing Prices<b id="dashMissingCount">0</b></div>
+  <div class="dashboardHero">
+    <div>
+      <h2>Dashboard</h2>
+      <p>Live control panel for recipes, prices, programs, and cloud alerts.</p>
     </div>
-    <div id="dashLastRecipe" class="warningBox"></div>
+    <div class="dashboardLogoBox">
+      <div>
+        <div class="dashboardCompany">MONICA TEXTILE MILLS</div>
+        <div class="dashboardAddress">F238 MANDIA ROAD PALI RAJ 306-401</div>
+      </div>
+      <img class="dashboardLogo" src="logo.svg" alt="Monica Textile Mills Logo">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="statGrid">
+      <div class="stat"><span>Saved Recipes</span><b id="dashRecipeCount">0</b></div>
+      <div class="stat"><span>Dye / Colors</span><b id="dashColorCount">0</b></div>
+      <div class="stat"><span>Programs</span><b id="dashProgramCount">0</b></div>
+      <div class="stat"><span>Missing Prices</span><b id="dashMissingCount">0</b></div>
+    </div>
+  </div>
+
+  <div class="dashboardGrid">
+    <div class="dashPanel">
+      <h3>Today Overview</h3>
+      <div class="dashList">
+        <div class="dashItem"><span>Programs created today</span><b id="dashTodayPrograms">0</b></div>
+        <div class="dashItem"><span>Process houses</span><b id="dashProcessHouseCount">0</b></div>
+        <div class="dashItem"><span>Current login role</span><b id="dashRole">Viewer</b></div>
+      </div>
+      <div id="dashLastRecipe" class="warningBox"></div>
+    </div>
+
+    <div class="dashPanel">
+      <h3>Quick Actions</h3>
+      <div class="quickActions">
+        <button class="btn" onclick="goToTab('recipe')">Recipe Master</button>
+        <button class="btn" onclick="goToTab('program')">Program</button>
+        <button class="btn" onclick="goToTab('importExport')">Import / Export</button>
+      </div>
+      <p class="muted">Backups and Excel tools stay on the Import / Export page to keep home clean.</p>
+    </div>
+  </div>
+
+  <div class="dashboardGrid">
     <div id="dashMissingPrices" class="warningBox"></div>
     <div id="dashLowPrices" class="warningBox dangerBox"></div>
-  </div>
-  <div class="card">
-    <h3>Quick Export</h3>
-    <p class="muted">Use the Import / Export page for backups, Excel exports, and imports.</p>
   </div>
 </section>
 
@@ -948,8 +1003,16 @@ function showTab(id,btn){
   document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
-  btn.classList.add("active");
+  if(btn) btn.classList.add("active");
   renderAll();
+}
+
+function goToTab(id){
+  let navButton = Array.from(document.querySelectorAll("nav button")).find(button => {
+    return (button.getAttribute("onclick") || "").includes("'" + id + "'");
+  });
+  showTab(id, navButton);
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 async function saveColor(){
@@ -1738,11 +1801,21 @@ function renderDashboard(){
   let missing = getAllMissingPriceNames();
   let lowPrices = getLowPriceColors();
   let lastRecipe = recipes[recipes.length - 1];
+  let todayKey = new Date().toDateString();
+  let todayPrograms = programs.filter(program => {
+    let dateValue = program.created_at || program.createdAt || program.programDate || program.date;
+    if(!dateValue) return false;
+    let parsed = new Date(dateValue);
+    return !isNaN(parsed.getTime()) && parsed.toDateString() === todayKey;
+  }).length;
 
   let recipeCount = document.getElementById("dashRecipeCount");
   let colorCount = document.getElementById("dashColorCount");
   let programCount = document.getElementById("dashProgramCount");
   let missingCount = document.getElementById("dashMissingCount");
+  let todayProgramCount = document.getElementById("dashTodayPrograms");
+  let processHouseCount = document.getElementById("dashProcessHouseCount");
+  let roleValue = document.getElementById("dashRole");
   let lastBox = document.getElementById("dashLastRecipe");
   let missingBox = document.getElementById("dashMissingPrices");
   let lowBox = document.getElementById("dashLowPrices");
@@ -1751,6 +1824,9 @@ function renderDashboard(){
   if(colorCount) colorCount.textContent = colors.length;
   if(programCount) programCount.textContent = programs.length;
   if(missingCount) missingCount.textContent = missing.length;
+  if(todayProgramCount) todayProgramCount.textContent = todayPrograms;
+  if(processHouseCount) processHouseCount.textContent = processHouses.length;
+  if(roleValue) roleValue.textContent = currentRole === "admin" ? "Admin" : "Viewer";
 
   if(lastBox){
     lastBox.innerHTML = lastRecipe
@@ -1759,14 +1835,18 @@ function renderDashboard(){
   }
 
   if(missingBox){
+    let missingText = missing.slice(0, 14).join(", ");
+    if(missing.length > 14) missingText += ` and ${missing.length - 14} more`;
     missingBox.innerHTML = missing.length
-      ? `<b>Missing Price Alerts:</b> ${missing.join(", ")}`
+      ? `<b>Missing Price Alerts:</b> ${missingText}`
       : "<b>Missing Price Alerts:</b> All recipe dyes have prices.";
   }
 
   if(lowBox){
+    let lowText = lowPrices.slice(0, 14).join(", ");
+    if(lowPrices.length > 14) lowText += ` and ${lowPrices.length - 14} more`;
     lowBox.innerHTML = lowPrices.length
-      ? `<b>Zero / Low Price Alerts:</b> ${lowPrices.join(", ")}`
+      ? `<b>Zero / Low Price Alerts:</b> ${lowText}`
       : "<b>Zero / Low Price Alerts:</b> No zero-rate dyes found.";
   }
 }
