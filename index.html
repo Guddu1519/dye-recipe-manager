@@ -34,10 +34,10 @@ th{background:#dbeafe}
     .dashboardHero{background:linear-gradient(135deg,#0f172a,#1e3a8a);color:white;border-radius:14px;padding:20px;display:grid;grid-template-columns:1.3fr .7fr;gap:18px;align-items:center;box-shadow:0 14px 40px #0f172a26}
     .dashboardHero h2{font-size:30px;margin:0 0 8px}
     .dashboardHero p{margin:0;color:#dbeafe}
-    .dashboardLogoBox{display:flex;align-items:center;justify-content:flex-end;gap:14px;text-align:right}
+    .dashboardLogoBox{display:flex;align-items:center;justify-content:flex-end;gap:14px;text-align:right;min-width:520px}
     .dashboardLogo{width:90px;height:90px;border-radius:18px;background:white;object-fit:contain;padding:6px}
-    .dashboardCompany{font-size:24px;font-weight:bold;line-height:1.1}
-    .dashboardAddress{font-size:13px;color:#dbeafe;margin-top:6px}
+    .dashboardCompany{font-size:24px;font-weight:bold;line-height:1.1;white-space:nowrap}
+    .dashboardAddress{font-size:13px;color:#dbeafe;margin-top:6px;white-space:nowrap}
     .statGrid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:12px}
     .stat{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:10px;padding:14px;position:relative;overflow:hidden}
     .stat:after{content:"";position:absolute;right:-20px;top:-25px;width:70px;height:70px;background:#dbeafe;border-radius:999px;opacity:.75}
@@ -159,7 +159,6 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .companyHeader .companyAddress{color:#64748b}
     .siteLogo{width:48px;height:48px;border-radius:12px;box-shadow:0 8px 22px #0f172a18}
     .mobileMenuBtn{display:none;background:#0f172a;color:white;border:0;border-radius:10px;padding:10px 12px;font-weight:bold}
-    .mobileMenuBtn.closeMode{background:#dc2626}
     .sidebarOverlay{display:none;position:fixed;inset:0;background:#0f172a80;z-index:950}
     nav{position:fixed;top:0;left:0;bottom:0;width:236px;display:flex;flex-direction:column;gap:clamp(2px,.45vh,4px);padding:clamp(10px,1.5vh,14px) 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow:hidden;box-sizing:border-box}
     nav:before{content:"MTM";color:white;font-size:clamp(18px,2.4vh,22px);font-weight:800;letter-spacing:.04em;padding:clamp(4px,.8vh,8px) 10px clamp(10px,1.5vh,16px);border-bottom:1px solid #334155;margin-bottom:clamp(4px,.8vh,8px);line-height:1}
@@ -208,7 +207,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .smartAssistantHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f172a;color:white;padding:12px 14px;font-weight:bold}
     .smartAssistantHeader button{background:#1e293b;color:white;border:0;border-radius:8px;padding:7px 10px;cursor:pointer}
     .footerLine{margin-left:260px;background:transparent;border:0}
-    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
+    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left;min-width:0}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
     @media(max-width:900px){header{left:0}.mobileMenuBtn{display:inline-block}.sidebarOpen .sidebarOverlay{display:block}nav{transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section,.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
     @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:column;align-items:flex-start}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}.smartAssistantButton{right:16px;bottom:16px}.smartAssistantWindow{right:14px;bottom:88px;height:72vh}section{padding-top:150px}}
     @media(max-width:700px){nav{width:min(82vw,260px);gap:3px;padding:10px 10px}nav:before{font-size:20px;padding:5px 8px 12px;margin-bottom:5px}nav button{padding:8px 10px!important;font-size:13px;line-height:1.05;border-radius:10px;min-height:0}nav button:before{width:22px!important;height:22px!important;flex-basis:22px!important}nav .logout{padding:9px 10px!important;margin-top:auto}nav .role-badge{padding:8px 8px!important;font-size:12px}}
@@ -1565,9 +1564,7 @@ function closeSidebar(){
 function updateMobileMenuButton(){
   let button = document.getElementById("mobileMenuBtn");
   if(!button) return;
-  let open = document.body.classList.contains("sidebarOpen");
-  button.textContent = open ? "Close" : "Menu";
-  button.classList.toggle("closeMode", open);
+  button.textContent = "Menu";
 }
 
 function goToTab(id){
