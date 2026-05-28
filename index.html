@@ -882,6 +882,19 @@ function startInactivityWatch(){
   resetInactivityTimer();
 }
 
+function setupLoginEnterKey(){
+  ["loginEmail","loginPassword"].forEach(id => {
+    let input = document.getElementById(id);
+    if(!input) return;
+    input.addEventListener("keydown", function(event){
+      if(event.key === "Enter"){
+        event.preventDefault();
+        loginUser();
+      }
+    });
+  });
+}
+
 async function loginUser(){
   if(!supabaseClient){
     showLoginError("Supabase is not connected. Please check your internet connection.");
@@ -3247,6 +3260,7 @@ if(window.supabase){
   console.warn("Supabase library not loaded.");
 }
 window.addEventListener("load", function(){
+setupLoginEnterKey();
 initAuth();
 });
 </script>
