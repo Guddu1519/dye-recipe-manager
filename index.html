@@ -1902,8 +1902,17 @@ function roundConvertedQty(qty){
   return Math.round(value / 10) * 10;
 }
 
-function convertRecipeForPdf(recipe, requiredThans){
+function getRecipeSavedThans(recipe){
   let savedThans = Number(recipe.recipeThans);
+  let recipeNo = String(recipe.recipeNo || "").trim().toUpperCase().replace(/\s+/g, " ");
+  if((!savedThans || savedThans <= 0) && (recipeNo === "15" || recipeNo === "15 S")){
+    return 20;
+  }
+  return savedThans;
+}
+
+function convertRecipeForPdf(recipe, requiredThans){
+  let savedThans = getRecipeSavedThans(recipe);
   if(!savedThans || savedThans <= 0){
     throw new Error("Batch thans missing for this recipe: " + (recipe.recipeNo || ""));
   }
@@ -1958,7 +1967,7 @@ async function createProgram(){
     alert("Required thans must be greater than 0");
     return;
   }
-  let missingBatchRecipe = selectedRecipes.find(r => !Number(r.recipeThans) || Number(r.recipeThans) <= 0);
+  let missingBatchRecipe = selectedRecipes.find(r => !getRecipeSavedThans(r) || getRecipeSavedThans(r) <= 0);
   if(missingBatchRecipe){
     alert("Batch thans missing for this recipe: " + (missingBatchRecipe.recipeNo || ""));
     return;
@@ -2538,7 +2547,7 @@ function getStockRows(){
 function getProgramUsageMap(recipesForProgram, requiredThans){
   let usage = {};
   recipesForProgram.forEach(recipe => {
-    let savedThans = Number(recipe.recipeThans);
+    let savedThans = getRecipeSavedThans(recipe);
     if(!savedThans || savedThans <= 0){
       throw new Error("Batch thans missing for this recipe: " + (recipe.recipeNo || ""));
     }
