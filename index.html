@@ -349,6 +349,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 <section id="costing">
   <div class="card">
     <h2>Batch Costing</h2>
+    <h3>Single Recipe Batch Costing</h3>
     <select id="recipeSelect"></select>
     <div class="row">
       <input id="thanCount" type="number" placeholder="Enter thans for costing e.g. 30">
@@ -366,6 +367,22 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 
   <div class="card" id="costResult"></div>
+
+  <div class="card">
+    <h2>Multiple Recipe Batch Costing</h2>
+    <p class="muted">Select multiple saved recipes to calculate combined color consumption and summary costing.</p>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Select</th><th>Recipe No</th><th>Color Name</th><th>Batch Thans</th></tr>
+        </thead>
+        <tbody id="multiCostRecipeTable"></tbody>
+      </table>
+    </div>
+    <button class="btn green" onclick="calculateMultiRecipeCost()">Calculate Multiple Recipe Cost</button>
+  </div>
+
+  <div class="card" id="multiCostResult"></div>
 </section>
 
 <section id="program">
@@ -402,7 +419,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Stock</th><th>Export</th><th>WhatsApp</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -872,8 +889,8 @@ function applyRolePermissions(){
     let id = el.id || "";
     let text = (el.textContent || "").trim();
     let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth";
-    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || text === "Calculate Cost";
-    let isProgramView = text === "Export" || text === "Export PDF" || text === "Share PDF on WhatsApp";
+    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || el.classList.contains("multiCostRecipeCheck") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost";
+    let isProgramView = text === "Export" || text === "Export PDF";
     let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "Reports" || text === "Activity Log" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
@@ -1819,6 +1836,19 @@ function renderRecipeSelect(){
   });
 }
 
+function renderMultiCostingSelect(){
+  let table = document.getElementById("multiCostRecipeTable");
+  if(!table) return;
+  table.innerHTML = sortRecipes(recipes).map(r => `
+    <tr>
+      <td><input class="multiCostRecipeCheck" type="checkbox" value="${r.recipeNo || ""}"></td>
+      <td>${r.recipeNo || ""}</td>
+      <td>${r.colorName || ""}</td>
+      <td>${r.recipeThans || ""}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="4">No recipes found.</td></tr>`;
+}
+
 function calculateCost(){
   let i = document.getElementById("recipeSelect").value;
   let askedThans = Number(document.getElementById("thanCount").value);
@@ -1907,6 +1937,68 @@ function calculateCost(){
         <tr><th>Final Cost</th><td><b>Rs. ${finalCost.toFixed(2)}</b></td></tr>
         <tr><th>Final Rate / Than</th><td><b>Rs. ${finalPerThan.toFixed(2)}</b></td></tr>
         <tr><th>Final Rate / Meter</th><td><b>${meterCount > 0 ? "Rs. " + finalPerMeter.toFixed(2) : "Enter meters to calculate"}</b></td></tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function calculateMultiRecipeCost(){
+  let selectedNos = Array.from(document.querySelectorAll(".multiCostRecipeCheck:checked")).map(cb => cb.value);
+  if(!selectedNos.length){
+    alert("Select recipes for multiple recipe costing");
+    return;
+  }
+
+  let selectedRecipes = sortRecipes(recipes.filter(recipe => selectedNos.includes(String(recipe.recipeNo || ""))));
+  let polyesterGrams = 0;
+  let cottonGrams = 0;
+  let totalCost = 0;
+  let totalThans = 0;
+  let perThanCosts = [];
+  let missingPrices = new Set();
+
+  selectedRecipes.forEach(recipe => {
+    let recipeThans = Number(recipe.recipeThans) || 0;
+    let recipeCost = 0;
+    totalThans += recipeThans;
+
+    (recipe.dyes || []).forEach(dye => {
+      let qty = Number(dye.qty) || 0;
+      let colorType = getDyeColorType(dye.name);
+      if(colorType === "COTTON") cottonGrams += qty;
+      else polyesterGrams += qty;
+
+      let price = findColorByName(dye.name);
+      let rate = price ? Number(price.rate) || 0 : 0;
+      if(!price) missingPrices.add(normalizeName(dye.name));
+      recipeCost += qty / 1000 * rate;
+    });
+
+    totalCost += recipeCost;
+    if(recipeThans > 0) perThanCosts.push(recipeCost / recipeThans);
+  });
+
+  let totalGrams = polyesterGrams + cottonGrams;
+  let perThanCost = totalThans > 0 ? totalCost / totalThans : 0;
+  let averageBatchCost = selectedRecipes.length ? totalCost / selectedRecipes.length : 0;
+  let averagePerThanCost = perThanCosts.length ? perThanCosts.reduce((sum, value) => sum + value, 0) / perThanCosts.length : 0;
+  let warningHtml = missingPrices.size
+    ? `<div class="warningBox"><b>Missing price warning:</b> ${Array.from(missingPrices).join(", ")} counted as 0.</div>`
+    : "";
+
+  document.getElementById("multiCostResult").innerHTML = `
+    <h2>Multiple Recipe Costing Summary</h2>
+    <p><b>Selected Recipes:</b> ${selectedRecipes.map(r => `${r.recipeNo} - ${r.colorName}`).join(", ")}</p>
+    ${warningHtml}
+    <table>
+      <tbody>
+        <tr><th>Total Polyester color consumption</th><td>${formatGrams(polyesterGrams)}</td></tr>
+        <tr><th>Total Cotton color consumption</th><td>${formatGrams(cottonGrams)}</td></tr>
+        <tr><th>Total overall color consumption</th><td>${formatGrams(totalGrams)}</td></tr>
+        <tr><th>Total batch cost</th><td><b>${formatMoney(totalCost)}</b></td></tr>
+        <tr><th>Per than cost</th><td><b>${formatMoney(perThanCost)}</b></td></tr>
+        <tr><th>Average batch cost</th><td><b>${formatMoney(averageBatchCost)}</b></td></tr>
+        <tr><th>Average per than cost</th><td><b>${formatMoney(averagePerThanCost)}</b></td></tr>
       </tbody>
     </table>
   `;
@@ -2232,10 +2324,9 @@ function renderPrograms(){
         </td>
         <td>${p.programDate || ""}</td>
         <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
-        <td><input id="programBatchThans_${index}" type="number" min="1" value="${p.requiredThans || ""}" placeholder="Batch thans"></td>
-        <td>${p.stockDeducted ? `<span class="stockLowBadge" style="background:#16a34a">Stock Deducted</span>` : `<button ${isAdmin() ? "" : "disabled"} onclick="deductExistingProgramStock(${index})">Deduct Stock</button>`}</td>
+        <td><input id="programBatchThans_${index}" type="number" min="1" value="${p.requiredThans || ""}" placeholder="Batch thans" onchange="updateProgramBatchThans(${index}, this.value)" ${isAdmin() ? "" : "disabled"}></td>
+        <td>${p.stockDeducted ? `<span class="stockLowBadge" style="background:#16a34a">Auto Deducted</span>` : `<span class="stockLowBadge">Not Deducted</span>`}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
-        <td><button onclick="shareProgramPdfOnWhatsApp(${index})">Share PDF on WhatsApp</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
     `).join("");
@@ -2383,39 +2474,6 @@ async function exportProgramPdf(index, options={}){
   return {program, requiredThans};
 }
 
-async function shareProgramPdfOnWhatsApp(index){
-  let result = await exportProgramPdf(index, {skipAudit:true});
-  if(!result) return;
-
-  let program = result.program;
-  let recipeText = (program.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join(", ");
-  let message = [
-    "MONICA TEXTILE MILLS",
-    "Program " + (program.programNo || "") + " - " + (program.programName || ""),
-    "Program Date: " + (program.programDate || ""),
-    "Batch Thans: " + result.requiredThans,
-    "Recipes: " + recipeText,
-    "PDF page has been generated. Please attach/download the PDF manually if WhatsApp cannot attach it directly."
-  ].join("\n");
-
-  if(navigator.share){
-    try{
-      await navigator.share({title:"Program PDF", text:message});
-      await logAudit("pdf shared", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans: result.requiredThans, method:"native share"});
-      await loadAuditLogsFromSupabase();
-      renderAuditLogs();
-      return;
-    }catch(err){
-      if(String(err.name || "") === "AbortError") return;
-    }
-  }
-
-  window.open("https://wa.me/?text=" + encodeURIComponent(message), "_blank");
-  await logAudit("pdf shared", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans: result.requiredThans, method:"whatsapp web"});
-  await loadAuditLogsFromSupabase();
-  renderAuditLogs();
-}
-
 async function updateProgramStatus(index, status){
   if(!requireAdmin()) return;
   let program = programs[index];
@@ -2435,54 +2493,64 @@ async function updateProgramStatus(index, status){
   await loadDataFromJson();
 }
 
-async function deductExistingProgramStock(index){
+async function updateProgramBatchThans(index, value){
   if(!requireAdmin()) return;
   let program = programs[index];
   if(!program || !program.id) return;
-  if(program.stockDeducted){
-    alert("Stock is already deducted for this program.");
+  let requiredThans = Number(value);
+  if(!requiredThans || requiredThans <= 0){
+    alert("Required thans must be greater than 0");
+    return;
+  }
+  if(Number(program.requiredThans) === requiredThans) return;
+
+  let oldValue = {...program};
+  let restored = await restoreProgramStock(program, "editing Program " + (program.programNo || ""));
+  if(!restored){
+    await loadDataFromJson();
     return;
   }
 
-  let requiredThans = getProgramRequiredThans(program, index);
-  if(!requiredThans || requiredThans <= 0){
-    let entered = prompt("Batch = How many thans?");
-    requiredThans = Number(entered);
-    if(!requiredThans || requiredThans <= 0){
-      alert("Required thans must be greater than 0");
-      return;
-    }
-    let input = document.getElementById("programBatchThans_" + index);
-    if(input) input.value = requiredThans;
+  let usageDeleted = await deleteProgramStockUsage(program);
+  if(!usageDeleted){
+    await loadDataFromJson();
+    return;
   }
 
   let stockOk = await confirmProgramStock(program.recipeSnapshot || [], requiredThans);
-  if(!stockOk) return;
+  if(!stockOk){
+    await supabaseClient.from("programs").update({stock_deducted:false}).eq("id", program.id);
+    await loadDataFromJson();
+    return;
+  }
 
   let updatedProgram = {...program, requiredThans, stockDeducted:false};
-  if(program.id){
-    let { error } = await supabaseClient.from("programs").update({required_thans: requiredThans}).eq("id", program.id);
-    if(error && !String(error.message || "").includes("required_thans")){
-      alert("Program batch thans update failed: " + error.message);
-      return;
-    }
+  let { error } = await supabaseClient
+    .from("programs")
+    .update({required_thans: requiredThans, stock_deducted:false})
+    .eq("id", program.id);
+  if(error && !String(error.message || "").includes("required_thans")){
+    alert("Program batch thans update failed: " + error.message);
+    await loadDataFromJson();
+    return;
   }
 
   let deducted = await deductStockForProgram(updatedProgram);
   if(deducted){
-    await logAudit("stock deduct", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans});
+    await logAudit("update", "Program", program.programNo + " - " + program.programName, oldValue, {...program, requiredThans, stockDeducted:true});
     await loadDataFromJson();
-    alert("Stock deducted for Program " + (program.programNo || ""));
+    alert("Program batch thans updated and stock recalculated.");
   }
 }
 
-async function restoreProgramStock(program){
-  if(!supabaseClient || !program || !program.stockDeducted) return true;
-
+async function restoreProgramStock(program, reason){
+  if(!supabaseClient || !program) return true;
   let usageRows = (programStockUsage || []).filter(row => {
     return (program.id && String(row.program_id || "") === String(program.id)) ||
       String(row.program_no || "") === String(program.programNo || "");
   });
+
+  if(!program.stockDeducted && !usageRows.length) return true;
 
   if(!usageRows.length){
     let requiredThans = Number(program.requiredThans);
@@ -2516,7 +2584,7 @@ async function restoreProgramStock(program){
     qty_delta_grams: Number(row.quantity_used_grams) || 0,
     program_id: program.id || null,
     program_no: String(program.programNo || ""),
-    note: "Stock restored after deleting Program " + (program.programNo || "") + " - " + (program.programName || ""),
+    note: "Stock restored after " + (reason || "deleting Program " + (program.programNo || "") + " - " + (program.programName || "")),
     created_at: now
   })).filter(row => row.chemical_name && row.qty_delta_grams > 0);
 
@@ -2764,7 +2832,8 @@ async function confirmProgramStock(recipesForProgram, requiredThans){
       let message = insufficient.map(item =>
         `Insufficient stock for ${item.name}. Required: ${formatGrams(item.required)}, Available: ${formatGrams(item.available)}.`
       ).join("\n");
-      return confirm(message + "\n\nDo you still want to create this program and deduct stock?");
+      alert(message + "\n\nStock was not deducted. Please add stock first.");
+      return false;
     }
     return true;
   }catch(err){
@@ -2775,6 +2844,18 @@ async function confirmProgramStock(recipesForProgram, requiredThans){
 
 async function deductStockForProgram(program){
   if(!supabaseClient || !program || program.stockDeducted) return false;
+  let existingUsage = (programStockUsage || []).some(row => {
+    return (program.id && String(row.program_id || "") === String(program.id)) ||
+      String(row.program_no || "") === String(program.programNo || "");
+  });
+  if(existingUsage){
+    if(program.id){
+      let { error } = await supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id);
+      if(error) console.warn("Program stock flag update failed", error);
+    }
+    return true;
+  }
+
   let requiredThans = Number(program.requiredThans);
   if(!requiredThans || requiredThans <= 0) return false;
 
@@ -2826,6 +2907,15 @@ async function deductStockForProgram(program){
 
   let { error: usageError } = await supabaseClient.from("program_stock_usage").insert(usageRows);
   if(usageError){
+    await supabaseClient.from("chemical_stock_ledger").insert(ledgerRows.map(row => ({
+      chemical_name: row.chemical_name,
+      entry_type: "program_delete_restore",
+      qty_delta_grams: Math.abs(Number(row.qty_delta_grams) || 0),
+      program_id: row.program_id,
+      program_no: row.program_no,
+      note: "Auto rollback after failed program stock usage save",
+      created_at: new Date().toISOString()
+    })));
     alert("Program stock usage save failed: " + usageError.message + ". Run the updated Supabase SQL for stock tables.");
     return false;
   }
@@ -3522,6 +3612,7 @@ function renderAll(){
   renderPriceHistory();
   renderRecipes();
   renderRecipeSelect();
+  renderMultiCostingSelect();
   renderPrograms();
   renderAuditLogs();
   renderRecipeVersions();
