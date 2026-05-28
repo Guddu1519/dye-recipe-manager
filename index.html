@@ -160,6 +160,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .siteLogo{width:48px;height:48px;border-radius:12px;box-shadow:0 8px 22px #0f172a18}
     .mobileMenuBtn{display:none;background:#0f172a;color:white;border:0;border-radius:10px;padding:10px 12px;font-weight:bold}
     .mobileMenuBtn.closeMode{background:#dc2626}
+    .sidebarOverlay{display:none;position:fixed;inset:0;background:#0f172a80;z-index:950}
+    .sidebarCloseBtn{display:none;background:#dc2626;color:white;border-radius:10px;padding:10px 12px;text-align:center;font-weight:800;cursor:pointer}
     nav{position:fixed;top:0;left:0;bottom:0;width:236px;display:flex;flex-direction:column;gap:clamp(2px,.45vh,4px);padding:clamp(10px,1.5vh,14px) 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow:hidden;box-sizing:border-box}
     nav:before{content:"MTM";color:white;font-size:clamp(18px,2.4vh,22px);font-weight:800;letter-spacing:.04em;padding:clamp(4px,.8vh,8px) 10px clamp(10px,1.5vh,16px);border-bottom:1px solid #334155;margin-bottom:clamp(4px,.8vh,8px);line-height:1}
     nav button{width:100%;box-sizing:border-box;order:initial!important;display:flex;align-items:center;gap:9px;text-align:left;background:transparent;color:#cbd5e1;border-radius:10px;padding:clamp(6px,.9vh,9px) 12px;font-size:clamp(12px,1.55vh,14px);line-height:1.1;font-weight:700;white-space:nowrap}
@@ -208,7 +210,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .smartAssistantHeader button{background:#1e293b;color:white;border:0;border-radius:8px;padding:7px 10px;cursor:pointer}
     .footerLine{margin-left:260px;background:transparent;border:0}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
-    @media(max-width:900px){header{left:0}.mobileMenuBtn{display:inline-block}nav{transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section,.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
+    @media(max-width:900px){header{left:0}.mobileMenuBtn{display:inline-block}.sidebarOpen .sidebarOverlay{display:block}.sidebarCloseBtn{display:block}nav{transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section,.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
     @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:column;align-items:flex-start}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}.smartAssistantButton{right:16px;bottom:16px}.smartAssistantWindow{right:14px;bottom:88px;height:72vh}section{padding-top:150px}}
     @media(max-width:700px){nav{width:min(82vw,260px);gap:3px;padding:10px 10px}nav:before{font-size:20px;padding:5px 8px 12px;margin-bottom:5px}nav button{padding:8px 10px!important;font-size:13px;line-height:1.05;border-radius:10px;min-height:0}nav button:before{width:22px!important;height:22px!important;flex-basis:22px!important}nav .logout{padding:9px 10px!important;margin-top:auto}nav .role-badge{padding:8px 8px!important;font-size:12px}}
   </style>
@@ -244,7 +246,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <p> Recipe Master • Batch Costing • Price Master</p>
 </header>
 
+<div id="sidebarOverlay" class="sidebarOverlay" onclick="closeSidebar()"></div>
+
 <nav>
+  <div class="sidebarCloseBtn" onclick="closeSidebar()">Close Menu</div>
   <button style="order:1" class="active" onclick="showTab('dashboard',this)">Dashboard</button>
   <button style="order:2" onclick="showTab('recipe',this)">Recipe Master</button>
   <button style="order:3" onclick="showTab('costing',this)">Batch Costing</button>
@@ -1554,6 +1559,11 @@ function showTab(id,btn){
 
 function toggleSidebar(){
   document.body.classList.toggle("sidebarOpen");
+  updateMobileMenuButton();
+}
+
+function closeSidebar(){
+  document.body.classList.remove("sidebarOpen");
   updateMobileMenuButton();
 }
 
