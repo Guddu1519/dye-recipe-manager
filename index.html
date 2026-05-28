@@ -279,6 +279,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </div>
     <input id="houseAddress" placeholder="Address">
     <button class="btn green" onclick="saveProcessHouse()">Save Process House</button>
+    <div id="processHouseStatus" class="warningBox" style="display:none"></div>
   </div>
   <div class="card">
     <h3>Saved Process Houses</h3>
@@ -1879,6 +1880,14 @@ function renderProcessHouses(){
   }
 }
 
+function showProcessHouseStatus(message, isError=false){
+  let box = document.getElementById("processHouseStatus");
+  if(!box) return;
+  box.textContent = message;
+  box.style.display = "block";
+  box.className = isError ? "warningBox dangerBox" : "warningBox";
+}
+
 async function saveProcessHouse(){
   if(!requireAdmin()) return;
   let payload = {
@@ -1902,22 +1911,34 @@ async function saveProcessHouse(){
   renderProcessHouses();
 
   let error;
+  let savedRows = null;
   let cloudExisting = existing && existing.id && !String(existing.id).startsWith("local-");
   if(cloudExisting){
-    ({ error } = await supabaseClient.from("process_houses").update(payload).eq("id", existing.id));
+    ({ data: savedRows, error } = await supabaseClient
+      .from("process_houses")
+      .update(payload)
+      .eq("id", existing.id)
+      .select("*"));
   } else {
-    ({ error } = await supabaseClient.from("process_houses").upsert(payload, {onConflict:"name"}));
+    ({ data: savedRows, error } = await supabaseClient
+      .from("process_houses")
+      .upsert(payload, {onConflict:"name"})
+      .select("*"));
   }
   if(error){
     processHouseLocalOnly = true;
-    alert("Saved on website. Cloud save failed: " + error.message);
+    showProcessHouseStatus("Saved on website only. Cloud save failed: " + error.message, true);
     return;
   }
   processHouseLocalOnly = false;
+  if(savedRows && savedRows[0]){
+    Object.assign(localRecord, savedRows[0]);
+    saveLocalProcessHouses();
+    renderProcessHouses();
+  }
   await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);
   ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
-  await loadDataFromJson();
-  alert("Process house saved");
+  showProcessHouseStatus("Process house saved to cloud.");
 }
 
 async function deleteProcessHouse(index){
