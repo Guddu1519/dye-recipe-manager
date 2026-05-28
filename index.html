@@ -1084,45 +1084,32 @@ function renderPrograms(){
   applyRolePermissions();
 }
 
-function getRecipeCostRows(recipe){
-  let baseBatchCost = 0;
+function getProgramRecipeRows(recipe){
   let rows = "";
 
   (recipe.dyes || []).forEach(d => {
-    let price = colors.find(c => c.name === d.name);
-    let rate = price ? Number(price.rate) : 0;
-    let qtyKg = Number(d.qty) / 1000;
-    let itemCost = qtyKg * rate;
-    baseBatchCost += itemCost;
-
     rows += `
       <tr>
         <td>${d.name}</td>
         <td>${d.qty} g</td>
-        <td>${qtyKg.toFixed(3)} kg</td>
-        <td>₹${rate}</td>
-        <td>₹${itemCost.toFixed(2)}</td>
       </tr>`;
   });
 
-  let recipeThans = Number(recipe.recipeThans) || 0;
-  let perThanCost = recipeThans > 0 ? baseBatchCost / recipeThans : 0;
-  return {rows, baseBatchCost, perThanCost};
+  return rows;
 }
 
 function renderProgramHtml(program){
   let recipesHtml = (program.recipeSnapshot || []).map(r => {
-    let cost = getRecipeCostRows(r);
+    let rows = getProgramRecipeRows(r);
     return `
       <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}</h3>
       <p><b>Hex Code:</b> ${r.hexCode || "N/A"} &nbsp; <b>Batch Thans:</b> ${r.recipeThans || ""}</p>
       <table>
         <thead>
-          <tr><th>Dye Name</th><th>Recipe Qty</th><th>Qty in KG</th><th>Rate/kg</th><th>Batch Cost</th></tr>
+          <tr><th>Color Name</th><th>Quantity</th></tr>
         </thead>
-        <tbody>${cost.rows}</tbody>
+        <tbody>${rows}</tbody>
       </table>
-      <p><b>Per Batch Cost:</b> ₹${cost.baseBatchCost.toFixed(2)} &nbsp; <b>Per Than Cost:</b> ₹${cost.perThanCost.toFixed(2)}</p>
     `;
   }).join("");
 
