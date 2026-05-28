@@ -2171,6 +2171,12 @@ function getMonthKeyFromDateValue(value){
   return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
 }
 
+function getMonthKeyOffset(monthOffset){
+  let now = new Date();
+  let date = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+}
+
 function isDateInMonth(value, monthValue){
   if(!value || !monthValue) return false;
   return getMonthKeyFromDateValue(value) === monthValue;
@@ -2310,19 +2316,60 @@ function convertRecipeForPdf(recipe, requiredThans){
   };
 }
 
+function parseProgramList(value){
+  if(Array.isArray(value)) return value;
+  if(!value) return [];
+  if(typeof value === "string"){
+    let text = value.trim();
+    if(!text) return [];
+    try{
+      let parsed = JSON.parse(text);
+      if(Array.isArray(parsed)) return parsed;
+    }catch(err){}
+    return text.split(",").map(item => item.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeProgramRecipeSnapshot(value){
+  return sortRecipes(parseProgramList(value).map(recipe => ({
+    recipeNo: recipe.recipeNo || recipe.recipe_no || recipe.no || recipe.number || "",
+    colorName: recipe.colorName || recipe.color_name || recipe.name || "",
+    hexCode: recipe.hexCode || recipe.hex_code || "N/A",
+    recipeThans: recipe.recipeThans || recipe.recipe_thans || recipe.than_count || recipe.batchThans || recipe.batch_thans || "",
+    requiredThans: recipe.requiredThans || recipe.required_thans || recipe.programThans || recipe.program_thans || "",
+    dyes: parseProgramList(recipe.dyes)
+  })));
+}
+
 function getProgramRequiredThans(program, index){
-  let snapshotThans = (program.recipeSnapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans;
-  return Number(program.requiredThans || program.batchThans || snapshotThans || 0);
+  let recipeSnapshot = normalizeProgramRecipeSnapshot(program.recipeSnapshot || program.recipe_snapshot || []);
+  let snapshotThans = recipeSnapshot.find(r => Number(r.requiredThans) > 0)?.requiredThans;
+  let recipeBatchThans = recipeSnapshot.find(r => Number(r.recipeThans) > 0)?.recipeThans;
+  let candidates = [
+    program.requiredThans,
+    program.required_thans,
+    program.batchThans,
+    program.batch_thans,
+    program.programThans,
+    program.program_thans,
+    program.thans,
+    program.than_count,
+    snapshotThans,
+    recipeBatchThans
+  ];
+  for(let value of candidates){
+    let number = Number(value);
+    if(number > 0) return number;
+  }
+  return 0;
 }
 
 function getProgramRecipeCount(program){
-  if(Array.isArray(program.recipeSnapshot) && program.recipeSnapshot.length) return program.recipeSnapshot.length;
-  if(Array.isArray(program.selectedRecipeNumbers) && program.selectedRecipeNumbers.length) return program.selectedRecipeNumbers.length;
-  if(Array.isArray(program.selected_recipe_numbers) && program.selected_recipe_numbers.length) return program.selected_recipe_numbers.length;
-  let rawNumbers = program.selectedRecipeNumbers || program.selected_recipe_numbers || program.recipeNumbers || program.recipe_numbers || "";
-  if(typeof rawNumbers === "string"){
-    return rawNumbers.split(",").map(value => value.trim()).filter(Boolean).length || 1;
-  }
+  let snapshot = parseProgramList(program.recipeSnapshot || program.recipe_snapshot);
+  if(snapshot.length) return snapshot.length;
+  let selected = parseProgramList(program.selectedRecipeNumbers || program.selected_recipe_numbers || program.recipeNumbers || program.recipe_numbers);
+  if(selected.length) return selected.length;
   return 1;
 }
 
@@ -2443,18 +2490,24 @@ async function loadProgramsFromSupabase(){
     return;
   }
 
-  programs = (data || []).map(p => ({
-    id: p.id,
-    programNo: p.program_no,
-    programName: p.program_name || "",
-    status: p.status || "Pending",
-    programDate: p.program_date,
-    requiredThans: p.required_thans || (p.recipe_snapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans || "",
-    stockDeducted: !!p.stock_deducted,
-    createdAt: p.created_at,
-    selectedRecipeNumbers: p.selected_recipe_numbers || [],
-    recipeSnapshot: sortRecipes(p.recipe_snapshot || [])
-  })).sort((a,b) => Number(a.programNo) - Number(b.programNo));
+  programs = (data || []).map(p => {
+    let recipeSnapshot = normalizeProgramRecipeSnapshot(p.recipe_snapshot);
+    let selectedRecipeNumbers = parseProgramList(p.selected_recipe_numbers);
+    let program = {
+      id: p.id,
+      programNo: p.program_no,
+      programName: p.program_name || "",
+      status: p.status || "Pending",
+      programDate: p.program_date,
+      requiredThans: p.required_thans || recipeSnapshot.find(r => Number(r.requiredThans) > 0)?.requiredThans || "",
+      stockDeducted: !!p.stock_deducted,
+      createdAt: p.created_at,
+      selectedRecipeNumbers,
+      recipeSnapshot
+    };
+    program.requiredThans = getProgramRequiredThans(program);
+    return program;
+  }).sort((a,b) => Number(a.programNo) - Number(b.programNo));
 }
 
 function renderPrograms(){
@@ -3533,9 +3586,7 @@ function renderDashboard(){
   let lowStockChart = document.getElementById("dashLowStockChart");
   if(programChart){
     let monthItems = Array.from({length:6}).map((_, index) => {
-      let date = new Date();
-      date.setMonth(date.getMonth() - (5 - index));
-      let key = getMonthKeyFromDateValue(date);
+      let key = getMonthKeyOffset(index - 5);
       let value = programs
         .filter(program => isDateInMonth(getProgramDateValue(program), key))
         .reduce((sum, program) => sum + getProgramThanDyedCount(program), 0);
@@ -3551,9 +3602,7 @@ function renderDashboard(){
   }
   if(costChart){
     let costItems = Array.from({length:6}).map((_, index) => {
-      let date = new Date();
-      date.setMonth(date.getMonth() - (5 - index));
-      let key = getMonthKeyFromDateValue(date);
+      let key = getMonthKeyOffset(index - 5);
       let value = programs.filter(program => isDateInMonth(getProgramDateValue(program), key)).reduce((sum, program) => sum + getProgramDyeCost(program), 0);
       return {label:key, value, display:formatMoney(value)};
     });
