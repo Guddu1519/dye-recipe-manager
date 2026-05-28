@@ -2412,6 +2412,14 @@ function formatGrams(value){
   return (Number(value) || 0).toLocaleString("en-IN") + " g";
 }
 
+function explainSupabaseError(error, sqlHint){
+  let message = String(error?.message || error || "Unknown error");
+  if(message.toLowerCase().includes("failed to fetch")){
+    return "Could not connect to Supabase. Check internet connection, disable VPN/ad blocker if any, refresh and login again. If other cloud data is also not loading, wait and try again.";
+  }
+  return message + (sqlHint ? ". " + sqlHint : "");
+}
+
 function waitForUi(){
   return new Promise(resolve => setTimeout(resolve, 20));
 }
@@ -2704,7 +2712,7 @@ async function saveStockPurchase(){
   };
   let { error } = await supabaseClient.from("chemical_stock_purchases").insert(purchase);
   if(error){
-    alert("Stock purchase failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
+    alert("Stock purchase failed: " + explainSupabaseError(error, "Run the updated Supabase SQL for stock tables."));
     return;
   }
   await checkStockPriceUpdate(name, purchase.rate_per_kg);
@@ -2716,7 +2724,7 @@ async function saveStockPurchase(){
     created_at: new Date().toISOString()
   });
   if(ledgerError){
-    alert("Stock ledger failed: " + ledgerError.message);
+    alert("Stock ledger failed: " + explainSupabaseError(ledgerError, "Run the updated Supabase SQL for stock tables."));
     return;
   }
   ["stockChemicalName","stockPurchaseQty","stockSupplier","stockRate","stockNote"].forEach(id => document.getElementById(id).value = "");
@@ -2878,7 +2886,7 @@ function importStockExcel(e){
     }catch(err){
       console.error(err);
       setStockImportProgress(0, "Import failed.");
-      alert("Stock import failed: " + (err.message || "Unknown error"));
+      alert("Stock import failed: " + explainSupabaseError(err, "Run the updated Supabase SQL for stock tables."));
     }
   };
   reader.readAsArrayBuffer(file);
