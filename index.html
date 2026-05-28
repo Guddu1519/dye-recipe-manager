@@ -28,6 +28,15 @@ th{background:#dbeafe}
 #recipeTable td:nth-child(3) span{display:none!important}
 .danger{background:#dc2626}
     .green{background:#16a34a}
+    .muted{color:#64748b;font-size:13px}
+    .statGrid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:12px}
+    .stat{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:10px;padding:14px}
+    .stat b{display:block;font-size:26px;margin-top:6px;color:#1d4ed8}
+    .warningBox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:10px;margin-top:10px}
+    .exportBar{display:flex;gap:10px;flex-wrap:wrap}
+    .tableWrap{overflow-x:auto}
+    .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+    .signatureBox{border-top:1px solid #111;padding-top:8px;text-align:center}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .dyeRow{display:grid;grid-template-columns:1fr 120px 50px;gap:8px;align-items:center}
     .suggestionBox{
@@ -71,7 +80,8 @@ th{background:#dbeafe}
 .logout{margin-left:auto;background:#dc2626;color:white}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
-    @media(max-width:700px){.row,.dyeRow{grid-template-columns:1fr}table{font-size:13px}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}}
+    @media(max-width:900px){.statGrid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}}
   </style>
 </head>
 <body>
@@ -102,24 +112,51 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </header>
 
 <nav>
-  <button style="order:1" class="active" onclick="showTab('recipe',this)">Recipe Master</button>
-  <button style="order:2" onclick="showTab('costing',this)">Batch Costing</button>
-  <button style="order:3" onclick="showTab('price',this)">Price Master</button>
-  <button style="order:4" onclick="showTab('program',this)">Program</button>
-  <button style="order:5" onclick="loadDataFromJson()">Refresh Cloud Data</button>
-  <button style="order:6" onclick="exportData()">Data Export</button>
-  <button style="order:7" onclick="document.getElementById('importFile').click()">Backup Import</button>
+  <button style="order:1" class="active" onclick="showTab('dashboard',this)">Dashboard</button>
+  <button style="order:2" onclick="showTab('recipe',this)">Recipe Master</button>
+  <button style="order:3" onclick="showTab('costing',this)">Batch Costing</button>
+  <button style="order:4" onclick="showTab('price',this)">Price Master</button>
+  <button style="order:5" onclick="showTab('program',this)">Program</button>
+  <button style="order:6" onclick="showTab('history',this)">History</button>
+  <button style="order:7" onclick="loadDataFromJson()">Refresh Cloud Data</button>
+  <button style="order:8" onclick="exportData()">Data Export</button>
+  <button style="order:9" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
+  <button style="order:10" onclick="exportPriceMasterExcel()">Price Master Excel</button>
+  <button style="order:11" onclick="exportProgramHistoryExcel()">Program History Excel</button>
+  <button style="order:12" onclick="document.getElementById('importFile').click()">Backup Import</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
-  <button style="order:8" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
+  <button style="order:13" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
 
 <input type="file"
        id="excelFile"
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:9" id="roleBadge" class="role-badge"></span>
-  <button style="order:10" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:14" id="roleBadge" class="role-badge"></span>
+  <button style="order:15" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
+
+<section id="dashboard" class="active">
+  <div class="card">
+    <h2>Dashboard</h2>
+    <div class="statGrid">
+      <div class="stat">Saved Recipes<b id="dashRecipeCount">0</b></div>
+      <div class="stat">Dye / Colors<b id="dashColorCount">0</b></div>
+      <div class="stat">Programs<b id="dashProgramCount">0</b></div>
+      <div class="stat">Missing Prices<b id="dashMissingCount">0</b></div>
+    </div>
+    <div id="dashLastRecipe" class="warningBox"></div>
+    <div id="dashMissingPrices" class="warningBox"></div>
+  </div>
+  <div class="card">
+    <h3>Quick Export</h3>
+    <div class="exportBar">
+      <button class="btn green" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
+      <button class="btn green" onclick="exportPriceMasterExcel()">Price Master Excel</button>
+      <button class="btn green" onclick="exportProgramHistoryExcel()">Program History Excel</button>
+    </div>
+  </div>
+</section>
 
 <section id="price">
   <div class="card">
@@ -135,7 +172,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 
   <div class="card">
-    <input id="priceSearch" oninput="renderColors()" placeholder="Search color by first 2-3 letters">
+    <input id="priceSearch" oninput="renderColors()" placeholder="Search color/dye name or Cotton/Polyster">
     <table>
       <thead>
         <tr><th>Color Name</th><th>Type</th><th>Rate/kg ₹</th><th>Action</th></tr>
@@ -145,7 +182,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 </section>
 
-<section id="recipe" class="active">
+<section id="recipe">
   <div class="card">
     <h2>Recipe Master</h2>
     <div class="row">
@@ -161,7 +198,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 
   <div class="card">
-    <input id="recipeSearch" oninput="renderRecipes()" placeholder="Search recipe">
+    <input id="recipeSearch" oninput="renderRecipes()" placeholder="Search recipe no, color, dye name, or thans">
     <table>
       <thead>
         <tr><th>Recipe No</th><th>Color</th><th>Hex</th><th>Thans</th><th>Dyes</th><th>Action</th></tr>
@@ -215,12 +252,29 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </table>
   </div>
 </section>
+
+<section id="history">
+  <div class="card">
+    <h2>History</h2>
+    <p class="muted">Admin action history from Supabase audit logs.</p>
+    <input id="historySearch" oninput="renderAuditLogs()" placeholder="Search history by user, section, action, item">
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Date / Time</th><th>User</th><th>Section</th><th>Action</th><th>Item</th><th>Old Value</th><th>New Value</th></tr>
+        </thead>
+        <tbody id="historyTable"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
 </div>
 
 <script>
 let colors = [];
 let recipes = [];
 let programs = [];
+let auditLogs = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let currentUser = null;
@@ -250,6 +304,33 @@ function getDefaultColorType(name){
   if(COTTON_COLORS.has(clean)) return "COTTON";
   if(POLYSTER_COLORS.has(clean)) return "POLYSTER";
   return "";
+}
+
+function normalizeName(name){
+  return String(name || "").trim().toUpperCase();
+}
+
+function findColorByName(name){
+  let clean = normalizeName(name);
+  return colors.find(c => normalizeName(c.name) === clean);
+}
+
+function getRecipeMissingPrices(recipe){
+  return (recipe.dyes || []).filter(d => !findColorByName(d.name));
+}
+
+function getAllMissingPriceNames(){
+  let missing = new Set();
+  recipes.forEach(r => getRecipeMissingPrices(r).forEach(d => missing.add(normalizeName(d.name))));
+  return Array.from(missing).filter(Boolean).sort();
+}
+
+function safeJson(value){
+  try{
+    return JSON.stringify(value || null);
+  }catch{
+    return "";
+  }
 }
 
 function isLoggedIn(){
@@ -306,10 +387,10 @@ function applyRolePermissions(){
   document.querySelectorAll("input, select, button").forEach(el=>{
     let id = el.id || "";
     let text = (el.textContent || "").trim();
-    let isSearch = id === "priceSearch" || id === "recipeSearch";
+    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch";
     let isCosting = id === "recipeSelect" || id === "thanCount" || text === "Calculate Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Refresh Cloud Data";
+    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "History" || text === "Refresh Cloud Data";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -601,6 +682,46 @@ async function deleteRecipeRecord(recipe){
   return true;
 }
 
+async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
+  if(!supabaseClient || !currentUser || !isAdmin()) return;
+
+  const payload = {
+    action_type: actionType,
+    section_name: sectionName,
+    item_name: String(itemName || ""),
+    old_value: oldValue || null,
+    new_value: newValue || null,
+    user_email: currentUser.email || "",
+    created_at: new Date().toISOString()
+  };
+
+  const { error } = await supabaseClient.from("audit_logs").insert(payload);
+  if(error){
+    console.warn("Audit log skipped. Run the updated Supabase SQL for audit_logs.", error);
+  }
+}
+
+async function loadAuditLogsFromSupabase(){
+  if(!supabaseClient || !isLoggedIn() || !isAdmin()){
+    auditLogs = [];
+    return;
+  }
+
+  const { data, error } = await supabaseClient
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", {ascending:false})
+    .limit(200);
+
+  if(error){
+    console.warn("Audit log load skipped", error);
+    auditLogs = [];
+    return;
+  }
+
+  auditLogs = data || [];
+}
+
 function showTab(id,btn){
   document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -622,10 +743,14 @@ async function saveColor(){
   }
 
   let obj = {name, rate, colorType};
+  let actionType = "create";
+  let oldValue = null;
 
   if(editColorIndex !== null){
     let oldColor = colors[editColorIndex];
+    oldValue = {...oldColor};
     obj.id = oldColor.id;
+    actionType = "update";
     let oldName = oldColor.name;
     if(oldName !== name && colors.some(c=>c.name === name)){
       alert("Color already exists");
@@ -642,6 +767,7 @@ async function saveColor(){
   const saved = await saveColorRecord(obj);
   if(!saved) return;
 
+  await logAudit(actionType, "Price Master", name, oldValue, obj);
   document.getElementById("colorName").value = "";
   document.getElementById("colorRate").value = "";
   document.getElementById("colorType").value = "";
@@ -652,7 +778,10 @@ function renderColors(){
   let q = document.getElementById("priceSearch")?.value.toUpperCase() || "";
   let html = "";
 
-  colors.filter(c=>c.name.includes(q)).forEach((c,i)=>{
+  colors.filter(c=>{
+    let type = c.colorType || getDefaultColorType(c.name);
+    return c.name.includes(q) || type.includes(q);
+  }).forEach((c,i)=>{
     let realIndex = colors.indexOf(c);
     html += `
       <tr>
@@ -690,8 +819,12 @@ async function deleteColor(i){
   if(!requireAdmin()) return;
 
   if(confirm("Delete only this color: " + colors[i].name + "?")){
+    let oldValue = {...colors[i]};
     const saved = await deleteColorRecord(colors[i]);
-    if(saved) await loadDataFromJson();
+    if(saved){
+      await logAudit("delete", "Price Master", oldValue.name, oldValue, null);
+      await loadDataFromJson();
+    }
   }
 }
 
@@ -796,6 +929,11 @@ async function saveRecipe(){
     return;
   }
 
+  let missingPrices = dyes.filter(d => !findColorByName(d.name)).map(d => d.name);
+  if(missingPrices.length){
+    alert("Warning: price missing for " + missingPrices.join(", ") + ". Recipe will still be saved.");
+  }
+
   let obj = {
   recipeNo,
   colorName,
@@ -804,9 +942,14 @@ async function saveRecipe(){
   dyes
 };
 
+  let actionType = "create";
+  let oldValue = null;
+
   if(editRecipeIndex !== null){
   let oldRecipe = recipes[editRecipeIndex];
+  oldValue = {...oldRecipe};
   obj.id = oldRecipe.id;
+  actionType = "update";
   let oldRecipeNo = oldRecipe.recipeNo;
   if(oldRecipeNo !== recipeNo && recipes.some(r=>r.recipeNo === recipeNo)){
     alert("Recipe No already exists");
@@ -823,6 +966,7 @@ async function saveRecipe(){
 const saved = await saveRecipeRecord(obj);
 if(!saved) return;
 
+await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldValue, obj);
 clearRecipeForm();
 await loadDataFromJson();
 }
@@ -852,7 +996,16 @@ function renderRecipes(){
 
   table.innerHTML = "";
 
-  recipes.forEach((r,index)=>{
+  let q = document.getElementById("recipeSearch")?.value.toUpperCase() || "";
+
+  recipes.filter(r => {
+    let dyeNames = (r.dyes || []).map(d => d.name).join(" ");
+    return String(r.recipeNo || "").toUpperCase().includes(q) ||
+      String(r.colorName || "").toUpperCase().includes(q) ||
+      String(r.recipeThans || "").toUpperCase().includes(q) ||
+      dyeNames.toUpperCase().includes(q);
+  }).forEach((r,index)=>{
+    let realIndex = recipes.indexOf(r);
 
     let dyeText = r.dyes
       .map(d => d.name + " - (" + d.qty + " g)")
@@ -866,11 +1019,11 @@ function renderRecipes(){
         <td>${r.recipeThans || ""}</td>
         <td>${dyeText}</td>
         <td>
-          <button ${isAdmin() ? "" : "disabled"} onclick="editRecipe(${index})">
+          <button ${isAdmin() ? "" : "disabled"} onclick="editRecipe(${realIndex})">
             Edit
           </button>
 
-          <button ${isAdmin() ? "" : "disabled"} onclick="deleteRecipe(${index})">
+          <button ${isAdmin() ? "" : "disabled"} onclick="deleteRecipe(${realIndex})">
             Delete
           </button>
         </td>
@@ -900,8 +1053,12 @@ async function deleteRecipe(i){
   if(!requireAdmin()) return;
 
   if(confirm("Delete only this recipe: " + recipes[i].recipeNo + "?")){
+    let oldValue = {...recipes[i]};
     const saved = await deleteRecipeRecord(recipes[i]);
-    if(saved) await loadDataFromJson();
+    if(saved){
+      await logAudit("delete", "Recipe Master", oldValue.recipeNo + " - " + oldValue.colorName, oldValue, null);
+      await loadDataFromJson();
+    }
   }
 }
 
@@ -932,10 +1089,12 @@ function calculateCost(){
 
   let baseBatchCost = 0;
   let rows = "";
+  let missingPrices = [];
 
   recipe.dyes.forEach(d=>{
-    let price = colors.find(c=>c.name === d.name);
+    let price = findColorByName(d.name);
     let rate = price ? Number(price.rate) : 0;
+    if(!price) missingPrices.push(d.name);
 
     let qtyKg = Number(d.qty) / 1000;
     let itemCost = qtyKg * rate;
@@ -954,11 +1113,14 @@ function calculateCost(){
   let perThanCost = baseBatchCost / recipeThans;
   let askedBatchCost = perThanCost * askedThans;
 
+  let warningHtml = missingPrices.length ? `<div class="warningBox"><b>Missing price warning:</b> ${missingPrices.join(", ")} is not in Price Master. Rate is counted as 0.</div>` : "";
+
   document.getElementById("costResult").innerHTML = `
     <h2>Costing Result</h2>
     <p><b>Recipe:</b> ${recipe.recipeNo} - ${recipe.colorName}</p>
     <p><b>Recipe Batch:</b> ${recipeThans} thans</p>
     <p><b>Costing Asked For:</b> ${askedThans} thans</p>
+    ${warningHtml}
 
     <table>
       <thead>
@@ -1046,10 +1208,18 @@ async function createProgram(){
     return;
   }
 
+  await logAudit("create", "Program", programNo + " - " + programName, null, {
+    programNo,
+    programName,
+    programDate,
+    selectedRecipeNumbers: snapshot.map(r => r.recipeNo)
+  });
   document.getElementById("programName").value = "";
   document.querySelectorAll(".programRecipeCheck").forEach(cb => cb.checked = false);
   await loadProgramsFromSupabase();
+  await loadAuditLogsFromSupabase();
   renderPrograms();
+  renderAuditLogs();
   alert("Program " + programNo + " created");
 }
 
@@ -1158,10 +1328,23 @@ function renderProgramHtml(program){
   }).join("");
 
   return `
-    <h2>${program.programName || "Dyeing / Process House"}</h2>
-    <p><b>Program Date:</b> ${program.programDate || ""}</p>
-    <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
+    <div class="printHeader">
+      <div>
+        <h1>MONICA TEXTILE MILLS</h1>
+        <p>F238 MANDIA ROAD PALI RAJ 306-401</p>
+      </div>
+      <div>
+        <h2>${program.programName || "Dyeing / Process House"}</h2>
+        <p><b>Program Date:</b> ${program.programDate || ""}</p>
+        <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
+      </div>
+    </div>
     ${recipesHtml}
+    <div class="signatureGrid">
+      <div class="signatureBox">Prepared By</div>
+      <div class="signatureBox">Checked By</div>
+      <div class="signatureBox">Signature</div>
+    </div>
   `;
 }
 
@@ -1176,16 +1359,29 @@ function exportProgramPdf(index){
         <title>Program ${program.programNo || ""}</title>
         <style>
           body{font-family:Arial;padding:20px;color:#111}
-          table{width:100%;border-collapse:collapse;margin:10px 0 18px}
-          th,td{border:1px solid #999;padding:7px;text-align:left}
+          .printHeader{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #111;margin-bottom:12px;padding-bottom:8px}
+          .printHeader h1,.printHeader h2{margin:0 0 4px}
+          .printHeader p{margin:2px 0}
+          table{width:100%;border-collapse:collapse;margin:8px 0 14px;page-break-inside:auto}
+          th,td{border:1px solid #999;padding:5px;text-align:left;font-size:12px}
           th{background:#dbeafe}
-          h2,h3{margin-bottom:8px}
-          @media print{button{display:none}}
+          h2,h3{margin:8px 0 6px}
+          .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:28px}
+          .signatureBox{border-top:1px solid #111;text-align:center;padding-top:8px}
+          .pageNo{display:none}
+          @media print{
+            button{display:none}
+            .pageNo{display:block;position:fixed;right:0;bottom:0;font-size:11px}
+            .pageNo:after{content:"Page " counter(page)}
+            @page{margin:12mm}
+            body{padding:0}
+          }
         </style>
       </head>
       <body>
         <button onclick="window.print()">Print / Save PDF</button>
         ${renderProgramHtml(program)}
+        <div class="pageNo"></div>
       </body>
     </html>
   `);
@@ -1206,8 +1402,128 @@ async function deleteProgram(index){
     return;
   }
 
+  await logAudit("delete", "Program", program.programNo + " - " + program.programName, program, null);
   await loadProgramsFromSupabase();
+  await loadAuditLogsFromSupabase();
   renderPrograms();
+  renderAuditLogs();
+}
+
+function renderDashboard(){
+  let missing = getAllMissingPriceNames();
+  let lastRecipe = recipes[recipes.length - 1];
+
+  let recipeCount = document.getElementById("dashRecipeCount");
+  let colorCount = document.getElementById("dashColorCount");
+  let programCount = document.getElementById("dashProgramCount");
+  let missingCount = document.getElementById("dashMissingCount");
+  let lastBox = document.getElementById("dashLastRecipe");
+  let missingBox = document.getElementById("dashMissingPrices");
+
+  if(recipeCount) recipeCount.textContent = recipes.length;
+  if(colorCount) colorCount.textContent = colors.length;
+  if(programCount) programCount.textContent = programs.length;
+  if(missingCount) missingCount.textContent = missing.length;
+
+  if(lastBox){
+    lastBox.innerHTML = lastRecipe
+      ? `<b>Last Recipe:</b> ${lastRecipe.recipeNo || ""} - ${lastRecipe.colorName || ""}, Batch Thans: ${lastRecipe.recipeThans || ""}`
+      : "No recipes saved yet.";
+  }
+
+  if(missingBox){
+    missingBox.innerHTML = missing.length
+      ? `<b>Missing Price Alerts:</b> ${missing.join(", ")}`
+      : "<b>Missing Price Alerts:</b> All recipe dyes have prices.";
+  }
+}
+
+function renderAuditLogs(){
+  let table = document.getElementById("historyTable");
+  if(!table) return;
+
+  if(!isAdmin()){
+    table.innerHTML = `<tr><td colspan="7">Only admin can view audit history.</td></tr>`;
+    return;
+  }
+
+  let q = document.getElementById("historySearch")?.value.toUpperCase() || "";
+  let rows = auditLogs.filter(log => {
+    let text = [
+      log.created_at,
+      log.user_email,
+      log.section_name,
+      log.action_type,
+      log.item_name,
+      safeJson(log.old_value),
+      safeJson(log.new_value)
+    ].join(" ").toUpperCase();
+    return text.includes(q);
+  }).map(log => `
+    <tr>
+      <td>${log.created_at ? new Date(log.created_at).toLocaleString() : ""}</td>
+      <td>${log.user_email || ""}</td>
+      <td>${log.section_name || ""}</td>
+      <td>${log.action_type || ""}</td>
+      <td>${log.item_name || ""}</td>
+      <td class="muted">${safeJson(log.old_value)}</td>
+      <td class="muted">${safeJson(log.new_value)}</td>
+    </tr>
+  `).join("");
+
+  table.innerHTML = rows || `<tr><td colspan="7">No history found.</td></tr>`;
+}
+
+function downloadExcel(filename, rows, sheetName){
+  if(!requireAdmin()) return;
+  let workbook = XLSX.utils.book_new();
+  let worksheet = XLSX.utils.json_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  XLSX.writeFile(workbook, filename);
+}
+
+function exportRecipeBookExcel(){
+  let rows = [];
+  recipes.forEach(r => {
+    (r.dyes || []).forEach(d => {
+      rows.push({
+        "Recipe No": r.recipeNo || "",
+        "Color Name": r.colorName || "",
+        "Hex Code": r.hexCode || "N/A",
+        "Batch Thans": r.recipeThans || "",
+        "Dye Name": d.name || "",
+        "Quantity": d.qty || ""
+      });
+    });
+  });
+  downloadExcel("recipe-book.xlsx", rows, "Recipe Book");
+}
+
+function exportPriceMasterExcel(){
+  let rows = colors.map(c => ({
+    "Color Name": c.name || "",
+    "Type": c.colorType || getDefaultColorType(c.name),
+    "Rate/kg": c.rate || ""
+  }));
+  downloadExcel("price-master.xlsx", rows, "Price Master");
+}
+
+function exportProgramHistoryExcel(){
+  let rows = [];
+  programs.forEach(p => {
+    (p.recipeSnapshot || []).forEach(r => {
+      rows.push({
+        "Program No": p.programNo || "",
+        "Dyeing / Process House": p.programName || "",
+        "Program Date": p.programDate || "",
+        "Created Date/Time": p.createdAt || "",
+        "Recipe No": r.recipeNo || "",
+        "Color Name": r.colorName || "",
+        "Batch Thans": r.recipeThans || ""
+      });
+    });
+  });
+  downloadExcel("program-history.xlsx", rows, "Program History");
 }
 
 function exportData(){
@@ -1293,10 +1609,12 @@ function importExcelRates(e){
 }
 
 function renderAll(){
+  renderDashboard();
   renderColors();
   renderRecipes();
   renderRecipeSelect();
   renderPrograms();
+  renderAuditLogs();
 } 
 
 async function loadDataFromJson(){
@@ -1342,6 +1660,7 @@ console.log("SUPABASE RECIPES:", recipeData);
   }));
 
   await loadProgramsFromSupabase();
+  await loadAuditLogsFromSupabase();
   renderAll();
 
   console.log("Loaded from Supabase");
