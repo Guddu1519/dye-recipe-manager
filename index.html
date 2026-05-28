@@ -1116,17 +1116,21 @@ function renderPrograms(){
   applyRolePermissions();
 }
 
+function getDyeColorType(name){
+  let color = colors.find(c => c.name === String(name || "").trim().toUpperCase());
+  return color ? (color.colorType || getDefaultColorType(color.name)) : getDefaultColorType(name);
+}
+
 function getProgramRecipeRows(recipe){
   let dyes = recipe.dyes || [];
-  let splitAt = Math.ceil(dyes.length / 2);
-  let left = dyes.slice(0, splitAt);
-  let right = dyes.slice(splitAt);
-  let maxRows = Math.max(left.length, right.length);
+  let polyster = dyes.filter(d => getDyeColorType(d.name) !== "COTTON");
+  let cotton = dyes.filter(d => getDyeColorType(d.name) === "COTTON");
+  let maxRows = Math.max(polyster.length, cotton.length);
   let rows = "";
 
   for(let i = 0; i < maxRows; i++){
-    let l = left[i];
-    let r = right[i];
+    let l = polyster[i];
+    let r = cotton[i];
     rows += `
       <tr>
         <td>${l ? l.name : ""}</td>
@@ -1146,7 +1150,7 @@ function renderProgramHtml(program){
       <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}, Batch Thans: ${r.recipeThans || ""}</h3>
       <table>
         <thead>
-          <tr><th>Color Name</th><th>Quantity</th><th>Color Name</th><th>Quantity</th></tr>
+          <tr><th>Polyster Color Name</th><th>Quantity</th><th>Cotton Color Name</th><th>Quantity</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
