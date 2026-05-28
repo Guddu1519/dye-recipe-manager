@@ -120,24 +120,18 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:4" onclick="showTab('price',this)">Price Master</button>
   <button style="order:5" onclick="showTab('program',this)">Program</button>
   <button style="order:6" onclick="showTab('customers',this)">Process House</button>
-  <button style="order:7" onclick="showTab('history',this)">History</button>
-  <button style="order:8" onclick="loadDataFromJson()">Refresh Cloud Data</button>
-  <button style="order:9" onclick="exportDailyBackupExcel()">Daily Backup Excel</button>
-  <button style="order:10" onclick="exportData()">Data Export</button>
-  <button style="order:11" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
-  <button style="order:12" onclick="exportPriceMasterExcel()">Price Master Excel</button>
-  <button style="order:13" onclick="exportProgramHistoryExcel()">Program History Excel</button>
-  <button style="order:14" onclick="document.getElementById('importFile').click()">Backup Import</button>
+  <button style="order:7" onclick="showTab('importExport',this)">Import / Export</button>
+  <button style="order:8" onclick="showTab('history',this)">History</button>
+  <button style="order:9" onclick="loadDataFromJson()">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
-  <button style="order:15" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
 
 <input type="file"
        id="excelFile"
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:16" id="roleBadge" class="role-badge"></span>
-  <button style="order:17" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:10" id="roleBadge" class="role-badge"></span>
+  <button style="order:11" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="dashboard" class="active">
@@ -155,12 +149,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
   <div class="card">
     <h3>Quick Export</h3>
-    <div class="exportBar">
-      <button class="btn green" onclick="exportDailyBackupExcel()">Daily Backup Excel</button>
-      <button class="btn green" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
-      <button class="btn green" onclick="exportPriceMasterExcel()">Price Master Excel</button>
-      <button class="btn green" onclick="exportProgramHistoryExcel()">Program History Excel</button>
-    </div>
+    <p class="muted">Use the Import / Export page for backups, Excel exports, and imports.</p>
   </div>
 </section>
 
@@ -185,20 +174,6 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </thead>
       <tbody id="colorTable"></tbody>
     </table>
-  </div>
-
-  <div class="card">
-    <h3>Bulk Edit Price Master</h3>
-    <p class="muted">Update many rates quickly, then save once.</p>
-    <div class="tableWrap">
-      <table>
-        <thead>
-          <tr><th>Color Name</th><th>Type</th><th>Rate/kg</th></tr>
-        </thead>
-        <tbody id="bulkPriceTable"></tbody>
-      </table>
-    </div>
-    <button class="btn green" onclick="saveBulkPrices()">Save Bulk Prices</button>
   </div>
 </section>
 
@@ -318,6 +293,30 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 </section>
 
+<section id="importExport">
+  <div class="card">
+    <h2>Import / Export</h2>
+    <p class="muted">All backup, import, and Excel export tools are kept here.</p>
+  </div>
+  <div class="card">
+    <h3>Export</h3>
+    <div class="exportBar">
+      <button class="btn green" onclick="exportDailyBackupExcel()">Daily Backup Excel</button>
+      <button class="btn green" onclick="exportData()">Data Export</button>
+      <button class="btn green" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
+      <button class="btn green" onclick="exportPriceMasterExcel()">Price Master Excel</button>
+      <button class="btn green" onclick="exportProgramHistoryExcel()">Program History Excel</button>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Import</h3>
+    <div class="exportBar">
+      <button class="btn" onclick="document.getElementById('importFile').click()">Backup Import</button>
+      <button class="btn" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
+    </div>
+  </div>
+</section>
+
 <section id="history">
   <div class="card">
     <h2>History</h2>
@@ -362,8 +361,13 @@ let editRecipeIndex = null;
 let currentUser = null;
 let currentRole = "viewer";
 let refreshTimer = null;
+let inactivityTimer = null;
 
 let dataLoaded = false;
+
+const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+const ADMIN_EMAILS = new Set(["JAINGARVIT31@GMAIL.COM"]);
+const ADMIN_UIDS = new Set(["2d40e8ad-d9dd-4043-8750-9c09cfc029e6"]);
 
 const COTTON_COLORS = new Set([
   "BLACK E","BOURDEX BW","BROWN MR","GOLDEN YELLOW HER","GREEN B","MAROON R",
@@ -446,8 +450,13 @@ function requireAdmin(){
 }
 
 async function loadUserRole(){
-  currentRole = "viewer";
+  let previousRole = currentRole;
   if(!currentUser) return;
+
+  if(ADMIN_UIDS.has(currentUser.id) || ADMIN_EMAILS.has(normalizeName(currentUser.email))){
+    currentRole = "admin";
+    return;
+  }
 
   try{
     let { data, error } = await supabaseClient
@@ -461,12 +470,14 @@ async function loadUserRole(){
       return;
     }
   }catch(err){
-    console.warn("Role lookup failed. Defaulting to viewer.", err);
+    console.warn("Role lookup failed. Keeping previous role.", err);
   }
 
   let metaRole = currentUser.user_metadata?.role || currentUser.app_metadata?.role;
   if(metaRole === "admin" || metaRole === "viewer"){
     currentRole = metaRole;
+  } else {
+    currentRole = previousRole === "admin" ? "admin" : "viewer";
   }
 }
 
@@ -481,7 +492,7 @@ function applyRolePermissions(){
     let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch";
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || text === "Calculate Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "History" || text === "Refresh Cloud Data";
+    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Import / Export" || text === "History" || text === "Refresh Cloud Data";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -511,6 +522,21 @@ function showLoginError(message){
   box.style.display = "block";
 }
 
+function resetInactivityTimer(){
+  if(!isLoggedIn()) return;
+  if(inactivityTimer) clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(function(){
+    logoutUser(true);
+  }, SESSION_TIMEOUT_MS);
+}
+
+function startInactivityWatch(){
+  ["click","keydown","mousemove","touchstart"].forEach(eventName => {
+    window.addEventListener(eventName, resetInactivityTimer, {passive:true});
+  });
+  resetInactivityTimer();
+}
+
 async function loginUser(){
   if(!supabaseClient){
     showLoginError("Supabase is not connected. Please check your internet connection.");
@@ -538,9 +564,10 @@ async function loginUser(){
   currentUser = data.user;
   await loadUserRole();
   await showDashboard();
+  resetInactivityTimer();
 }
 
-async function logoutUser(){
+async function logoutUser(auto=false){
   if(supabaseClient){
     await supabaseClient.auth.signOut();
   }
@@ -558,9 +585,14 @@ async function logoutUser(){
     clearInterval(refreshTimer);
     refreshTimer = null;
   }
+  if(inactivityTimer){
+    clearTimeout(inactivityTimer);
+    inactivityTimer = null;
+  }
 
   document.getElementById("appShell").style.display = "none";
   document.getElementById("loginPage").style.display = "flex";
+  if(auto) showLoginError("Session expired after 5 minutes of inactivity.");
 }
 
 async function showDashboard(){
@@ -575,14 +607,11 @@ async function showDashboard(){
 
   await loadDataFromJson();
   applyRolePermissions();
+  resetInactivityTimer();
 
   if(refreshTimer){
     clearInterval(refreshTimer);
   }
-
-  refreshTimer = setInterval(function(){
-    if(isLoggedIn()) loadDataFromJson();
-  }, 30000);
 }
 
 async function initAuth(){
@@ -591,23 +620,23 @@ async function initAuth(){
     return;
   }
 
-  let { data, error } = await supabaseClient.auth.getSession();
-  if(error){
-    showLoginError(error.message);
-    return;
-  }
-
-  currentUser = data.session?.user || null;
-  if(currentUser){
-    await loadUserRole();
-    await showDashboard();
-  }
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  currentRole = "viewer";
+  document.getElementById("appShell").style.display = "none";
+  document.getElementById("loginPage").style.display = "flex";
+  startInactivityWatch();
 
   supabaseClient.auth.onAuthStateChange(async function(event, session){
     currentUser = session?.user || null;
     if(currentUser && event === "SIGNED_IN"){
       await loadUserRole();
       await showDashboard();
+    } else if(event === "SIGNED_OUT"){
+      currentUser = null;
+      currentRole = "viewer";
+      document.getElementById("appShell").style.display = "none";
+      document.getElementById("loginPage").style.display = "flex";
     }
   });
 }
@@ -642,11 +671,25 @@ async function saveColorRecord(color){
     return false;
   }
 
+  async function runColorWrite(payload, fallbackPayload, id){
+    let query = id
+      ? supabaseClient.from("colors").update(payload).eq("id", id)
+      : supabaseClient.from("colors").insert(payload);
+    let { error } = await query;
+    if(error && String(error.message || "").includes("color_type")){
+      let fallbackQuery = id
+        ? supabaseClient.from("colors").update(fallbackPayload).eq("id", id)
+        : supabaseClient.from("colors").insert(fallbackPayload);
+      return await fallbackQuery;
+    }
+    return { error };
+  }
+
+  let fullPayload = {name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)};
+  let fallbackPayload = {name: color.name, rate: color.rate};
+
   if(color.id){
-    const { error } = await supabaseClient
-      .from("colors")
-      .update({name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)})
-      .eq("id", color.id);
+    const { error } = await runColorWrite(fullPayload, fallbackPayload, color.id);
 
     if(error){
       alert("Color update failed: " + error.message);
@@ -662,10 +705,7 @@ async function saveColorRecord(color){
     }
 
     if(existing && existing.length){
-      const { error } = await supabaseClient
-        .from("colors")
-        .update({name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)})
-        .eq("id", existing[0].id);
+      const { error } = await runColorWrite(fullPayload, fallbackPayload, existing[0].id);
 
       if(error){
         alert("Color update failed: " + error.message);
@@ -676,9 +716,7 @@ async function saveColorRecord(color){
       return true;
     }
 
-    const { error } = await supabaseClient
-      .from("colors")
-      .insert({name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)});
+    const { error } = await runColorWrite(fullPayload, fallbackPayload, null);
 
     if(error){
       alert("Color insert failed: " + error.message);
@@ -805,7 +843,7 @@ async function loadAuditLogsFromSupabase(){
   const { data, error } = await supabaseClient
     .from("audit_logs")
     .select("*")
-    .order("created_at", {ascending:false})
+    .order("created_at", {ascending:true})
     .limit(200);
 
   if(error){
@@ -840,7 +878,7 @@ async function loadRecipeVersionsFromSupabase(){
   const { data, error } = await supabaseClient
     .from("recipe_versions")
     .select("*")
-    .order("created_at", {ascending:false})
+    .order("created_at", {ascending:true})
     .limit(200);
   if(error){
     console.warn("Recipe version load skipped", error);
@@ -923,7 +961,10 @@ function renderColors(){
   let q = document.getElementById("priceSearch")?.value.toUpperCase() || "";
   let html = "";
 
-  colors.filter(c=>{
+  colors
+  .slice()
+  .sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)))
+  .filter(c=>{
     let type = c.colorType || getDefaultColorType(c.name);
     return c.name.includes(q) || type.includes(q);
   }).forEach((c,i)=>{
@@ -941,7 +982,6 @@ function renderColors(){
   });
 
   document.getElementById("colorTable").innerHTML = html;
-  renderBulkPriceTable();
   let dl = document.getElementById("dyeSuggestions");
 
 if(dl){
@@ -1241,7 +1281,11 @@ async function deleteRecipe(i){
 function renderRecipeSelect(){
   let select = document.getElementById("recipeSelect");
   select.innerHTML = `<option value="">Select Recipe</option>`;
-  recipes.forEach((r,i)=>{
+  recipes
+  .slice()
+  .sort((a,b) => Number(a.recipeNo) - Number(b.recipeNo) || String(a.recipeNo).localeCompare(String(b.recipeNo)))
+  .forEach(r=>{
+    let i = recipes.indexOf(r);
     select.innerHTML += `<option value="${i}">${r.recipeNo} - ${r.colorName}</option>`;
   });
 }
@@ -1393,7 +1437,7 @@ async function createProgram(){
   let programNo = getNextProgramNo();
   let snapshot = selectedRecipes.map(makeRecipeSnapshot);
 
-  const { error } = await supabaseClient.from("programs").insert({
+  let programPayload = {
     program_no: programNo,
     program_name: programName,
     status: programStatus,
@@ -1401,7 +1445,12 @@ async function createProgram(){
     created_at: createdAt,
     selected_recipe_numbers: snapshot.map(r => r.recipeNo),
     recipe_snapshot: snapshot
-  });
+  };
+  let { error } = await supabaseClient.from("programs").insert(programPayload);
+  if(error && String(error.message || "").includes("status")){
+    delete programPayload.status;
+    ({ error } = await supabaseClient.from("programs").insert(programPayload));
+  }
 
   if(error){
     alert("Program save failed: " + error.message + ". Run the updated Supabase SQL for programs table.");
@@ -1430,7 +1479,7 @@ async function loadProgramsFromSupabase(){
   const { data, error } = await supabaseClient
     .from("programs")
     .select("*")
-    .order("created_at", {ascending:false});
+    .order("created_at", {ascending:true});
 
   if(error){
     console.warn("Program load skipped", error);
@@ -1447,7 +1496,7 @@ async function loadProgramsFromSupabase(){
     createdAt: p.created_at,
     selectedRecipeNumbers: p.selected_recipe_numbers || [],
     recipeSnapshot: p.recipe_snapshot || []
-  }));
+  })).sort((a,b) => Number(a.programNo) - Number(b.programNo));
 }
 
 function renderPrograms(){
@@ -1461,7 +1510,10 @@ function renderPrograms(){
 
   let recipeTable = document.getElementById("programRecipeTable");
   if(recipeTable){
-    recipeTable.innerHTML = recipes.map(r => `
+    recipeTable.innerHTML = recipes
+    .slice()
+    .sort((a,b) => Number(a.recipeNo) - Number(b.recipeNo) || String(a.recipeNo).localeCompare(String(b.recipeNo)))
+    .map(r => `
       <tr>
         <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${isAdmin() ? "" : "disabled"}></td>
         <td>${r.recipeNo || ""}</td>
@@ -1491,40 +1543,6 @@ function renderPrograms(){
   }
 
   applyRolePermissions();
-}
-
-function renderBulkPriceTable(){
-  let table = document.getElementById("bulkPriceTable");
-  if(!table) return;
-  table.innerHTML = colors.map((c, index) => `
-    <tr>
-      <td>${c.name}</td>
-      <td>${c.colorType || getDefaultColorType(c.name)}</td>
-      <td><input class="bulkRate" data-index="${index}" type="number" value="${c.rate || 0}"></td>
-    </tr>
-  `).join("");
-}
-
-async function saveBulkPrices(){
-  if(!requireAdmin()) return;
-  let changed = 0;
-  document.querySelectorAll(".bulkRate").forEach(input => {
-    let index = Number(input.dataset.index);
-    let newRate = Number(input.value);
-    if(colors[index] && Number(colors[index].rate) !== newRate){
-      colors[index].rate = newRate;
-      changed++;
-    }
-  });
-  if(!changed){
-    alert("No price changes found.");
-    return;
-  }
-  const saved = await saveAll();
-  if(!saved) return;
-  await logAudit("bulk update", "Price Master", changed + " rates", null, {changed});
-  await loadDataFromJson();
-  alert(changed + " prices updated");
 }
 
 function getDyeColorType(name){
@@ -1558,6 +1576,7 @@ function renderProgramHtml(program){
   let recipesHtml = (program.recipeSnapshot || []).map(r => {
     let rows = getProgramRecipeRows(r);
     return `
+      <div class="recipePrintBlock">
       <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}, Batch Thans: ${r.recipeThans || ""}</h3>
       <table>
         <thead>
@@ -1565,6 +1584,7 @@ function renderProgramHtml(program){
         </thead>
         <tbody>${rows}</tbody>
       </table>
+      </div>
     `;
   }).join("");
 
@@ -1608,11 +1628,13 @@ function exportProgramPdf(index){
           .qrCode{width:70px;height:70px;float:right;margin-left:10px}
           .printHeader h1,.printHeader h2{margin:0 0 4px}
           .printHeader p{margin:2px 0}
-          table{width:100%;border-collapse:collapse;margin:8px 0 14px;page-break-inside:auto}
-          th,td{border:1px solid #999;padding:5px;text-align:left;font-size:12px}
+          .recipePrintBlock{break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
+          table{width:100%;border-collapse:collapse;margin:5px 0 10px;page-break-inside:avoid;break-inside:avoid}
+          tr{page-break-inside:avoid;break-inside:avoid}
+          th,td{border:1px solid #999;padding:3px 5px;text-align:left;font-size:11px}
           th{background:#dbeafe}
-          h2,h3{margin:8px 0 6px}
-          .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:28px}
+          h2,h3{margin:5px 0 4px}
+          .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:18px}
           .signatureBox{border-top:1px solid #111;text-align:center;padding-top:8px}
           .pageNo{display:none}
           @media print{
@@ -1642,7 +1664,12 @@ async function updateProgramStatus(index, status){
   let oldValue = {...program};
   const { error } = await supabaseClient.from("programs").update({status}).eq("id", program.id);
   if(error){
-    alert("Program status update failed: " + error.message + ". Run updated Supabase SQL.");
+    if(String(error.message || "").includes("status")){
+      alert("Program status needs the updated Supabase SQL before it can be saved.");
+      await loadDataFromJson();
+      return;
+    }
+    alert("Program status update failed: " + error.message);
     return;
   }
   await logAudit("status update", "Program", program.programNo + " - " + program.programName, oldValue, {...program, status});
@@ -2044,7 +2071,7 @@ console.log("SUPABASE COLORS:", colorData);
     name: c.name,
     rate: c.rate,
     colorType: c.color_type || getDefaultColorType(c.name)
-  }));
+  })).sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
 
   const { data: recipeData, error: recipeError } =
     await supabaseClient.from("recipes").select("*");
@@ -2062,7 +2089,7 @@ console.log("SUPABASE RECIPES:", recipeData);
     recipeThans: r.than_count,
     hexCode: r.hex_code || "N/A",
     dyes: r.dyes || []
-  }));
+  })).sort((a,b) => Number(a.recipeNo) - Number(b.recipeNo) || String(a.recipeNo).localeCompare(String(b.recipeNo)));
 
   await loadProgramsFromSupabase();
   await loadAuditLogsFromSupabase();
@@ -2085,7 +2112,14 @@ let supabaseClient = null;
 if(window.supabase){
   supabaseClient = supabase.createClient(
     SUPABASE_URL,
-    SUPABASE_KEY
+    SUPABASE_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
+    }
   );
   console.log("Supabase Connected");
 } else {

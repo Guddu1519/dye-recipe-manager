@@ -10,6 +10,8 @@ alter table public.recipes enable row level security;
 alter table public.colors
 add column if not exists color_type text not null default '';
 
+notify pgrst, 'reload schema';
+
 update public.colors
 set color_type = 'COTTON'
 where upper(name) in (
@@ -115,6 +117,8 @@ add column if not exists program_name text not null default '';
 
 alter table public.programs
 add column if not exists status text not null default 'Pending';
+
+notify pgrst, 'reload schema';
 
 alter table public.programs enable row level security;
 alter table public.audit_logs enable row level security;
