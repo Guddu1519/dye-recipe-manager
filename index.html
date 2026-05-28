@@ -1866,9 +1866,9 @@ function renderProcessHouses(){
   table.innerHTML = processHouses.map((h, index) => `
     <tr>
       <td>${h.name || ""}</td>
-      <td>${h.phone || ""}</td>
-      <td>${h.gst || ""}</td>
-      <td>${h.default_rate || ""}</td>
+      <td>${h.phone || h.mobile || ""}</td>
+      <td>${h.gst || h.gst_no || ""}</td>
+      <td>${h.default_rate || h.rate || ""}</td>
       <td>${h.address || ""}</td>
       <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProcessHouse(${index})">Delete</button></td>
     </tr>
@@ -1892,10 +1892,10 @@ async function saveProcessHouse(){
   if(!requireAdmin()) return;
   let payload = {
     name: document.getElementById("houseName").value.trim(),
-    phone: document.getElementById("housePhone").value.trim(),
-    gst: document.getElementById("houseGst").value.trim(),
+    phone: String(document.getElementById("housePhone").value || "").trim(),
+    gst: String(document.getElementById("houseGst").value || "").trim(),
     default_rate: Number(document.getElementById("houseRate").value) || 0,
-    address: document.getElementById("houseAddress").value.trim()
+    address: String(document.getElementById("houseAddress").value || "").trim()
   };
   if(!payload.name){
     alert("Process House Name required");
@@ -1909,20 +1909,29 @@ async function saveProcessHouse(){
   processHouses.sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
   saveLocalProcessHouses();
   renderProcessHouses();
+  ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
+  showProcessHouseStatus("Saved on website. Trying cloud save...", false);
 
   let error;
   let savedRows = null;
+  let cloudPayload = {
+    name: payload.name,
+    phone: payload.phone,
+    gst: payload.gst,
+    default_rate: payload.default_rate,
+    address: payload.address
+  };
   let cloudExisting = existing && existing.id && !String(existing.id).startsWith("local-");
   if(cloudExisting){
     ({ data: savedRows, error } = await supabaseClient
       .from("process_houses")
-      .update(payload)
+      .update(cloudPayload)
       .eq("id", existing.id)
       .select("*"));
   } else {
     ({ data: savedRows, error } = await supabaseClient
       .from("process_houses")
-      .upsert(payload, {onConflict:"name"})
+      .upsert(cloudPayload, {onConflict:"name"})
       .select("*"));
   }
   if(error){
@@ -1937,7 +1946,6 @@ async function saveProcessHouse(){
     renderProcessHouses();
   }
   await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);
-  ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
   showProcessHouseStatus("Process house saved to cloud.");
 }
 
