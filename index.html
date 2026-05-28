@@ -49,6 +49,10 @@ th{background:#dbeafe}
     .dashList{display:grid;gap:8px}
     .dashItem{display:flex;justify-content:space-between;gap:12px;padding:10px;border-radius:9px;background:#f8fafc;border:1px solid #e2e8f0}
     .dashItem b{color:#0f172a}
+    .reportGrid{display:grid;grid-template-columns:repeat(3,minmax(160px,1fr));gap:12px}
+    .reportCard{background:linear-gradient(135deg,#f8fafc,#fff);border:1px solid #dbeafe;border-radius:12px;padding:14px}
+    .reportCard span{display:block;color:#475569;font-size:13px;font-weight:bold;text-transform:uppercase}
+    .reportCard b{display:block;color:#1d4ed8;font-size:24px;margin-top:6px}
     .quickActions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .quickActions .btn{text-align:center;text-decoration:none}
     .footerLine{text-align:center;color:#64748b;font-size:12px;padding:14px 10px;border-top:1px solid #e2e8f0;background:#fff}
@@ -137,7 +141,7 @@ th{background:#dbeafe}
 .logout{margin-left:auto;background:#dc2626;color:white}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
-    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
+    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
     @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}}
   </style>
 </head>
@@ -181,8 +185,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:7" onclick="showTab('stock',this)">Chemical Stock</button>
   <button style="order:8" onclick="showTab('contact',this)">Contact Us</button>
   <button style="order:9" onclick="showTab('importExport',this)">Import / Export</button>
-  <button style="order:10" onclick="showTab('history',this)">History</button>
-  <button id="refreshCloudBtn" style="order:11" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
+  <button style="order:10" onclick="showTab('reports',this)">Reports</button>
+  <button style="order:11" onclick="showTab('history',this)">Activity Log</button>
+  <button id="refreshCloudBtn" style="order:12" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
 
 <input type="file"
@@ -243,6 +248,38 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <div class="dashboardGrid">
     <div id="dashMissingPrices" class="warningBox"></div>
     <div id="dashLowPrices" class="warningBox dangerBox"></div>
+  </div>
+</section>
+
+<section id="reports">
+  <div class="card">
+    <h2>Monthly Reports</h2>
+    <p class="muted">Business summary from cloud recipes, programs, stock ledger, and Price Master.</p>
+    <div class="row">
+      <input id="reportMonth" type="month" onchange="renderReports()">
+      <button class="btn" onclick="renderReports()">Load Report</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="reportGrid">
+      <div class="reportCard"><span>Monthly Recipe Count</span><b id="reportRecipeCount">0</b></div>
+      <div class="reportCard"><span>Monthly Program Count</span><b id="reportProgramCount">0</b></div>
+      <div class="reportCard"><span>Total Stock Used</span><b id="reportStockUsed">0 g</b></div>
+      <div class="reportCard"><span>Total Dye Cost</span><b id="reportDyeCost">Rs. 0.00</b></div>
+      <div class="reportCard"><span>Total Program Cost</span><b id="reportProgramCost">Rs. 0.00</b></div>
+      <div class="reportCard"><span>Most Used Color</span><b id="reportTopColor">-</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Most Used Colors</h3>
+    <div class="tableWrap">
+      <table>
+        <thead><tr><th>Color / Chemical</th><th>Used Quantity</th><th>Estimated Cost</th></tr></thead>
+        <tbody id="reportMostUsedTable"></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
@@ -365,7 +402,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Stock</th><th>Export</th><th>WhatsApp</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -573,13 +610,13 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <section id="history">
   <div class="card">
-    <h2>History</h2>
+    <h2>Admin Activity Report / Activity Log</h2>
     <p class="muted">Admin action history from Supabase audit logs.</p>
-    <input id="historySearch" oninput="renderAuditLogs()" placeholder="Search history by user, section, action, item">
+    <input id="historySearch" oninput="renderAuditLogs()" placeholder="Search date, user, action, page/module, old value, or new value">
     <div class="tableWrap">
       <table>
         <thead>
-          <tr><th>Date / Time</th><th>User</th><th>Section</th><th>Action</th><th>Item</th><th>Old Value</th><th>New Value</th></tr>
+          <tr><th>Date & Time</th><th>User</th><th>Page / Module</th><th>Action</th><th>Item</th><th>Old Value</th><th>New Value</th></tr>
         </thead>
         <tbody id="historyTable"></tbody>
       </table>
@@ -834,10 +871,10 @@ function applyRolePermissions(){
   document.querySelectorAll("input, select, button").forEach(el=>{
     let id = el.id || "";
     let text = (el.textContent || "").trim();
-    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter";
+    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth";
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || text === "Calculate Cost";
-    let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "History" || text === "Refresh Cloud Data" || id === "stockBellButton" || text === "Clear";
+    let isProgramView = text === "Export" || text === "Export PDF" || text === "Share PDF on WhatsApp";
+    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "Reports" || text === "Activity Log" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -1212,8 +1249,8 @@ async function loadAuditLogsFromSupabase(){
   const { data, error } = await supabaseClient
     .from("audit_logs")
     .select("*")
-    .order("created_at", {ascending:true})
-    .limit(200);
+    .order("created_at", {ascending:false})
+    .limit(1000);
 
   if(error){
     console.warn("Audit log load skipped", error);
@@ -1874,6 +1911,107 @@ function calculateCost(){
     </table>
   `;
 }
+
+function formatMoney(value){
+  return "Rs. " + (Number(value) || 0).toFixed(2);
+}
+
+function getSelectedReportMonth(){
+  let input = document.getElementById("reportMonth");
+  let current = new Date().toISOString().slice(0, 7);
+  if(input && !input.value) input.value = current;
+  return input?.value || current;
+}
+
+function isDateInMonth(value, monthValue){
+  if(!value || !monthValue) return false;
+  let date = new Date(value);
+  if(Number.isNaN(date.getTime())) return false;
+  return date.toISOString().slice(0, 7) === monthValue;
+}
+
+function getProgramDateValue(program){
+  return program.programDate || program.date || program.createdAt || program.created_at || "";
+}
+
+function getProgramDyeCost(program){
+  let requiredThans = Number(program.requiredThans) || Number((program.recipeSnapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans) || 0;
+  let total = 0;
+
+  (program.recipeSnapshot || []).forEach(recipe => {
+    let savedThans = getRecipeSavedThans(recipe);
+    let targetThans = requiredThans || savedThans;
+    if(!savedThans || !targetThans) return;
+
+    (recipe.dyes || []).forEach(dye => {
+      let color = findColorByName(dye.name);
+      let rate = color ? Number(color.rate) || 0 : 0;
+      let convertedQty = Number(dye.qty || 0) / savedThans * targetThans;
+      total += convertedQty / 1000 * rate;
+    });
+  });
+
+  return total;
+}
+
+function getMonthlyRecipeCount(monthValue){
+  let auditCreates = auditLogs.filter(log =>
+    log.section_name === "Recipe Master" &&
+    String(log.action_type || "").toLowerCase() === "create" &&
+    isDateInMonth(log.created_at, monthValue)
+  ).length;
+
+  if(auditCreates) return auditCreates;
+
+  return recipes.filter(recipe => isDateInMonth(recipe.createdAt, monthValue)).length;
+}
+
+function renderReports(){
+  let monthInput = document.getElementById("reportMonth");
+  if(!monthInput) return;
+
+  let monthValue = getSelectedReportMonth();
+  let monthlyPrograms = programs.filter(program => isDateInMonth(getProgramDateValue(program), monthValue));
+  let monthlyLedgerUsage = (stockLedger || []).filter(entry => {
+    let type = entry.entryType || entry.entry_type || "";
+    return type === "program_usage" && isDateInMonth(entry.created_at || entry.createdAt, monthValue);
+  });
+
+  let stockUsed = monthlyLedgerUsage.reduce((sum, entry) => sum + Math.abs(Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0)), 0);
+  let usageMap = {};
+  monthlyLedgerUsage.forEach(entry => {
+    let name = normalizeName(entry.chemicalName || entry.chemical_name);
+    if(!name) return;
+    if(!usageMap[name]) usageMap[name] = {name, qty:0, cost:0};
+    let qty = Math.abs(Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0));
+    let color = findColorByName(name);
+    usageMap[name].qty += qty;
+    usageMap[name].cost += qty / 1000 * (color ? Number(color.rate) || 0 : 0);
+  });
+
+  let mostUsed = Object.values(usageMap).sort((a,b) => b.qty - a.qty);
+  let programCost = monthlyPrograms.reduce((sum, program) => sum + getProgramDyeCost(program), 0);
+  let dyeCost = mostUsed.reduce((sum, item) => sum + item.cost, 0) || programCost;
+
+  document.getElementById("reportRecipeCount").textContent = getMonthlyRecipeCount(monthValue);
+  document.getElementById("reportProgramCount").textContent = monthlyPrograms.length;
+  document.getElementById("reportStockUsed").textContent = formatGrams(stockUsed);
+  document.getElementById("reportDyeCost").textContent = formatMoney(dyeCost);
+  document.getElementById("reportProgramCost").textContent = formatMoney(programCost);
+  document.getElementById("reportTopColor").textContent = mostUsed[0] ? mostUsed[0].name : "-";
+
+  let table = document.getElementById("reportMostUsedTable");
+  if(table){
+    table.innerHTML = mostUsed.slice(0, 20).map(item => `
+      <tr>
+        <td>${item.name}</td>
+        <td>${formatGrams(item.qty)}</td>
+        <td>${formatMoney(item.cost)}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="3">No stock usage found for this month.</td></tr>`;
+  }
+}
+
 function getNextProgramNo(){
   let nums = programs
     .map(p => Number(p.programNo || p.program_no))
@@ -2097,6 +2235,7 @@ function renderPrograms(){
         <td><input id="programBatchThans_${index}" type="number" min="1" value="${p.requiredThans || ""}" placeholder="Batch thans"></td>
         <td>${p.stockDeducted ? `<span class="stockLowBadge" style="background:#16a34a">Stock Deducted</span>` : `<button ${isAdmin() ? "" : "disabled"} onclick="deductExistingProgramStock(${index})">Deduct Stock</button>`}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
+        <td><button onclick="shareProgramPdfOnWhatsApp(${index})">Share PDF on WhatsApp</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
     `).join("");
@@ -2173,16 +2312,16 @@ function renderProgramHtml(program, requiredThans){
   `;
 }
 
-function exportProgramPdf(index){
+async function exportProgramPdf(index, options={}){
   let program = programs[index];
-  if(!program) return;
+  if(!program) return null;
   let requiredThans = getProgramRequiredThans(program, index);
   if(!requiredThans || requiredThans <= 0){
     let entered = prompt("Batch = How many thans?");
     requiredThans = Number(entered);
     if(!requiredThans || requiredThans <= 0){
       alert("Required thans must be greater than 0");
-      return;
+      return null;
     }
     let input = document.getElementById("programBatchThans_" + index);
     if(input) input.value = requiredThans;
@@ -2191,10 +2330,14 @@ function exportProgramPdf(index){
     (program.recipeSnapshot || []).forEach(r => convertRecipeForPdf(r, requiredThans));
   }catch(err){
     alert(err.message || "Batch thans missing for this recipe");
-    return;
+    return null;
   }
 
   let win = window.open("", "_blank");
+  if(!win){
+    alert("Popup blocked. Please allow popups to export the Program PDF.");
+    return null;
+  }
   win.document.write(`
     <html>
       <head>
@@ -2232,6 +2375,45 @@ function exportProgramPdf(index){
   `);
   win.document.close();
   win.focus();
+  if(!options.skipAudit){
+    await logAudit("pdf generated", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans});
+    await loadAuditLogsFromSupabase();
+    renderAuditLogs();
+  }
+  return {program, requiredThans};
+}
+
+async function shareProgramPdfOnWhatsApp(index){
+  let result = await exportProgramPdf(index, {skipAudit:true});
+  if(!result) return;
+
+  let program = result.program;
+  let recipeText = (program.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join(", ");
+  let message = [
+    "MONICA TEXTILE MILLS",
+    "Program " + (program.programNo || "") + " - " + (program.programName || ""),
+    "Program Date: " + (program.programDate || ""),
+    "Batch Thans: " + result.requiredThans,
+    "Recipes: " + recipeText,
+    "PDF page has been generated. Please attach/download the PDF manually if WhatsApp cannot attach it directly."
+  ].join("\n");
+
+  if(navigator.share){
+    try{
+      await navigator.share({title:"Program PDF", text:message});
+      await logAudit("pdf shared", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans: result.requiredThans, method:"native share"});
+      await loadAuditLogsFromSupabase();
+      renderAuditLogs();
+      return;
+    }catch(err){
+      if(String(err.name || "") === "AbortError") return;
+    }
+  }
+
+  window.open("https://wa.me/?text=" + encodeURIComponent(message), "_blank");
+  await logAudit("pdf shared", "Program", program.programNo + " - " + program.programName, null, {programNo: program.programNo, requiredThans: result.requiredThans, method:"whatsapp web"});
+  await loadAuditLogsFromSupabase();
+  renderAuditLogs();
 }
 
 async function updateProgramStatus(index, status){
@@ -2727,9 +2909,12 @@ async function saveStockPurchase(){
     alert("Stock ledger failed: " + explainSupabaseError(ledgerError, "Run the updated Supabase SQL for stock tables."));
     return;
   }
+  await logAudit("stock purchase", "Chemical Stock", name, null, purchase);
   ["stockChemicalName","stockPurchaseQty","stockSupplier","stockRate","stockNote"].forEach(id => document.getElementById(id).value = "");
   await loadStockFromSupabase();
+  await loadAuditLogsFromSupabase();
   renderStock();
+  renderAuditLogs();
   alert("Stock purchase saved");
 }
 
@@ -2752,9 +2937,17 @@ async function saveStockAdjustment(){
     alert("Stock adjustment failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
     return;
   }
+  await logAudit("stock adjustment", "Chemical Stock", name, null, {
+    chemicalName: name,
+    qtyDeltaGrams: grams,
+    reason: document.getElementById("adjustReason").value,
+    note: document.getElementById("adjustNote").value.trim()
+  });
   ["adjustChemicalName","adjustQty","adjustNote"].forEach(id => document.getElementById(id).value = "");
   await loadStockFromSupabase();
+  await loadAuditLogsFromSupabase();
   renderStock();
+  renderAuditLogs();
   alert("Stock adjustment saved");
 }
 
@@ -2878,8 +3071,11 @@ function importStockExcel(e){
         if(index % 5 === 0) await waitForUi();
       }
       setStockImportProgress(99, "Refreshing stock table...");
+      await logAudit("stock import", "Chemical Stock", "Excel stock import", null, {imported, skipped});
       await loadStockFromSupabase();
+      await loadAuditLogsFromSupabase();
       renderStock();
+      renderAuditLogs();
       setStockImportProgress(100, "Stock from Excel uploaded successfully.");
       alert("Stock from Excel uploaded successfully.\nImported: " + imported + "\nSkipped: " + skipped);
       e.target.value = "";
@@ -3321,6 +3517,7 @@ function importExcelRates(e){
 
 function renderAll(){
   renderDashboard();
+  renderReports();
   renderColors();
   renderPriceHistory();
   renderRecipes();
@@ -3391,6 +3588,7 @@ console.log("SUPABASE RECIPES:", recipeData);
       colorName: r.color_name,
       recipeThans: r.than_count,
       hexCode: r.hex_code || "N/A",
+      createdAt: r.created_at || "",
       dyes: r.dyes || []
     }));
     sortRecipesInPlace();

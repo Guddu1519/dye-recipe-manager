@@ -10,6 +10,9 @@ alter table public.recipes enable row level security;
 alter table public.colors
 add column if not exists color_type text not null default '';
 
+alter table public.recipes
+add column if not exists created_at timestamptz not null default now();
+
 notify pgrst, 'reload schema';
 
 update public.colors
