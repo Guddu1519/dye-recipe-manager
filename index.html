@@ -159,6 +159,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .companyHeader .companyAddress{color:#64748b}
     .siteLogo{width:48px;height:48px;border-radius:12px;box-shadow:0 8px 22px #0f172a18}
     .mobileMenuBtn{display:none;background:#0f172a;color:white;border:0;border-radius:10px;padding:10px 12px;font-weight:bold}
+    .mobileMenuBtn.closeMode{background:#dc2626}
     nav{position:fixed;top:0;left:0;bottom:0;width:236px;display:flex;flex-direction:column;gap:clamp(2px,.45vh,4px);padding:clamp(10px,1.5vh,14px) 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow:hidden;box-sizing:border-box}
     nav:before{content:"MTM";color:white;font-size:clamp(18px,2.4vh,22px);font-weight:800;letter-spacing:.04em;padding:clamp(4px,.8vh,8px) 10px clamp(10px,1.5vh,16px);border-bottom:1px solid #334155;margin-bottom:clamp(4px,.8vh,8px);line-height:1}
     nav button{width:100%;box-sizing:border-box;order:initial!important;display:flex;align-items:center;gap:9px;text-align:left;background:transparent;color:#cbd5e1;border-radius:10px;padding:clamp(6px,.9vh,9px) 12px;font-size:clamp(12px,1.55vh,14px);line-height:1.1;font-weight:700;white-space:nowrap}
@@ -227,7 +228,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="appShell">
 <header>
-  <button class="mobileMenuBtn" onclick="toggleSidebar()">Menu</button>
+  <button id="mobileMenuBtn" class="mobileMenuBtn" onclick="toggleSidebar()">Menu</button>
   <div class="brandLeft">
     <img class="siteLogo" src="logo.svg" alt="Monica Textile Mills Logo">
     <div class="appTitle">
@@ -1550,11 +1551,21 @@ function showTab(id,btn){
   document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
   if(btn) btn.classList.add("active");
   document.body.classList.remove("sidebarOpen");
+  updateMobileMenuButton();
   renderAll();
 }
 
 function toggleSidebar(){
   document.body.classList.toggle("sidebarOpen");
+  updateMobileMenuButton();
+}
+
+function updateMobileMenuButton(){
+  let button = document.getElementById("mobileMenuBtn");
+  if(!button) return;
+  let open = document.body.classList.contains("sidebarOpen");
+  button.textContent = open ? "Close" : "Menu";
+  button.classList.toggle("closeMode", open);
 }
 
 function goToTab(id){
