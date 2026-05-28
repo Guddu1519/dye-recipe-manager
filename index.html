@@ -149,8 +149,64 @@ th{background:#dbeafe}
 .logout{margin-left:auto;background:#dc2626;color:white}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
+    :root{--erp-bg:#eef2f7;--erp-panel:#ffffff;--erp-ink:#111827;--erp-muted:#64748b;--erp-line:#d7dee9;--erp-dark:#0b1220;--erp-blue:#1d4ed8;--erp-green:#15803d;--erp-red:#b91c1c;--erp-amber:#b45309}
+    body{background:var(--erp-bg);color:var(--erp-ink);font-size:14px}
+    #appShell{min-height:100vh;background:var(--erp-bg)}
+    header{position:fixed;top:0;left:260px;right:0;height:72px;padding:12px 22px;background:rgba(255,255,255,.95);color:#111827;border-bottom:1px solid var(--erp-line);box-shadow:0 8px 26px #0f172a12;z-index:900;backdrop-filter:blur(10px)}
+    header h1{font-size:20px;color:#0f172a}
+    .appTitle p{color:#64748b;font-size:13px;margin-top:4px}
+    .companyHeader .companyName{font-size:20px;color:#0f172a}
+    .companyHeader .companyAddress{color:#64748b}
+    .siteLogo{width:48px;height:48px;border-radius:12px;box-shadow:0 8px 22px #0f172a18}
+    .mobileMenuBtn{display:none;background:#0f172a;color:white;border:0;border-radius:10px;padding:10px 12px;font-weight:bold}
+    nav{position:fixed;top:0;left:0;bottom:0;width:236px;display:flex;flex-direction:column;gap:6px;padding:18px 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow:auto}
+    nav:before{content:"MTM ERP";color:white;font-size:22px;font-weight:800;letter-spacing:.04em;padding:8px 10px 18px;border-bottom:1px solid #334155;margin-bottom:8px}
+    nav button{width:100%;order:initial!important;display:flex;align-items:center;gap:10px;text-align:left;background:transparent;color:#cbd5e1;border-radius:10px;padding:12px 12px;font-weight:700}
+    nav button:hover{background:#1e293b;color:white}
+    nav button.active{background:#2563eb;color:white;box-shadow:0 10px 24px #2563eb40}
+    nav button:nth-of-type(1):before{content:"D";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#1e40af;color:white;font-size:12px}
+    nav button:nth-of-type(2):before{content:"R";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
+    nav button:nth-of-type(3):before{content:"C";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
+    nav button:nth-of-type(4):before{content:"P";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
+    nav button:nth-of-type(5):before{content:"M";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
+    nav button:nth-of-type(7):before{content:"S";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
+    .role-badge,.logout{width:100%;margin-left:0;box-sizing:border-box;text-align:center;justify-content:center}
+    section{padding:100px 24px 20px;margin-left:260px;min-height:calc(100vh - 120px)}
+    .card,.dashPanel{border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 14px 38px #0f172a0d;background:var(--erp-panel)}
+    .card h2,.card h3,.dashPanel h3{color:#0f172a;letter-spacing:-.01em}
+    input,select{border:1px solid #cbd5e1;background:#fff;border-radius:10px;padding:12px 13px;font-size:14px}
+    input:focus,select:focus{outline:2px solid #bfdbfe;border-color:#2563eb}
+    .btn,nav button,button{transition:.15s ease}
+    .btn{border-radius:10px;box-shadow:0 8px 18px #2563eb18}
+    .green{background:#15803d}
+    .danger{background:#b91c1c;color:white}
+    .tableWrap,.card{overflow-x:auto}
+    table{border-collapse:separate;border-spacing:0;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden}
+    th,td{border:0;border-bottom:1px solid #e2e8f0;padding:11px 12px;vertical-align:top}
+    th{position:sticky;top:0;background:#f1f5f9;color:#334155;font-size:12px;text-transform:uppercase;letter-spacing:.04em;z-index:2}
+    tbody tr:nth-child(even) td{background:#f8fafc}
+    tbody tr:hover td{background:#eef6ff}
+    .dashboardHero{background:linear-gradient(135deg,#0b1220,#1d4ed8);border-radius:18px;box-shadow:0 20px 54px #0f172a22}
+    .statGrid{grid-template-columns:repeat(4,minmax(160px,1fr))}
+    .stat,.reportCard{border-color:#dbeafe;border-radius:14px;box-shadow:0 10px 26px #0f172a0a}
+    .erpChartGrid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px}
+    .erpChart{background:white;border:1px solid #e2e8f0;border-radius:14px;padding:15px;box-shadow:0 10px 28px #0f172a0c}
+    .erpChart h3{margin:0 0 12px;color:#0f172a}
+    .barRow{display:grid;grid-template-columns:120px 1fr auto;gap:10px;align-items:center;margin:8px 0;color:#475569}
+    .barTrack{height:10px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+    .barFill{height:100%;background:linear-gradient(90deg,#2563eb,#16a34a);border-radius:999px}
+    .workflowSteps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
+    .workflowStep{background:#f8fafc;border:1px solid #dbeafe;border-radius:12px;padding:10px;color:#334155;font-weight:700;font-size:13px}
+    .workflowStep span{display:block;color:#2563eb;font-size:12px;text-transform:uppercase;margin-bottom:4px}
+    .smartAssistantButton{position:fixed;right:22px;bottom:22px;width:64px;height:64px;border-radius:999px;border:0;background:linear-gradient(135deg,#2563eb,#0f172a);color:white;font-size:20px;font-weight:800;box-shadow:0 18px 46px #0f172a55;z-index:9998}
+    .smartAssistantWindow{display:none;position:fixed;right:22px;bottom:96px;width:390px;max-width:calc(100vw - 28px);height:560px;max-height:calc(100vh - 120px);background:white;border:1px solid #dbeafe;border-radius:16px;box-shadow:0 24px 70px #0f172a55;z-index:9999;overflow:hidden}
+    .smartAssistantWindow.open{display:flex;flex-direction:column}
+    .smartAssistantHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f172a;color:white;padding:12px 14px;font-weight:bold}
+    .smartAssistantHeader button{background:#1e293b;color:white;border:0;border-radius:8px;padding:7px 10px;cursor:pointer}
+    .footerLine{margin-left:260px;background:transparent;border:0}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}}
+    @media(max-width:900px){header{left:0}.mobileMenuBtn{display:inline-block}nav{transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section,.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:column;align-items:flex-start}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}.smartAssistantButton{right:16px;bottom:16px}.smartAssistantWindow{right:14px;bottom:88px;height:72vh}section{padding-top:150px}}
   </style>
 </head>
 <body>
@@ -169,6 +225,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="appShell">
 <header>
+  <button class="mobileMenuBtn" onclick="toggleSidebar()">Menu</button>
   <div class="brandLeft">
     <img class="siteLogo" src="logo.svg" alt="Monica Textile Mills Logo">
     <div class="appTitle">
@@ -188,15 +245,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:2" onclick="showTab('recipe',this)">Recipe Master</button>
   <button style="order:3" onclick="showTab('costing',this)">Batch Costing</button>
   <button style="order:4" onclick="showTab('price',this)">Price Master</button>
-  <button style="order:5" onclick="showTab('program',this)">Program</button>
+  <button style="order:5" onclick="showTab('program',this)">Program Management</button>
   <button style="order:6" onclick="showTab('customers',this)">Process House</button>
-  <button style="order:7" onclick="showTab('stock',this)">Chemical Stock</button>
+  <button style="order:7" onclick="showTab('stock',this)">Stock Master</button>
   <button style="order:8" onclick="showTab('contact',this)">Contact Us</button>
-  <button style="order:9" onclick="showTab('importExport',this)">Import / Export</button>
+  <button style="order:9" onclick="showTab('importExport',this)">Settings / Backup</button>
   <button style="order:10" onclick="showTab('reports',this)">Reports</button>
-  <button style="order:11" onclick="showTab('aiAssistant',this)">AI Production Assistant</button>
-  <button style="order:12" onclick="showTab('history',this)">Activity Log</button>
-  <button id="refreshCloudBtn" style="order:13" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
+  <button style="order:11" onclick="showTab('history',this)">Activity Logs</button>
+  <button id="refreshCloudBtn" style="order:12" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
 
 <input type="file"
@@ -204,8 +260,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:14" id="roleBadge" class="role-badge"></span>
-  <button style="order:15" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:13" id="roleBadge" class="role-badge"></span>
+  <button style="order:14" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="dashboard" class="active">
@@ -225,10 +281,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
   <div class="card">
     <div class="statGrid">
-      <div class="stat"><span>Saved Recipes</span><b id="dashRecipeCount">0</b></div>
-      <div class="stat"><span>Dye / Colors</span><b id="dashColorCount">0</b></div>
-      <div class="stat"><span>Programs</span><b id="dashProgramCount">0</b></div>
-      <div class="stat"><span>Missing Prices</span><b id="dashMissingCount">0</b></div>
+      <div class="stat"><span>Total Recipes</span><b id="dashRecipeCount">0</b></div>
+      <div class="stat"><span>Total Programs</span><b id="dashProgramCount">0</b></div>
+      <div class="stat"><span>Total Stock Items</span><b id="dashStockItemCount">0</b></div>
+      <div class="stat"><span>Low Stock Alerts</span><b id="dashLowStockCount">0</b></div>
+      <div class="stat"><span>Monthly Dye Cost</span><b id="dashMonthlyDyeCost">Rs. 0</b></div>
+      <div class="stat"><span>Monthly Production</span><b id="dashMonthlyProduction">0</b></div>
+      <div class="stat"><span>Pending Programs</span><b id="dashPendingPrograms">0</b></div>
+      <div class="stat"><span>Stock Value</span><b id="dashStockValue">Rs. 0</b></div>
     </div>
   </div>
 
@@ -244,13 +304,31 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </div>
 
     <div class="dashPanel">
-      <h3>Quick Actions</h3>
-      <div class="quickActions">
-        <button class="btn" onclick="goToTab('recipe')">Recipe Master</button>
-        <button class="btn" onclick="goToTab('program')">Program</button>
-        <button class="btn" onclick="goToTab('importExport')">Import / Export</button>
+      <h3>ERP Status</h3>
+      <div class="dashList">
+        <div class="dashItem"><span>Dye / Colors</span><b id="dashColorCount">0</b></div>
+        <div class="dashItem"><span>Missing prices</span><b id="dashMissingCount">0</b></div>
+        <div class="dashItem"><span>Stock watch</span><b>Live</b></div>
       </div>
-      <p class="muted">Backups and Excel tools stay on the Import / Export page to keep home clean.</p>
+    </div>
+  </div>
+
+  <div class="erpChartGrid">
+    <div class="erpChart">
+      <h3>Monthly Program Count</h3>
+      <div id="dashProgramChart"></div>
+    </div>
+    <div class="erpChart">
+      <h3>Most Used Colors</h3>
+      <div id="dashColorChart"></div>
+    </div>
+    <div class="erpChart">
+      <h3>Monthly Dye Cost Trend</h3>
+      <div id="dashCostChart"></div>
+    </div>
+    <div class="erpChart">
+      <h3>Low Stock Summary</h3>
+      <div id="dashLowStockChart"></div>
     </div>
   </div>
 
@@ -288,23 +366,6 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <thead><tr><th>Color / Chemical</th><th>Used Quantity</th><th>Estimated Cost</th></tr></thead>
         <tbody id="reportMostUsedTable"></tbody>
       </table>
-    </div>
-  </div>
-</section>
-
-<section id="aiAssistant">
-  <div class="card">
-    <h2>AI Production Assistant</h2>
-    <p class="muted">Ask read-only questions about recipes, programs, stock, prices, costing, and reports data.</p>
-    <div class="chatShell">
-      <div id="aiChatMessages" class="chatMessages">
-        <div class="chatMsg chatAi">Ask me things like: "Which color was used most this month?" or "Show recipes using Yellow 5GLL."</div>
-      </div>
-      <div class="chatInputBar">
-        <input id="aiQuestionInput" placeholder="Ask about recipe, stock, price, program, costing, or reports">
-        <button id="aiSendBtn" class="btn green" onclick="sendAiAssistantMessage()">Send</button>
-        <button class="btn danger" onclick="clearAiAssistantChat()">Clear Chat</button>
-      </div>
     </div>
   </div>
 </section>
@@ -414,6 +475,13 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 <section id="program">
   <div class="card">
     <h2>Program</h2>
+    <div class="workflowSteps">
+      <div class="workflowStep"><span>Step 1</span>Select recipes</div>
+      <div class="workflowStep"><span>Step 2</span>Enter required thans</div>
+      <div class="workflowStep"><span>Step 3</span>Proceed</div>
+      <div class="workflowStep"><span>Step 4</span>Review history</div>
+      <div class="workflowStep"><span>Step 5</span>Export PDF</div>
+    </div>
     <h3 id="programRecipeCount">You have saved 0 recipes.</h3>
     <div class="row">
       <input id="programDate" type="date">
@@ -693,6 +761,26 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 </div>
 
+<button id="smartAssistantButton" class="smartAssistantButton" onclick="toggleSmartAssistant()" title="MTM Smart Assistant">AI</button>
+<div id="smartAssistantWindow" class="smartAssistantWindow">
+  <div class="smartAssistantHeader">
+    <span>MTM Smart Assistant</span>
+    <div>
+      <button onclick="clearAiAssistantChat()">Clear</button>
+      <button onclick="toggleSmartAssistant(false)">Minimize</button>
+    </div>
+  </div>
+  <div class="chatShell" style="height:100%;max-height:none;border:0;border-radius:0">
+    <div id="aiChatMessages" class="chatMessages">
+      <div class="chatMsg chatAi">Ask me about recipes, programs, stock, prices, costing, reports, or production planning.</div>
+    </div>
+    <div class="chatInputBar">
+      <input id="aiQuestionInput" placeholder="Ask MTM Smart Assistant">
+      <button id="aiSendBtn" class="btn green" onclick="sendAiAssistantMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
 <datalist id="processHouseList"></datalist>
 
 <script>
@@ -917,8 +1005,8 @@ function applyRolePermissions(){
     let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth" || id === "aiQuestionInput";
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || id === "multiCostSelectAll" || el.classList.contains("multiCostRecipeCheck") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isAiAssistant = text === "AI Production Assistant" || text === "Send" || text === "Clear Chat";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "Reports" || text === "Activity Log" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
+    let isAiAssistant = id === "smartAssistantButton" || id === "aiSendBtn" || text === "Send" || text === "Clear" || text === "Minimize";
+    let isNavigation = text === "Menu" || text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isAiAssistant || isLogout || isLogin;
@@ -1459,7 +1547,12 @@ function showTab(id,btn){
   document.getElementById(id).classList.add("active");
   document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
   if(btn) btn.classList.add("active");
+  document.body.classList.remove("sidebarOpen");
   renderAll();
+}
+
+function toggleSidebar(){
+  document.body.classList.toggle("sidebarOpen");
 }
 
 function goToTab(id){
@@ -2825,6 +2918,16 @@ function clearStockNotifications(){
   renderStockNotifications();
 }
 
+function toggleSmartAssistant(forceOpen){
+  let panel = document.getElementById("smartAssistantWindow");
+  if(!panel) return;
+  let open = typeof forceOpen === "boolean" ? forceOpen : !panel.classList.contains("open");
+  panel.classList.toggle("open", open);
+  if(open){
+    setTimeout(() => document.getElementById("aiQuestionInput")?.focus(), 50);
+  }
+}
+
 function getAiChatHistory(){
   return Array.from(document.querySelectorAll("#aiChatMessages .chatMsg")).slice(-8).map(node => ({
     role: node.classList.contains("chatUser") ? "user" : "assistant",
@@ -3308,10 +3411,28 @@ function exportStockExcel(){
   XLSX.writeFile(workbook, "chemical-stock.xlsx");
 }
 
+function renderBarRows(items){
+  if(!items || !items.length) return `<p class="muted">No data available yet.</p>`;
+  let max = Math.max(...items.map(item => Number(item.value) || 0), 1);
+  return items.map(item => {
+    let percent = Math.max(4, Math.round(((Number(item.value) || 0) / max) * 100));
+    return `
+      <div class="barRow">
+        <span>${item.label}</span>
+        <div class="barTrack"><div class="barFill" style="width:${percent}%"></div></div>
+        <b>${item.display ?? item.value}</b>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderDashboard(){
   let missing = getAllMissingPriceNames();
   let lowPrices = getLowPriceColors();
+  let stockRows = getStockRows();
+  let lowStockRows = getLowStockRows(stockRows);
   let lastRecipe = recipes[recipes.length - 1];
+  let currentMonth = new Date().toISOString().slice(0, 7);
   let todayKey = new Date().toDateString();
   let todayPrograms = programs.filter(program => {
     let dateValue = program.created_at || program.createdAt || program.programDate || program.date;
@@ -3319,6 +3440,21 @@ function renderDashboard(){
     let parsed = new Date(dateValue);
     return !isNaN(parsed.getTime()) && parsed.toDateString() === todayKey;
   }).length;
+  let monthlyPrograms = programs.filter(program => isDateInMonth(getProgramDateValue(program), currentMonth));
+  let pendingPrograms = programs.filter(program => String(program.status || "").toLowerCase() === "pending").length;
+  let monthlyDyeCost = monthlyPrograms.reduce((sum, program) => sum + getProgramDyeCost(program), 0);
+  let stockValue = stockRows.reduce((sum, row) => {
+    let price = findColorByName(row.name);
+    return sum + (Number(row.balance) || 0) / 1000 * (price ? Number(price.rate) || 0 : 0);
+  }, 0);
+  let usageMap = {};
+  (stockLedger || []).forEach(entry => {
+    let type = entry.entryType || entry.entry_type || "";
+    if(type !== "program_usage" || !isDateInMonth(entry.created_at || entry.createdAt, currentMonth)) return;
+    let name = normalizeName(entry.chemicalName || entry.chemical_name);
+    let qty = Math.abs(Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0));
+    usageMap[name] = (usageMap[name] || 0) + qty;
+  });
 
   let recipeCount = document.getElementById("dashRecipeCount");
   let colorCount = document.getElementById("dashColorCount");
@@ -3330,6 +3466,12 @@ function renderDashboard(){
   let lastBox = document.getElementById("dashLastRecipe");
   let missingBox = document.getElementById("dashMissingPrices");
   let lowBox = document.getElementById("dashLowPrices");
+  let stockItemCount = document.getElementById("dashStockItemCount");
+  let lowStockCount = document.getElementById("dashLowStockCount");
+  let monthlyDyeCostEl = document.getElementById("dashMonthlyDyeCost");
+  let monthlyProductionEl = document.getElementById("dashMonthlyProduction");
+  let pendingProgramsEl = document.getElementById("dashPendingPrograms");
+  let stockValueEl = document.getElementById("dashStockValue");
 
   if(recipeCount) recipeCount.textContent = recipes.length;
   if(colorCount) colorCount.textContent = colors.length;
@@ -3338,6 +3480,45 @@ function renderDashboard(){
   if(todayProgramCount) todayProgramCount.textContent = todayPrograms;
   if(processHouseCount) processHouseCount.textContent = processHouses.length;
   if(roleValue) roleValue.textContent = currentRole === "admin" ? "Admin" : "Viewer";
+  if(stockItemCount) stockItemCount.textContent = stockRows.length;
+  if(lowStockCount) lowStockCount.textContent = lowStockRows.length;
+  if(monthlyDyeCostEl) monthlyDyeCostEl.textContent = formatMoney(monthlyDyeCost);
+  if(monthlyProductionEl) monthlyProductionEl.textContent = monthlyPrograms.length;
+  if(pendingProgramsEl) pendingProgramsEl.textContent = pendingPrograms;
+  if(stockValueEl) stockValueEl.textContent = formatMoney(stockValue);
+
+  let programChart = document.getElementById("dashProgramChart");
+  let colorChart = document.getElementById("dashColorChart");
+  let costChart = document.getElementById("dashCostChart");
+  let lowStockChart = document.getElementById("dashLowStockChart");
+  if(programChart){
+    let monthItems = Array.from({length:6}).map((_, index) => {
+      let date = new Date();
+      date.setMonth(date.getMonth() - (5 - index));
+      let key = date.toISOString().slice(0, 7);
+      return {label:key, value:programs.filter(program => isDateInMonth(getProgramDateValue(program), key)).length};
+    });
+    programChart.innerHTML = renderBarRows(monthItems);
+  }
+  if(colorChart){
+    colorChart.innerHTML = renderBarRows(Object.entries(usageMap)
+      .map(([label, value]) => ({label, value, display:formatGrams(value)}))
+      .sort((a,b) => b.value - a.value)
+      .slice(0, 6));
+  }
+  if(costChart){
+    let costItems = Array.from({length:6}).map((_, index) => {
+      let date = new Date();
+      date.setMonth(date.getMonth() - (5 - index));
+      let key = date.toISOString().slice(0, 7);
+      let value = programs.filter(program => isDateInMonth(getProgramDateValue(program), key)).reduce((sum, program) => sum + getProgramDyeCost(program), 0);
+      return {label:key, value, display:formatMoney(value)};
+    });
+    costChart.innerHTML = renderBarRows(costItems);
+  }
+  if(lowStockChart){
+    lowStockChart.innerHTML = renderBarRows(lowStockRows.slice(0, 6).map(row => ({label:row.name, value:row.balance, display:formatGrams(row.balance)})));
+  }
 
   if(lastBox){
     lastBox.innerHTML = lastRecipe
