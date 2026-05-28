@@ -159,9 +159,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .companyHeader .companyAddress{color:#64748b}
     .siteLogo{width:48px;height:48px;border-radius:12px;box-shadow:0 8px 22px #0f172a18}
     .mobileMenuBtn{display:none;background:#0f172a;color:white;border:0;border-radius:10px;padding:10px 12px;font-weight:bold}
-    nav{position:fixed;top:0;left:0;bottom:0;width:236px;display:flex;flex-direction:column;gap:6px;padding:18px 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow:auto}
+    nav{position:fixed;top:0;left:0;bottom:0;width:236px;display:flex;flex-direction:column;gap:4px;padding:16px 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow-y:auto;overflow-x:hidden;box-sizing:border-box}
     nav:before{content:"MTM ERP";color:white;font-size:22px;font-weight:800;letter-spacing:.04em;padding:8px 10px 18px;border-bottom:1px solid #334155;margin-bottom:8px}
-    nav button{width:100%;order:initial!important;display:flex;align-items:center;gap:10px;text-align:left;background:transparent;color:#cbd5e1;border-radius:10px;padding:12px 12px;font-weight:700}
+    nav button{width:100%;box-sizing:border-box;order:initial!important;display:flex;align-items:center;gap:10px;text-align:left;background:transparent;color:#cbd5e1;border-radius:10px;padding:10px 12px;font-weight:700}
     nav button:hover{background:#1e293b;color:white}
     nav button.active{background:#2563eb;color:white;box-shadow:0 10px 24px #2563eb40}
     nav button:nth-of-type(1):before{content:"D";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#1e40af;color:white;font-size:12px}
@@ -171,6 +171,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     nav button:nth-of-type(5):before{content:"M";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
     nav button:nth-of-type(7):before{content:"S";display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:#334155;color:white;font-size:12px}
     .role-badge,.logout{width:100%;margin-left:0;box-sizing:border-box;text-align:center;justify-content:center}
+    nav .logout{margin-top:auto}
     section{padding:100px 24px 20px;margin-left:260px;min-height:calc(100vh - 120px)}
     .card,.dashPanel{border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 14px 38px #0f172a0d;background:var(--erp-panel)}
     .card h2,.card h3,.dashPanel h3{color:#0f172a;letter-spacing:-.01em}
