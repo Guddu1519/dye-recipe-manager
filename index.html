@@ -2151,16 +2151,29 @@ function formatMoney(value){
 
 function getSelectedReportMonth(){
   let input = document.getElementById("reportMonth");
-  let current = new Date().toISOString().slice(0, 7);
+  let now = new Date();
+  let current = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
   if(input && !input.value) input.value = current;
   return input?.value || current;
 }
 
+function getMonthKeyFromDateValue(value){
+  if(!value) return "";
+  let text = String(value).trim();
+  let isoMatch = text.match(/^(\d{4})-(\d{1,2})/);
+  if(isoMatch) return isoMatch[1] + "-" + isoMatch[2].padStart(2, "0");
+
+  let indianMatch = text.match(/^(\d{1,2})\s*[-/]\s*(\d{1,2})\s*[-/]\s*(\d{4})/);
+  if(indianMatch) return indianMatch[3] + "-" + indianMatch[2].padStart(2, "0");
+
+  let date = new Date(text);
+  if(Number.isNaN(date.getTime())) return "";
+  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+}
+
 function isDateInMonth(value, monthValue){
   if(!value || !monthValue) return false;
-  let date = new Date(value);
-  if(Number.isNaN(date.getTime())) return false;
-  return date.toISOString().slice(0, 7) === monthValue;
+  return getMonthKeyFromDateValue(value) === monthValue;
 }
 
 function getProgramDateValue(program){
@@ -3459,7 +3472,7 @@ function renderDashboard(){
   let stockRows = getStockRows();
   let lowStockRows = getLowStockRows(stockRows);
   let lastRecipe = recipes[recipes.length - 1];
-  let currentMonth = new Date().toISOString().slice(0, 7);
+  let currentMonth = getMonthKeyFromDateValue(new Date());
   let todayKey = new Date().toDateString();
   let todayPrograms = programs.filter(program => {
     let dateValue = program.created_at || program.createdAt || program.programDate || program.date;
@@ -3522,7 +3535,7 @@ function renderDashboard(){
     let monthItems = Array.from({length:6}).map((_, index) => {
       let date = new Date();
       date.setMonth(date.getMonth() - (5 - index));
-      let key = date.toISOString().slice(0, 7);
+      let key = getMonthKeyFromDateValue(date);
       let value = programs
         .filter(program => isDateInMonth(getProgramDateValue(program), key))
         .reduce((sum, program) => sum + getProgramThanDyedCount(program), 0);
@@ -3540,7 +3553,7 @@ function renderDashboard(){
     let costItems = Array.from({length:6}).map((_, index) => {
       let date = new Date();
       date.setMonth(date.getMonth() - (5 - index));
-      let key = date.toISOString().slice(0, 7);
+      let key = getMonthKeyFromDateValue(date);
       let value = programs.filter(program => isDateInMonth(getProgramDateValue(program), key)).reduce((sum, program) => sum + getProgramDyeCost(program), 0);
       return {label:key, value, display:formatMoney(value)};
     });
