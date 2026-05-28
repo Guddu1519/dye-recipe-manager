@@ -33,8 +33,10 @@ th{background:#dbeafe}
     .stat{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:10px;padding:14px}
     .stat b{display:block;font-size:26px;margin-top:6px;color:#1d4ed8}
     .warningBox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:10px;margin-top:10px}
+    .dangerBox{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
     .exportBar{display:flex;gap:10px;flex-wrap:wrap}
     .tableWrap{overflow-x:auto}
+    .miniLogo{display:inline-flex;align-items:center;justify-content:center;width:58px;height:58px;border:2px solid #111;font-weight:bold;font-size:20px;margin-right:10px}
     .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
     .signatureBox{border-top:1px solid #111;padding-top:8px;text-align:center}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -117,23 +119,25 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:3" onclick="showTab('costing',this)">Batch Costing</button>
   <button style="order:4" onclick="showTab('price',this)">Price Master</button>
   <button style="order:5" onclick="showTab('program',this)">Program</button>
-  <button style="order:6" onclick="showTab('history',this)">History</button>
-  <button style="order:7" onclick="loadDataFromJson()">Refresh Cloud Data</button>
-  <button style="order:8" onclick="exportData()">Data Export</button>
-  <button style="order:9" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
-  <button style="order:10" onclick="exportPriceMasterExcel()">Price Master Excel</button>
-  <button style="order:11" onclick="exportProgramHistoryExcel()">Program History Excel</button>
-  <button style="order:12" onclick="document.getElementById('importFile').click()">Backup Import</button>
+  <button style="order:6" onclick="showTab('customers',this)">Process House</button>
+  <button style="order:7" onclick="showTab('history',this)">History</button>
+  <button style="order:8" onclick="loadDataFromJson()">Refresh Cloud Data</button>
+  <button style="order:9" onclick="exportDailyBackupExcel()">Daily Backup Excel</button>
+  <button style="order:10" onclick="exportData()">Data Export</button>
+  <button style="order:11" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
+  <button style="order:12" onclick="exportPriceMasterExcel()">Price Master Excel</button>
+  <button style="order:13" onclick="exportProgramHistoryExcel()">Program History Excel</button>
+  <button style="order:14" onclick="document.getElementById('importFile').click()">Backup Import</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
-  <button style="order:13" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
+  <button style="order:15" onclick="document.getElementById('excelFile').click()">Backup Import Excel Rate List</button>
 
 <input type="file"
        id="excelFile"
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:14" id="roleBadge" class="role-badge"></span>
-  <button style="order:15" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:16" id="roleBadge" class="role-badge"></span>
+  <button style="order:17" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="dashboard" class="active">
@@ -147,10 +151,12 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </div>
     <div id="dashLastRecipe" class="warningBox"></div>
     <div id="dashMissingPrices" class="warningBox"></div>
+    <div id="dashLowPrices" class="warningBox dangerBox"></div>
   </div>
   <div class="card">
     <h3>Quick Export</h3>
     <div class="exportBar">
+      <button class="btn green" onclick="exportDailyBackupExcel()">Daily Backup Excel</button>
       <button class="btn green" onclick="exportRecipeBookExcel()">Recipe Book Excel</button>
       <button class="btn green" onclick="exportPriceMasterExcel()">Price Master Excel</button>
       <button class="btn green" onclick="exportProgramHistoryExcel()">Program History Excel</button>
@@ -180,6 +186,20 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <tbody id="colorTable"></tbody>
     </table>
   </div>
+
+  <div class="card">
+    <h3>Bulk Edit Price Master</h3>
+    <p class="muted">Update many rates quickly, then save once.</p>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Color Name</th><th>Type</th><th>Rate/kg</th></tr>
+        </thead>
+        <tbody id="bulkPriceTable"></tbody>
+      </table>
+    </div>
+    <button class="btn green" onclick="saveBulkPrices()">Save Bulk Prices</button>
+  </div>
 </section>
 
 <section id="recipe">
@@ -189,6 +209,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <input id="recipeNo" placeholder="Recipe No">
       <input id="recipeColor" placeholder="Color Name">
     </div>
+    <button class="btn" onclick="useNextRecipeNo()">Use Next Recipe No</button>
     <input id="hexCode" placeholder="Hex Code e.g. #6A4F22">
     <input id="recipeThans" type="number" placeholder="Batch Thans (20/22/24)">
     <h3>Dyes</h3>
@@ -214,6 +235,15 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <select id="recipeSelect"></select>
     <div class="row">
       <input id="thanCount" type="number" placeholder="Enter thans for costing e.g. 30">
+      <input id="meterCount" type="number" placeholder="Meters, optional">
+    </div>
+    <div class="row">
+      <input id="chemicalCost" type="number" placeholder="Chemical cost">
+      <input id="processCharge" type="number" placeholder="Process charge">
+    </div>
+    <div class="row">
+      <input id="labourCost" type="number" placeholder="Labour cost">
+      <input id="profitPercent" type="number" placeholder="Profit %">
     </div>
     <button class="btn green" onclick="calculateCost()">Calculate Cost</button>
   </div>
@@ -227,7 +257,15 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3 id="programRecipeCount">You have saved 0 recipes.</h3>
     <div class="row">
       <input id="programDate" type="date">
-      <input id="programName" placeholder="Dyeing Name / Process House Name">
+      <input id="programName" list="processHouseList" placeholder="Dyeing Name / Process House Name">
+    </div>
+    <div class="row">
+      <select id="programStatus">
+        <option value="Pending">Pending</option>
+        <option value="In dyeing">In dyeing</option>
+        <option value="Completed">Completed</option>
+        <option value="Delivered">Delivered</option>
+      </select>
     </div>
     <button class="btn green" onclick="createProgram()">Proceed</button>
   </div>
@@ -246,10 +284,37 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Date</th><th>Recipes</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
+  </div>
+</section>
+
+<section id="customers">
+  <div class="card">
+    <h2>Process House Master</h2>
+    <div class="row">
+      <input id="houseName" placeholder="Process House Name">
+      <input id="housePhone" placeholder="Phone">
+    </div>
+    <div class="row">
+      <input id="houseGst" placeholder="GST No">
+      <input id="houseRate" type="number" placeholder="Default process rate">
+    </div>
+    <input id="houseAddress" placeholder="Address">
+    <button class="btn green" onclick="saveProcessHouse()">Save Process House</button>
+  </div>
+  <div class="card">
+    <h3>Saved Process Houses</h3>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Name</th><th>Phone</th><th>GST</th><th>Rate</th><th>Address</th><th>Action</th></tr>
+        </thead>
+        <tbody id="processHouseTable"></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
@@ -267,14 +332,31 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </table>
     </div>
   </div>
+  <div class="card">
+    <h2>Recipe Version History</h2>
+    <p class="muted">Admin can restore an old saved formula if needed.</p>
+    <input id="versionSearch" oninput="renderRecipeVersions()" placeholder="Search version by recipe no or color">
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Date / Time</th><th>Recipe No</th><th>Color</th><th>Saved By</th><th>Restore</th></tr>
+        </thead>
+        <tbody id="versionTable"></tbody>
+      </table>
+    </div>
+  </div>
 </section>
 </div>
+
+<datalist id="processHouseList"></datalist>
 
 <script>
 let colors = [];
 let recipes = [];
 let programs = [];
 let auditLogs = [];
+let recipeVersions = [];
+let processHouses = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let currentUser = null;
@@ -323,6 +405,15 @@ function getAllMissingPriceNames(){
   let missing = new Set();
   recipes.forEach(r => getRecipeMissingPrices(r).forEach(d => missing.add(normalizeName(d.name))));
   return Array.from(missing).filter(Boolean).sort();
+}
+
+function getLowPriceColors(){
+  return colors.filter(c => !Number(c.rate) || Number(c.rate) <= 0).map(c => c.name).sort();
+}
+
+function getNextRecipeNo(){
+  let nums = recipes.map(r => Number(r.recipeNo)).filter(n => !Number.isNaN(n));
+  return nums.length ? Math.max(...nums) + 1 : 1;
 }
 
 function safeJson(value){
@@ -387,10 +478,10 @@ function applyRolePermissions(){
   document.querySelectorAll("input, select, button").forEach(el=>{
     let id = el.id || "";
     let text = (el.textContent || "").trim();
-    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch";
-    let isCosting = id === "recipeSelect" || id === "thanCount" || text === "Calculate Cost";
+    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch";
+    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || text === "Calculate Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "History" || text === "Refresh Cloud Data";
+    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "History" || text === "Refresh Cloud Data";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -458,6 +549,10 @@ async function logoutUser(){
   currentRole = "viewer";
   colors = [];
   recipes = [];
+  programs = [];
+  auditLogs = [];
+  recipeVersions = [];
+  processHouses = [];
 
   if(refreshTimer){
     clearInterval(refreshTimer);
@@ -722,6 +817,56 @@ async function loadAuditLogsFromSupabase(){
   auditLogs = data || [];
 }
 
+async function saveRecipeVersion(recipe, actionType){
+  if(!supabaseClient || !currentUser || !isAdmin() || !recipe) return;
+  const payload = {
+    recipe_id: String(recipe.id || ""),
+    recipe_no: recipe.recipeNo || "",
+    color_name: recipe.colorName || "",
+    snapshot: recipe,
+    saved_by: currentUser.email || "",
+    action_type: actionType || "update",
+    created_at: new Date().toISOString()
+  };
+  const { error } = await supabaseClient.from("recipe_versions").insert(payload);
+  if(error) console.warn("Recipe version skipped. Run updated Supabase SQL.", error);
+}
+
+async function loadRecipeVersionsFromSupabase(){
+  if(!supabaseClient || !isLoggedIn() || !isAdmin()){
+    recipeVersions = [];
+    return;
+  }
+  const { data, error } = await supabaseClient
+    .from("recipe_versions")
+    .select("*")
+    .order("created_at", {ascending:false})
+    .limit(200);
+  if(error){
+    console.warn("Recipe version load skipped", error);
+    recipeVersions = [];
+    return;
+  }
+  recipeVersions = data || [];
+}
+
+async function loadProcessHousesFromSupabase(){
+  if(!supabaseClient || !isLoggedIn()){
+    processHouses = [];
+    return;
+  }
+  const { data, error } = await supabaseClient
+    .from("process_houses")
+    .select("*")
+    .order("name", {ascending:true});
+  if(error){
+    console.warn("Process house load skipped", error);
+    processHouses = [];
+    return;
+  }
+  processHouses = data || [];
+}
+
 function showTab(id,btn){
   document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
@@ -796,6 +941,7 @@ function renderColors(){
   });
 
   document.getElementById("colorTable").innerHTML = html;
+  renderBulkPriceTable();
   let dl = document.getElementById("dyeSuggestions");
 
 if(dl){
@@ -904,6 +1050,11 @@ function hideSuggestionsLater(input){
   }, 200);
 }
 
+function useNextRecipeNo(){
+  if(!requireAdmin()) return;
+  document.getElementById("recipeNo").value = getNextRecipeNo();
+}
+
 async function saveRecipe(){
   if(!requireAdmin()) return;
 
@@ -966,6 +1117,8 @@ async function saveRecipe(){
 const saved = await saveRecipeRecord(obj);
 if(!saved) return;
 
+if(oldValue) await saveRecipeVersion(oldValue, "before update");
+await saveRecipeVersion(obj, actionType);
 await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldValue, obj);
 clearRecipeForm();
 await loadDataFromJson();
@@ -985,12 +1138,17 @@ function clearRecipeForm(){
 
   addDyeLine("", "", true);
   addDyeLine("", "", true);
+  document.getElementById("recipeNo").placeholder = "Recipe No (next: " + getNextRecipeNo() + ")";
   applyRolePermissions();
 }
 
 function renderRecipes(){
 
   let table = document.getElementById("recipeTable");
+  let recipeNoInput = document.getElementById("recipeNo");
+  if(recipeNoInput && !recipeNoInput.value){
+    recipeNoInput.placeholder = "Recipe No (next: " + getNextRecipeNo() + ")";
+  }
 
   if(!table) return;
 
@@ -1022,6 +1180,9 @@ function renderRecipes(){
           <button ${isAdmin() ? "" : "disabled"} onclick="editRecipe(${realIndex})">
             Edit
           </button>
+          <button ${isAdmin() ? "" : "disabled"} onclick="duplicateRecipe(${realIndex})">
+            Duplicate
+          </button>
 
           <button ${isAdmin() ? "" : "disabled"} onclick="deleteRecipe(${realIndex})">
             Delete
@@ -1030,6 +1191,20 @@ function renderRecipes(){
       </tr>
     `;
   });
+  applyRolePermissions();
+}
+
+function duplicateRecipe(i){
+  if(!requireAdmin()) return;
+  let r = recipes[i];
+  editRecipeIndex = null;
+  document.getElementById("recipeNo").value = getNextRecipeNo();
+  document.getElementById("recipeColor").value = (r.colorName || "") + " COPY";
+  document.getElementById("hexCode").value = r.hexCode || "N/A";
+  document.getElementById("recipeThans").value = r.recipeThans || "";
+  document.getElementById("dyeLines").innerHTML = "";
+  (r.dyes || []).forEach(d => addDyeLine(d.name, d.qty, true));
+  showTab("recipe", document.querySelector("nav button[onclick*=\"recipe\"]"));
   applyRolePermissions();
 }
 
@@ -1054,6 +1229,7 @@ async function deleteRecipe(i){
 
   if(confirm("Delete only this recipe: " + recipes[i].recipeNo + "?")){
     let oldValue = {...recipes[i]};
+    await saveRecipeVersion(oldValue, "before delete");
     const saved = await deleteRecipeRecord(recipes[i]);
     if(saved){
       await logAudit("delete", "Recipe Master", oldValue.recipeNo + " - " + oldValue.colorName, oldValue, null);
@@ -1073,6 +1249,11 @@ function renderRecipeSelect(){
 function calculateCost(){
   let i = document.getElementById("recipeSelect").value;
   let askedThans = Number(document.getElementById("thanCount").value);
+  let meterCount = Number(document.getElementById("meterCount").value);
+  let chemicalCost = Number(document.getElementById("chemicalCost").value) || 0;
+  let processCharge = Number(document.getElementById("processCharge").value) || 0;
+  let labourCost = Number(document.getElementById("labourCost").value) || 0;
+  let profitPercent = Number(document.getElementById("profitPercent").value) || 0;
 
   if(i === "" || askedThans <= 0){
     alert("Select recipe and enter thans for costing");
@@ -1112,6 +1293,12 @@ function calculateCost(){
 
   let perThanCost = baseBatchCost / recipeThans;
   let askedBatchCost = perThanCost * askedThans;
+  let extraCost = chemicalCost + processCharge + labourCost;
+  let subtotal = askedBatchCost + extraCost;
+  let profitAmount = subtotal * profitPercent / 100;
+  let finalCost = subtotal + profitAmount;
+  let finalPerThan = finalCost / askedThans;
+  let finalPerMeter = meterCount > 0 ? finalCost / meterCount : 0;
 
   let warningHtml = missingPrices.length ? `<div class="warningBox"><b>Missing price warning:</b> ${missingPrices.join(", ")} is not in Price Master. Rate is counted as 0.</div>` : "";
 
@@ -1137,7 +1324,18 @@ function calculateCost(){
 
     <h3>Per Batch Cost (${recipeThans} Thans): ₹${baseBatchCost.toFixed(2)}</h3>
     <h3>Per Than Cost: ₹${perThanCost.toFixed(2)}</h3>
-    <h3>Cost for ${askedThans} Thans: ₹${askedBatchCost.toFixed(2)}</h3>
+    <h3>Dye Cost for ${askedThans} Thans: Rs. ${askedBatchCost.toFixed(2)}</h3>
+    <table>
+      <tbody>
+        <tr><th>Chemical Cost</th><td>Rs. ${chemicalCost.toFixed(2)}</td></tr>
+        <tr><th>Process Charge</th><td>Rs. ${processCharge.toFixed(2)}</td></tr>
+        <tr><th>Labour Cost</th><td>Rs. ${labourCost.toFixed(2)}</td></tr>
+        <tr><th>Profit (${profitPercent}%)</th><td>Rs. ${profitAmount.toFixed(2)}</td></tr>
+        <tr><th>Final Cost</th><td><b>Rs. ${finalCost.toFixed(2)}</b></td></tr>
+        <tr><th>Final Rate / Than</th><td><b>Rs. ${finalPerThan.toFixed(2)}</b></td></tr>
+        <tr><th>Final Rate / Meter</th><td><b>${meterCount > 0 ? "Rs. " + finalPerMeter.toFixed(2) : "Enter meters to calculate"}</b></td></tr>
+      </tbody>
+    </table>
   `;
 }
 function getNextProgramNo(){
@@ -1185,6 +1383,7 @@ async function createProgram(){
 
   let programDate = document.getElementById("programDate").value || new Date().toISOString().slice(0, 10);
   let programName = document.getElementById("programName").value.trim();
+  let programStatus = document.getElementById("programStatus").value || "Pending";
   if(!programName){
     alert("Dyeing Name / Process House Name required");
     return;
@@ -1197,6 +1396,7 @@ async function createProgram(){
   const { error } = await supabaseClient.from("programs").insert({
     program_no: programNo,
     program_name: programName,
+    status: programStatus,
     program_date: programDate,
     created_at: createdAt,
     selected_recipe_numbers: snapshot.map(r => r.recipeNo),
@@ -1211,6 +1411,7 @@ async function createProgram(){
   await logAudit("create", "Program", programNo + " - " + programName, null, {
     programNo,
     programName,
+    programStatus,
     programDate,
     selectedRecipeNumbers: snapshot.map(r => r.recipeNo)
   });
@@ -1241,6 +1442,7 @@ async function loadProgramsFromSupabase(){
     id: p.id,
     programNo: p.program_no,
     programName: p.program_name || "",
+    status: p.status || "Pending",
     programDate: p.program_date,
     createdAt: p.created_at,
     selectedRecipeNumbers: p.selected_recipe_numbers || [],
@@ -1275,6 +1477,11 @@ function renderPrograms(){
       <tr>
         <td>${p.programNo || ""}</td>
         <td>${p.programName || ""}</td>
+        <td>
+          <select onchange="updateProgramStatus(${index}, this.value)" ${isAdmin() ? "" : "disabled"}>
+            ${["Pending","In dyeing","Completed","Delivered"].map(s => `<option value="${s}" ${p.status === s ? "selected" : ""}>${s}</option>`).join("")}
+          </select>
+        </td>
         <td>${p.programDate || ""}</td>
         <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
@@ -1284,6 +1491,40 @@ function renderPrograms(){
   }
 
   applyRolePermissions();
+}
+
+function renderBulkPriceTable(){
+  let table = document.getElementById("bulkPriceTable");
+  if(!table) return;
+  table.innerHTML = colors.map((c, index) => `
+    <tr>
+      <td>${c.name}</td>
+      <td>${c.colorType || getDefaultColorType(c.name)}</td>
+      <td><input class="bulkRate" data-index="${index}" type="number" value="${c.rate || 0}"></td>
+    </tr>
+  `).join("");
+}
+
+async function saveBulkPrices(){
+  if(!requireAdmin()) return;
+  let changed = 0;
+  document.querySelectorAll(".bulkRate").forEach(input => {
+    let index = Number(input.dataset.index);
+    let newRate = Number(input.value);
+    if(colors[index] && Number(colors[index].rate) !== newRate){
+      colors[index].rate = newRate;
+      changed++;
+    }
+  });
+  if(!changed){
+    alert("No price changes found.");
+    return;
+  }
+  const saved = await saveAll();
+  if(!saved) return;
+  await logAudit("bulk update", "Price Master", changed + " rates", null, {changed});
+  await loadDataFromJson();
+  alert(changed + " prices updated");
 }
 
 function getDyeColorType(name){
@@ -1330,11 +1571,14 @@ function renderProgramHtml(program){
   return `
     <div class="printHeader">
       <div>
+        <span class="miniLogo">MTM</span>
         <h1>MONICA TEXTILE MILLS</h1>
         <p>F238 MANDIA ROAD PALI RAJ 306-401</p>
       </div>
       <div>
+        <img class="qrCode" src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(location.origin)}" alt="Website QR">
         <h2>${program.programName || "Dyeing / Process House"}</h2>
+        <p><b>Status:</b> ${program.status || "Pending"}</p>
         <p><b>Program Date:</b> ${program.programDate || ""}</p>
         <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
       </div>
@@ -1360,6 +1604,8 @@ function exportProgramPdf(index){
         <style>
           body{font-family:Arial;padding:20px;color:#111}
           .printHeader{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #111;margin-bottom:12px;padding-bottom:8px}
+          .miniLogo{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:2px solid #111;font-weight:bold;font-size:18px;float:left;margin-right:10px}
+          .qrCode{width:70px;height:70px;float:right;margin-left:10px}
           .printHeader h1,.printHeader h2{margin:0 0 4px}
           .printHeader p{margin:2px 0}
           table{width:100%;border-collapse:collapse;margin:8px 0 14px;page-break-inside:auto}
@@ -1389,6 +1635,20 @@ function exportProgramPdf(index){
   win.focus();
 }
 
+async function updateProgramStatus(index, status){
+  if(!requireAdmin()) return;
+  let program = programs[index];
+  if(!program || !program.id) return;
+  let oldValue = {...program};
+  const { error } = await supabaseClient.from("programs").update({status}).eq("id", program.id);
+  if(error){
+    alert("Program status update failed: " + error.message + ". Run updated Supabase SQL.");
+    return;
+  }
+  await logAudit("status update", "Program", program.programNo + " - " + program.programName, oldValue, {...program, status});
+  await loadDataFromJson();
+}
+
 async function deleteProgram(index){
   if(!requireAdmin()) return;
 
@@ -1411,6 +1671,7 @@ async function deleteProgram(index){
 
 function renderDashboard(){
   let missing = getAllMissingPriceNames();
+  let lowPrices = getLowPriceColors();
   let lastRecipe = recipes[recipes.length - 1];
 
   let recipeCount = document.getElementById("dashRecipeCount");
@@ -1419,6 +1680,7 @@ function renderDashboard(){
   let missingCount = document.getElementById("dashMissingCount");
   let lastBox = document.getElementById("dashLastRecipe");
   let missingBox = document.getElementById("dashMissingPrices");
+  let lowBox = document.getElementById("dashLowPrices");
 
   if(recipeCount) recipeCount.textContent = recipes.length;
   if(colorCount) colorCount.textContent = colors.length;
@@ -1435,6 +1697,12 @@ function renderDashboard(){
     missingBox.innerHTML = missing.length
       ? `<b>Missing Price Alerts:</b> ${missing.join(", ")}`
       : "<b>Missing Price Alerts:</b> All recipe dyes have prices.";
+  }
+
+  if(lowBox){
+    lowBox.innerHTML = lowPrices.length
+      ? `<b>Zero / Low Price Alerts:</b> ${lowPrices.join(", ")}`
+      : "<b>Zero / Low Price Alerts:</b> No zero-rate dyes found.";
   }
 }
 
@@ -1515,6 +1783,7 @@ function exportProgramHistoryExcel(){
       rows.push({
         "Program No": p.programNo || "",
         "Dyeing / Process House": p.programName || "",
+        "Status": p.status || "Pending",
         "Program Date": p.programDate || "",
         "Created Date/Time": p.createdAt || "",
         "Recipe No": r.recipeNo || "",
@@ -1524,6 +1793,140 @@ function exportProgramHistoryExcel(){
     });
   });
   downloadExcel("program-history.xlsx", rows, "Program History");
+}
+
+function renderProcessHouses(){
+  let table = document.getElementById("processHouseTable");
+  if(!table) return;
+  table.innerHTML = processHouses.map((h, index) => `
+    <tr>
+      <td>${h.name || ""}</td>
+      <td>${h.phone || ""}</td>
+      <td>${h.gst || ""}</td>
+      <td>${h.default_rate || ""}</td>
+      <td>${h.address || ""}</td>
+      <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProcessHouse(${index})">Delete</button></td>
+    </tr>
+  `).join("");
+
+  let list = document.getElementById("processHouseList");
+  if(list){
+    list.innerHTML = processHouses.map(h => `<option value="${h.name || ""}">`).join("");
+  }
+}
+
+async function saveProcessHouse(){
+  if(!requireAdmin()) return;
+  let payload = {
+    name: document.getElementById("houseName").value.trim(),
+    phone: document.getElementById("housePhone").value.trim(),
+    gst: document.getElementById("houseGst").value.trim(),
+    default_rate: Number(document.getElementById("houseRate").value) || 0,
+    address: document.getElementById("houseAddress").value.trim()
+  };
+  if(!payload.name){
+    alert("Process House Name required");
+    return;
+  }
+
+  let existing = processHouses.find(h => normalizeName(h.name) === normalizeName(payload.name));
+  let error;
+  if(existing){
+    ({ error } = await supabaseClient.from("process_houses").update(payload).eq("id", existing.id));
+  } else {
+    ({ error } = await supabaseClient.from("process_houses").insert(payload));
+  }
+  if(error){
+    alert("Process house save failed: " + error.message + ". Run updated Supabase SQL.");
+    return;
+  }
+  await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);
+  ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
+  await loadDataFromJson();
+}
+
+async function deleteProcessHouse(index){
+  if(!requireAdmin()) return;
+  let house = processHouses[index];
+  if(!house || !house.id) return;
+  if(!confirm("Delete process house: " + house.name + "?")) return;
+  const { error } = await supabaseClient.from("process_houses").delete().eq("id", house.id);
+  if(error){
+    alert("Process house delete failed: " + error.message);
+    return;
+  }
+  await logAudit("delete", "Process House", house.name, house, null);
+  await loadDataFromJson();
+}
+
+function renderRecipeVersions(){
+  let table = document.getElementById("versionTable");
+  if(!table) return;
+  if(!isAdmin()){
+    table.innerHTML = `<tr><td colspan="5">Only admin can view recipe versions.</td></tr>`;
+    return;
+  }
+  let q = document.getElementById("versionSearch")?.value.toUpperCase() || "";
+  let rows = recipeVersions.filter(v => {
+    return String(v.recipe_no || "").toUpperCase().includes(q) ||
+      String(v.color_name || "").toUpperCase().includes(q) ||
+      String(v.saved_by || "").toUpperCase().includes(q);
+  }).map(v => {
+    let realIndex = recipeVersions.indexOf(v);
+    return `
+    <tr>
+      <td>${v.created_at ? new Date(v.created_at).toLocaleString() : ""}</td>
+      <td>${v.recipe_no || ""}</td>
+      <td>${v.color_name || ""}</td>
+      <td>${v.saved_by || ""}</td>
+      <td><button ${isAdmin() ? "" : "disabled"} onclick="restoreRecipeVersion(${realIndex})">Restore</button></td>
+    </tr>
+  `;
+  }).join("");
+  table.innerHTML = rows || `<tr><td colspan="5">No recipe versions found.</td></tr>`;
+}
+
+async function restoreRecipeVersion(index){
+  if(!requireAdmin()) return;
+  let version = recipeVersions[index];
+  let snapshot = version?.snapshot;
+  if(!snapshot){
+    alert("Version snapshot missing.");
+    return;
+  }
+  let existing = recipes.find(r => String(r.recipeNo) === String(snapshot.recipeNo));
+  if(existing) snapshot.id = existing.id;
+  const saved = await saveRecipeRecord(snapshot);
+  if(!saved) return;
+  await logAudit("restore", "Recipe Version", snapshot.recipeNo + " - " + snapshot.colorName, existing || null, snapshot);
+  await loadDataFromJson();
+  alert("Recipe " + snapshot.recipeNo + " restored");
+}
+
+function exportDailyBackupExcel(){
+  if(!requireAdmin()) return;
+  let workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(colors.map(c => ({
+    "Color Name": c.name || "",
+    "Type": c.colorType || getDefaultColorType(c.name),
+    "Rate/kg": c.rate || ""
+  }))), "Price Master");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(recipes.flatMap(r => (r.dyes || []).map(d => ({
+    "Recipe No": r.recipeNo || "",
+    "Color Name": r.colorName || "",
+    "Batch Thans": r.recipeThans || "",
+    "Dye Name": d.name || "",
+    "Quantity": d.qty || ""
+  })))), "Recipes");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(programs.map(p => ({
+    "Program No": p.programNo || "",
+    "Process House": p.programName || "",
+    "Status": p.status || "Pending",
+    "Date": p.programDate || "",
+    "Recipes": (p.recipeSnapshot || []).map(r => r.recipeNo).join(", ")
+  }))), "Programs");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(processHouses), "Process Houses");
+  XLSX.writeFile(workbook, "daily-dye-backup.xlsx");
 }
 
 function exportData(){
@@ -1615,6 +2018,8 @@ function renderAll(){
   renderRecipeSelect();
   renderPrograms();
   renderAuditLogs();
+  renderRecipeVersions();
+  renderProcessHouses();
 } 
 
 async function loadDataFromJson(){
@@ -1661,6 +2066,8 @@ console.log("SUPABASE RECIPES:", recipeData);
 
   await loadProgramsFromSupabase();
   await loadAuditLogsFromSupabase();
+  await loadRecipeVersionsFromSupabase();
+  await loadProcessHousesFromSupabase();
   renderAll();
 
   console.log("Loaded from Supabase");
