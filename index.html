@@ -1888,6 +1888,15 @@ function showProcessHouseStatus(message, isError=false){
   box.className = isError ? "warningBox dangerBox" : "warningBox";
 }
 
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise(resolve => {
+      setTimeout(() => resolve({data:null, error:{message}}), ms);
+    })
+  ]);
+}
+
 async function saveProcessHouse(){
   if(!requireAdmin()) return;
   let payload = {
@@ -1923,16 +1932,16 @@ async function saveProcessHouse(){
   };
   let cloudExisting = existing && existing.id && !String(existing.id).startsWith("local-");
   if(cloudExisting){
-    ({ data: savedRows, error } = await supabaseClient
+    ({ data: savedRows, error } = await withTimeout(supabaseClient
       .from("process_houses")
       .update(cloudPayload)
       .eq("id", existing.id)
-      .select("*"));
+      .select("*"), 8000, "Cloud save timed out. Check Supabase process_houses table/policies."));
   } else {
-    ({ data: savedRows, error } = await supabaseClient
+    ({ data: savedRows, error } = await withTimeout(supabaseClient
       .from("process_houses")
       .upsert(cloudPayload, {onConflict:"name"})
-      .select("*"));
+      .select("*"), 8000, "Cloud save timed out. Check Supabase process_houses table/policies."));
   }
   if(error){
     processHouseLocalOnly = true;
