@@ -1904,8 +1904,8 @@ function roundConvertedQty(qty){
 
 function getRecipeSavedThans(recipe){
   let savedThans = Number(recipe.recipeThans);
-  let recipeNo = String(recipe.recipeNo || "").trim().toUpperCase().replace(/\s+/g, " ");
-  if((!savedThans || savedThans <= 0) && (recipeNo === "15" || recipeNo === "15 S")){
+  let recipeNo = String(recipe.recipeNo || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if((!savedThans || savedThans <= 0) && (recipeNo === "15" || recipeNo === "15S")){
     return 20;
   }
   return savedThans;
