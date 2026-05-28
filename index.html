@@ -185,9 +185,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3 id="programRecipeCount">You have saved 0 recipes.</h3>
     <div class="row">
       <input id="programDate" type="date">
-      <input id="programRecipeNumbers" placeholder="Enter recipe numbers for program e.g. 1,2,5,8,12,18">
+      <input id="programName" placeholder="Program Name">
     </div>
-    <button class="btn green" onclick="createProgram()">Create Program</button>
+    <button class="btn green" onclick="createProgram()">Proceed</button>
   </div>
 
   <div class="card">
@@ -204,13 +204,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Date</th><th>Number of Recipes</th><th>View</th><th>Export PDF</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Program Name</th><th>Date</th><th>Recipes</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
   </div>
-
-  <div class="card" id="programView"></div>
 </section>
 </div>
 
@@ -282,7 +280,7 @@ function applyRolePermissions(){
     let text = (el.textContent || "").trim();
     let isSearch = id === "priceSearch" || id === "recipeSearch";
     let isCosting = id === "recipeSelect" || id === "thanCount" || text === "Calculate Cost";
-    let isProgramView = text === "View" || text === "Export PDF";
+    let isProgramView = text === "Export" || text === "Export PDF";
     let isNavigation = text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Refresh Cloud Data";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
@@ -956,10 +954,7 @@ function getNextProgramNo(){
 }
 
 function parseProgramNumbers(){
-  let typed = document.getElementById("programRecipeNumbers")?.value || "";
-  let fromInput = typed.split(",").map(v => v.trim()).filter(Boolean);
-  let fromChecks = Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => cb.value);
-  return Array.from(new Set([...fromInput, ...fromChecks]));
+  return Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => cb.value);
 }
 
 function makeRecipeSnapshot(recipe){
@@ -995,12 +990,19 @@ async function createProgram(){
   }
 
   let programDate = document.getElementById("programDate").value || new Date().toISOString().slice(0, 10);
+  let programName = document.getElementById("programName").value.trim();
+  if(!programName){
+    alert("Program Name required");
+    return;
+  }
+
   let createdAt = new Date().toISOString();
   let programNo = getNextProgramNo();
   let snapshot = selectedRecipes.map(makeRecipeSnapshot);
 
   const { error } = await supabaseClient.from("programs").insert({
     program_no: programNo,
+    program_name: programName,
     program_date: programDate,
     created_at: createdAt,
     selected_recipe_numbers: snapshot.map(r => r.recipeNo),
@@ -1008,11 +1010,11 @@ async function createProgram(){
   });
 
   if(error){
-    alert("Program save failed: " + error.message);
+    alert("Program save failed: " + error.message + ". Run the updated Supabase SQL for programs table.");
     return;
   }
 
-  document.getElementById("programRecipeNumbers").value = "";
+  document.getElementById("programName").value = "";
   document.querySelectorAll(".programRecipeCheck").forEach(cb => cb.checked = false);
   await loadProgramsFromSupabase();
   renderPrograms();
@@ -1036,6 +1038,7 @@ async function loadProgramsFromSupabase(){
   programs = (data || []).map(p => ({
     id: p.id,
     programNo: p.program_no,
+    programName: p.program_name || "",
     programDate: p.program_date,
     createdAt: p.created_at,
     selectedRecipeNumbers: p.selected_recipe_numbers || [],
@@ -1069,10 +1072,10 @@ function renderPrograms(){
     historyTable.innerHTML = programs.map((p, index) => `
       <tr>
         <td>${p.programNo || ""}</td>
+        <td>${p.programName || ""}</td>
         <td>${p.programDate || ""}</td>
-        <td>${(p.recipeSnapshot || []).length}</td>
-        <td><button onclick="viewProgram(${index})">View</button></td>
-        <td><button onclick="exportProgramPdf(${index})">Export PDF</button></td>
+        <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
+        <td><button onclick="exportProgramPdf(${index})">Export</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
     `).join("");
@@ -1125,17 +1128,12 @@ function renderProgramHtml(program){
 
   return `
     <h2>Program ${program.programNo || ""}</h2>
+    <p><b>Program Name:</b> ${program.programName || ""}</p>
     <p><b>Program Date:</b> ${program.programDate || ""}</p>
     <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
-    <p><b>Selected Recipes:</b> ${(program.selectedRecipeNumbers || []).join(", ")}</p>
+    <p><b>Selected Recipes:</b> ${(program.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join(", ")}</p>
     ${recipesHtml}
   `;
-}
-
-function viewProgram(index){
-  let program = programs[index];
-  if(!program) return;
-  document.getElementById("programView").innerHTML = renderProgramHtml(program);
 }
 
 function exportProgramPdf(index){
