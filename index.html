@@ -87,6 +87,14 @@ th{background:#dbeafe}
     .priceModalBody b{color:#1d4ed8}
     .priceModalActions{display:flex;gap:10px;justify-content:flex-end;padding:0 18px 18px}
     .priceHistoryTag{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:bold}
+    .chatShell{display:flex;flex-direction:column;height:560px;max-height:70vh;border:1px solid #dbeafe;border-radius:12px;background:#f8fafc;overflow:hidden}
+    .chatMessages{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+    .chatMsg{max-width:85%;padding:10px 12px;border-radius:12px;line-height:1.45;white-space:pre-wrap}
+    .chatUser{align-self:flex-end;background:#2563eb;color:white}
+    .chatAi{align-self:flex-start;background:white;border:1px solid #e2e8f0;color:#111}
+    .chatAi table{margin-top:8px}
+    .chatInputBar{display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:12px;background:white;border-top:1px solid #e2e8f0}
+    .chatInputBar input{margin:0}
     @keyframes bellPulse{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-10deg) scale(1.05)}40%{transform:rotate(10deg) scale(1.05)}60%{transform:rotate(-6deg) scale(1.03)}80%{transform:rotate(6deg) scale(1.03)}}
     @keyframes notifyDrop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
     @keyframes modalFade{from{opacity:0}to{opacity:1}}
@@ -142,7 +150,7 @@ th{background:#dbeafe}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}}
   </style>
 </head>
 <body>
@@ -186,8 +194,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:8" onclick="showTab('contact',this)">Contact Us</button>
   <button style="order:9" onclick="showTab('importExport',this)">Import / Export</button>
   <button style="order:10" onclick="showTab('reports',this)">Reports</button>
-  <button style="order:11" onclick="showTab('history',this)">Activity Log</button>
-  <button id="refreshCloudBtn" style="order:12" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
+  <button style="order:11" onclick="showTab('aiAssistant',this)">AI Production Assistant</button>
+  <button style="order:12" onclick="showTab('history',this)">Activity Log</button>
+  <button id="refreshCloudBtn" style="order:13" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
 
 <input type="file"
@@ -195,8 +204,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:13" id="roleBadge" class="role-badge"></span>
-  <button style="order:14" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:14" id="roleBadge" class="role-badge"></span>
+  <button style="order:15" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="dashboard" class="active">
@@ -279,6 +288,23 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <thead><tr><th>Color / Chemical</th><th>Used Quantity</th><th>Estimated Cost</th></tr></thead>
         <tbody id="reportMostUsedTable"></tbody>
       </table>
+    </div>
+  </div>
+</section>
+
+<section id="aiAssistant">
+  <div class="card">
+    <h2>AI Production Assistant</h2>
+    <p class="muted">Ask read-only questions about recipes, programs, stock, prices, costing, and reports data.</p>
+    <div class="chatShell">
+      <div id="aiChatMessages" class="chatMessages">
+        <div class="chatMsg chatAi">Ask me things like: "Which color was used most this month?" or "Show recipes using Yellow 5GLL."</div>
+      </div>
+      <div class="chatInputBar">
+        <input id="aiQuestionInput" placeholder="Ask about recipe, stock, price, program, costing, or reports">
+        <button id="aiSendBtn" class="btn green" onclick="sendAiAssistantMessage()">Send</button>
+        <button class="btn danger" onclick="clearAiAssistantChat()">Clear Chat</button>
+      </div>
     </div>
   </div>
 </section>
@@ -374,7 +400,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div class="tableWrap">
       <table>
         <thead>
-          <tr><th>Select</th><th>Recipe No</th><th>Color Name</th><th>Batch Thans</th></tr>
+          <tr><th><label><input id="multiCostSelectAll" type="checkbox" onchange="toggleMultiCostSelectAll(this.checked)"> Select All</label></th><th>Recipe No</th><th>Color Name</th><th>Batch Thans</th></tr>
         </thead>
         <tbody id="multiCostRecipeTable"></tbody>
       </table>
@@ -888,13 +914,14 @@ function applyRolePermissions(){
   document.querySelectorAll("input, select, button").forEach(el=>{
     let id = el.id || "";
     let text = (el.textContent || "").trim();
-    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth";
-    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || el.classList.contains("multiCostRecipeCheck") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost";
+    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth" || id === "aiQuestionInput";
+    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || id === "multiCostSelectAll" || el.classList.contains("multiCostRecipeCheck") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
+    let isAiAssistant = text === "AI Production Assistant" || text === "Send" || text === "Clear Chat";
     let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "Reports" || text === "Activity Log" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
-    let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
+    let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isAiAssistant || isLogout || isLogin;
 
     if(viewer){
       el.disabled = !isAllowedViewerControl;
@@ -937,13 +964,14 @@ function startInactivityWatch(){
 }
 
 function setupLoginEnterKey(){
-  ["loginEmail","loginPassword"].forEach(id => {
+  ["loginEmail","loginPassword","aiQuestionInput"].forEach(id => {
     let input = document.getElementById(id);
     if(!input) return;
     input.addEventListener("keydown", function(event){
       if(event.key === "Enter"){
         event.preventDefault();
-        loginUser();
+        if(id === "aiQuestionInput") sendAiAssistantMessage();
+        else loginUser();
       }
     });
   });
@@ -1847,6 +1875,14 @@ function renderMultiCostingSelect(){
       <td>${r.recipeThans || ""}</td>
     </tr>
   `).join("") || `<tr><td colspan="4">No recipes found.</td></tr>`;
+  let selectAll = document.getElementById("multiCostSelectAll");
+  if(selectAll) selectAll.checked = false;
+}
+
+function toggleMultiCostSelectAll(checked){
+  document.querySelectorAll(".multiCostRecipeCheck").forEach(cb => {
+    cb.checked = checked;
+  });
 }
 
 function calculateCost(){
@@ -2779,6 +2815,79 @@ function clearStockNotifications(){
   stockNotifications = [];
   saveStockNotificationState();
   renderStockNotifications();
+}
+
+function getAiChatHistory(){
+  return Array.from(document.querySelectorAll("#aiChatMessages .chatMsg")).slice(-8).map(node => ({
+    role: node.classList.contains("chatUser") ? "user" : "assistant",
+    content: node.textContent || ""
+  }));
+}
+
+function addAiChatMessage(role, text){
+  let box = document.getElementById("aiChatMessages");
+  if(!box) return null;
+  let message = document.createElement("div");
+  message.className = "chatMsg " + (role === "user" ? "chatUser" : "chatAi");
+  message.textContent = text;
+  box.appendChild(message);
+  box.scrollTop = box.scrollHeight;
+  return message;
+}
+
+function clearAiAssistantChat(){
+  let box = document.getElementById("aiChatMessages");
+  if(!box) return;
+  box.innerHTML = "";
+  addAiChatMessage("assistant", "Chat cleared. Ask me about recipes, stock, prices, programs, costing, or reports.");
+}
+
+async function sendAiAssistantMessage(){
+  if(!requireLogin()) return;
+  let input = document.getElementById("aiQuestionInput");
+  let button = document.getElementById("aiSendBtn");
+  let question = (input?.value || "").trim();
+  if(!question){
+    alert("Please type a question for AI Production Assistant.");
+    return;
+  }
+
+  addAiChatMessage("user", question);
+  input.value = "";
+  let loading = addAiChatMessage("assistant", "Thinking...");
+  if(button){
+    button.disabled = true;
+    button.textContent = "Loading...";
+  }
+
+  try{
+    let sessionResult = supabaseClient ? await supabaseClient.auth.getSession() : null;
+    let token = sessionResult?.data?.session?.access_token || "";
+    let response = await fetch("/api/ai-assistant", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": token ? "Bearer " + token : ""
+      },
+      body: JSON.stringify({
+        question,
+        history: getAiChatHistory()
+      })
+    });
+    let result = await response.json();
+    if(!response.ok) throw new Error(result.error || "AI Assistant failed.");
+    loading.textContent = result.answer || "No answer received.";
+    if(result.remaining !== undefined){
+      loading.textContent += "\n\nRemaining AI questions this hour: " + result.remaining;
+    }
+  }catch(error){
+    loading.textContent = "AI Assistant error: " + (error.message || error);
+  }finally{
+    if(button){
+      button.disabled = false;
+      button.textContent = "Send";
+    }
+  }
 }
 
 function getStockRows(){
