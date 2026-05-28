@@ -185,7 +185,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3 id="programRecipeCount">You have saved 0 recipes.</h3>
     <div class="row">
       <input id="programDate" type="date">
-      <input id="programName" placeholder="Program Name">
+      <input id="programName" placeholder="Dyeing Name / Process House Name">
     </div>
     <button class="btn green" onclick="createProgram()">Proceed</button>
   </div>
@@ -204,7 +204,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Program Name</th><th>Date</th><th>Recipes</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Date</th><th>Recipes</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -992,7 +992,7 @@ async function createProgram(){
   let programDate = document.getElementById("programDate").value || new Date().toISOString().slice(0, 10);
   let programName = document.getElementById("programName").value.trim();
   if(!programName){
-    alert("Program Name required");
+    alert("Dyeing Name / Process House Name required");
     return;
   }
 
@@ -1122,8 +1122,7 @@ function renderProgramHtml(program){
   }).join("");
 
   return `
-    <h2>Program ${program.programNo || ""}</h2>
-    <p><b>Program Name:</b> ${program.programName || ""}</p>
+    <h2>${program.programName || "Dyeing / Process House"}</h2>
     <p><b>Program Date:</b> ${program.programDate || ""}</p>
     <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
     ${recipesHtml}
