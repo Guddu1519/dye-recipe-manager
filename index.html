@@ -3523,7 +3523,7 @@ function renderDashboard(){
   if(stockItemCount) stockItemCount.textContent = stockRows.length;
   if(lowStockCount) lowStockCount.textContent = lowStockRows.length;
   if(monthlyDyeCostEl) monthlyDyeCostEl.textContent = formatMoney(monthlyDyeCost);
-  if(monthlyProductionEl) monthlyProductionEl.textContent = monthlyPrograms.reduce((sum, program) => sum + getProgramThanDyedCount(program), 0);
+  if(monthlyProductionEl) monthlyProductionEl.textContent = monthlyPrograms.reduce((sum, program) => sum + getProgramThanDyedCount(program), 0) + " THANS";
   if(pendingProgramsEl) pendingProgramsEl.textContent = pendingPrograms;
   if(stockValueEl) stockValueEl.textContent = formatMoney(stockValue);
 
