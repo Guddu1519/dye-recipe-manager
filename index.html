@@ -1894,28 +1894,30 @@ async function saveProcessHouse(){
   }
 
   let existing = processHouses.find(h => normalizeName(h.name) === normalizeName(payload.name));
+  let localRecord = existing || {id: "local-" + Date.now()};
+  Object.assign(localRecord, payload);
+  if(!existing) processHouses.push(localRecord);
+  processHouses.sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
+  saveLocalProcessHouses();
+  renderProcessHouses();
+
   let error;
-  let cloudExisting = existing && !String(existing.id || "").startsWith("local-");
+  let cloudExisting = existing && existing.id && !String(existing.id).startsWith("local-");
   if(cloudExisting){
     ({ error } = await supabaseClient.from("process_houses").update(payload).eq("id", existing.id));
   } else {
-    ({ error } = await supabaseClient.from("process_houses").insert(payload));
+    ({ error } = await supabaseClient.from("process_houses").upsert(payload, {onConflict:"name"}));
   }
   if(error){
-    if(existing){
-      Object.assign(existing, payload);
-    } else {
-      processHouses.push({...payload, id: "local-" + Date.now()});
-    }
     processHouseLocalOnly = true;
-    saveLocalProcessHouses();
-    renderProcessHouses();
-    alert("Process house saved locally. Cloud save failed: " + error.message);
+    alert("Saved on website. Cloud save failed: " + error.message);
     return;
   }
+  processHouseLocalOnly = false;
   await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);
   ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
   await loadDataFromJson();
+  alert("Process house saved");
 }
 
 async function deleteProcessHouse(index){
