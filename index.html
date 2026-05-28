@@ -2302,6 +2302,21 @@ function getProgramRequiredThans(program, index){
   return Number(program.requiredThans || program.batchThans || snapshotThans || 0);
 }
 
+function getProgramRecipeCount(program){
+  if(Array.isArray(program.recipeSnapshot) && program.recipeSnapshot.length) return program.recipeSnapshot.length;
+  if(Array.isArray(program.selectedRecipeNumbers) && program.selectedRecipeNumbers.length) return program.selectedRecipeNumbers.length;
+  if(Array.isArray(program.selected_recipe_numbers) && program.selected_recipe_numbers.length) return program.selected_recipe_numbers.length;
+  let rawNumbers = program.selectedRecipeNumbers || program.selected_recipe_numbers || program.recipeNumbers || program.recipe_numbers || "";
+  if(typeof rawNumbers === "string"){
+    return rawNumbers.split(",").map(value => value.trim()).filter(Boolean).length || 1;
+  }
+  return 1;
+}
+
+function getProgramThanDyedCount(program){
+  return getProgramRequiredThans(program) * getProgramRecipeCount(program);
+}
+
 async function createProgram(){
   if(!requireAdmin()) return;
 
@@ -3495,7 +3510,7 @@ function renderDashboard(){
   if(stockItemCount) stockItemCount.textContent = stockRows.length;
   if(lowStockCount) lowStockCount.textContent = lowStockRows.length;
   if(monthlyDyeCostEl) monthlyDyeCostEl.textContent = formatMoney(monthlyDyeCost);
-  if(monthlyProductionEl) monthlyProductionEl.textContent = monthlyPrograms.length;
+  if(monthlyProductionEl) monthlyProductionEl.textContent = monthlyPrograms.reduce((sum, program) => sum + getProgramThanDyedCount(program), 0);
   if(pendingProgramsEl) pendingProgramsEl.textContent = pendingPrograms;
   if(stockValueEl) stockValueEl.textContent = formatMoney(stockValue);
 
@@ -3510,7 +3525,7 @@ function renderDashboard(){
       let key = date.toISOString().slice(0, 7);
       let value = programs
         .filter(program => isDateInMonth(getProgramDateValue(program), key))
-        .reduce((sum, program) => sum + (getProgramRequiredThans(program) * ((program.recipeSnapshot || []).length || 1)), 0);
+        .reduce((sum, program) => sum + getProgramThanDyedCount(program), 0);
       return {label:key, value, display:value + " thans"};
     });
     programChart.innerHTML = renderBarRows(monthItems);
