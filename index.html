@@ -445,7 +445,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch Size</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -2359,6 +2359,7 @@ function renderPrograms(){
         </td>
         <td>${p.programDate || ""}</td>
         <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
+        <td><span class="stockLowBadge" style="background:#2563eb">${getProgramRequiredThans(p, index) || ""} Thans</span></td>
         <td>${renderProgramStockBadge(p)}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
@@ -2457,12 +2458,8 @@ async function exportProgramPdf(index, options={}){
   if(!program) return null;
   let requiredThans = getProgramRequiredThans(program, index);
   if(!requiredThans || requiredThans <= 0){
-    let entered = prompt("How many thans recipe should I create?");
-    requiredThans = Number(entered);
-    if(!requiredThans || requiredThans <= 0){
-      alert("Required thans must be greater than 0");
-      return null;
-    }
+    alert("Program batch size is missing. Create the program again with thans entered before clicking Proceed.");
+    return null;
   }
   try{
     (program.recipeSnapshot || []).forEach(r => convertRecipeForPdf(r, requiredThans));
