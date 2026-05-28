@@ -1872,12 +1872,13 @@ function parseProgramNumbers(){
   return Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => cb.value);
 }
 
-function makeRecipeSnapshot(recipe){
+function makeRecipeSnapshot(recipe, requiredThans=""){
   return {
     recipeNo: recipe.recipeNo || "",
     colorName: recipe.colorName || "",
     hexCode: recipe.hexCode || "N/A",
     recipeThans: recipe.recipeThans || "",
+    requiredThans: requiredThans || "",
     dyes: recipe.dyes || []
   };
 }
@@ -1905,7 +1906,8 @@ function convertRecipeForPdf(recipe, requiredThans){
 
 function getProgramRequiredThans(program, index){
   let input = document.getElementById("programBatchThans_" + index);
-  return Number(input?.value || program.requiredThans || program.batchThans || 0);
+  let snapshotThans = (program.recipeSnapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans;
+  return Number(input?.value || program.requiredThans || program.batchThans || snapshotThans || 0);
 }
 
 async function createProgram(){
@@ -1953,7 +1955,7 @@ async function createProgram(){
 
   let createdAt = new Date().toISOString();
   let programNo = getNextProgramNo();
-  let snapshot = selectedRecipes.map(makeRecipeSnapshot);
+  let snapshot = selectedRecipes.map(recipe => makeRecipeSnapshot(recipe, requiredThans));
 
   let programPayload = {
     program_no: programNo,
@@ -2027,7 +2029,7 @@ async function loadProgramsFromSupabase(){
     programName: p.program_name || "",
     status: p.status || "Pending",
     programDate: p.program_date,
-    requiredThans: p.required_thans || "",
+    requiredThans: p.required_thans || (p.recipe_snapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans || "",
     stockDeducted: !!p.stock_deducted,
     createdAt: p.created_at,
     selectedRecipeNumbers: p.selected_recipe_numbers || [],
@@ -2153,8 +2155,14 @@ function exportProgramPdf(index){
   if(!program) return;
   let requiredThans = getProgramRequiredThans(program, index);
   if(!requiredThans || requiredThans <= 0){
-    alert("Required thans must be greater than 0");
-    return;
+    let entered = prompt("Batch = How many thans?");
+    requiredThans = Number(entered);
+    if(!requiredThans || requiredThans <= 0){
+      alert("Required thans must be greater than 0");
+      return;
+    }
+    let input = document.getElementById("programBatchThans_" + index);
+    if(input) input.value = requiredThans;
   }
   try{
     (program.recipeSnapshot || []).forEach(r => convertRecipeForPdf(r, requiredThans));
