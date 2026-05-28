@@ -125,6 +125,10 @@ alter table public.audit_logs enable row level security;
 alter table public.recipe_versions enable row level security;
 alter table public.process_houses enable row level security;
 
+grant select on public.process_houses to authenticated;
+grant insert, update, delete on public.process_houses to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+
 drop policy if exists "profiles can read own role" on public.profiles;
 drop policy if exists "admins can manage profiles" on public.profiles;
 drop policy if exists "authenticated users can read colors" on public.colors;

@@ -2016,12 +2016,12 @@ async function saveProcessHouse(){
       .from("process_houses")
       .update(cloudPayload)
       .eq("id", existing.id)
-      .select("*"), 8000, "Cloud save timed out. Check Supabase process_houses table/policies."));
+      .select("*"), 30000, "Cloud save timed out after 30 seconds. Check Supabase process_houses table/policies."));
   } else {
     ({ data: savedRows, error } = await withTimeout(supabaseClient
       .from("process_houses")
       .upsert(cloudPayload, {onConflict:"name"})
-      .select("*"), 8000, "Cloud save timed out. Check Supabase process_houses table/policies."));
+      .select("*"), 30000, "Cloud save timed out after 30 seconds. Check Supabase process_houses table/policies."));
   }
   if(error){
     processHouseLocalOnly = true;
