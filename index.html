@@ -420,7 +420,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <input id="programName" list="processHouseList" placeholder="Dyeing Name / Process House Name">
     </div>
     <div class="row">
-      <input id="programRequiredThans" type="number" min="1" placeholder="Batch = How many thans?">
+      <input id="programRequiredThans" type="number" min="1" placeholder="How many thans recipe should I create?">
       <select id="programStatus">
         <option value="Pending">Pending</option>
         <option value="In dyeing">In dyeing</option>
@@ -445,7 +445,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -2193,9 +2193,8 @@ function convertRecipeForPdf(recipe, requiredThans){
 }
 
 function getProgramRequiredThans(program, index){
-  let input = document.getElementById("programBatchThans_" + index);
   let snapshotThans = (program.recipeSnapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans;
-  return Number(input?.value || program.requiredThans || program.batchThans || snapshotThans || 0);
+  return Number(program.requiredThans || program.batchThans || snapshotThans || 0);
 }
 
 async function createProgram(){
@@ -2360,8 +2359,7 @@ function renderPrograms(){
         </td>
         <td>${p.programDate || ""}</td>
         <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
-        <td><input id="programBatchThans_${index}" type="number" min="1" value="${p.requiredThans || ""}" placeholder="Batch thans" onchange="updateProgramBatchThans(${index}, this.value)" ${isAdmin() ? "" : "disabled"}></td>
-        <td>${p.stockDeducted ? `<span class="stockLowBadge" style="background:#16a34a">Auto Deducted</span>` : `<span class="stockLowBadge">Not Deducted</span>`}</td>
+        <td>${renderProgramStockBadge(p)}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
@@ -2369,6 +2367,21 @@ function renderPrograms(){
   }
 
   applyRolePermissions();
+}
+
+function programStockWasDeducted(program){
+  if(program?.stockDeducted) return true;
+  return (programStockUsage || []).some(row => {
+    return (program?.id && String(row.program_id || "") === String(program.id)) ||
+      String(row.program_no || "") === String(program?.programNo || "");
+  });
+}
+
+function renderProgramStockBadge(program){
+  if(programStockWasDeducted(program)){
+    return `<span class="stockLowBadge" style="background:#16a34a">Stock Deducted</span>`;
+  }
+  return `<span class="stockLowBadge" style="background:#dc2626">Stock Not Deducted</span>`;
 }
 
 function getDyeColorType(name){
@@ -2444,14 +2457,12 @@ async function exportProgramPdf(index, options={}){
   if(!program) return null;
   let requiredThans = getProgramRequiredThans(program, index);
   if(!requiredThans || requiredThans <= 0){
-    let entered = prompt("Batch = How many thans?");
+    let entered = prompt("How many thans recipe should I create?");
     requiredThans = Number(entered);
     if(!requiredThans || requiredThans <= 0){
       alert("Required thans must be greater than 0");
       return null;
     }
-    let input = document.getElementById("programBatchThans_" + index);
-    if(input) input.value = requiredThans;
   }
   try{
     (program.recipeSnapshot || []).forEach(r => convertRecipeForPdf(r, requiredThans));
