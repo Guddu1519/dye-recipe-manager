@@ -362,6 +362,8 @@ let currentUser = null;
 let currentRole = "viewer";
 let refreshTimer = null;
 let inactivityTimer = null;
+let localColorTypes = {};
+let processHouseLocalOnly = false;
 
 let dataLoaded = false;
 
@@ -390,6 +392,36 @@ function getDefaultColorType(name){
   if(COTTON_COLORS.has(clean)) return "COTTON";
   if(POLYSTER_COLORS.has(clean)) return "POLYSTER";
   return "";
+}
+
+function loadLocalColorTypes(){
+  try{
+    localColorTypes = JSON.parse(localStorage.getItem("dyeColorTypes") || "{}");
+  }catch{
+    localColorTypes = {};
+  }
+}
+
+function saveLocalColorType(name, type){
+  if(!name || !type) return;
+  localColorTypes[normalizeName(name)] = type;
+  localStorage.setItem("dyeColorTypes", JSON.stringify(localColorTypes));
+}
+
+function getColorType(name, dbType=""){
+  return dbType || localColorTypes[normalizeName(name)] || getDefaultColorType(name);
+}
+
+function loadLocalProcessHouses(){
+  try{
+    return JSON.parse(localStorage.getItem("processHousesLocal") || "[]");
+  }catch{
+    return [];
+  }
+}
+
+function saveLocalProcessHouses(){
+  localStorage.setItem("processHousesLocal", JSON.stringify(processHouses));
 }
 
 function normalizeName(name){
@@ -597,6 +629,7 @@ async function logoutUser(auto=false){
 
 async function showDashboard(){
   await loadUserRole();
+  loadLocalColorTypes();
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("appShell").style.display = "block";
 
@@ -685,7 +718,9 @@ async function saveColorRecord(color){
     return { error };
   }
 
-  let fullPayload = {name: color.name, rate: color.rate, color_type: color.colorType || getDefaultColorType(color.name)};
+  let resolvedType = color.colorType || getColorType(color.name);
+  saveLocalColorType(color.name, resolvedType);
+  let fullPayload = {name: color.name, rate: color.rate, color_type: resolvedType};
   let fallbackPayload = {name: color.name, rate: color.rate};
 
   if(color.id){
@@ -899,10 +934,13 @@ async function loadProcessHousesFromSupabase(){
     .order("name", {ascending:true});
   if(error){
     console.warn("Process house load skipped", error);
-    processHouses = [];
+    processHouseLocalOnly = true;
+    processHouses = loadLocalProcessHouses();
     return;
   }
-  processHouses = data || [];
+  processHouseLocalOnly = false;
+  let localHouses = loadLocalProcessHouses();
+  processHouses = data && data.length ? data : localHouses;
 }
 
 function showTab(id,btn){
@@ -1589,14 +1627,14 @@ function renderProgramHtml(program){
   }).join("");
 
   return `
-    <div class="printHeader">
-      <div>
-        <span class="miniLogo">MTM</span>
+      <div class="printHeader">
+      <div class="printBrand">
+        <img class="printLogo" src="logo.svg" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
+        <span class="miniLogo" style="display:none">MTM</span>
         <h1>MONICA TEXTILE MILLS</h1>
         <p>F238 MANDIA ROAD PALI RAJ 306-401</p>
       </div>
       <div>
-        <img class="qrCode" src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(location.origin)}" alt="Website QR">
         <h2>${program.programName || "Dyeing / Process House"}</h2>
         <p><b>Status:</b> ${program.status || "Pending"}</p>
         <p><b>Program Date:</b> ${program.programDate || ""}</p>
@@ -1624,9 +1662,12 @@ function exportProgramPdf(index){
         <style>
           body{font-family:Arial;padding:20px;color:#111}
           .printHeader{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #111;margin-bottom:12px;padding-bottom:8px}
+          .printBrand{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center}
+          .printBrand p{grid-column:2}
+          .printLogo{width:48px;height:48px;object-fit:contain;grid-row:1 / span 2}
           .miniLogo{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border:2px solid #111;font-weight:bold;font-size:18px;float:left;margin-right:10px}
-          .qrCode{width:70px;height:70px;float:right;margin-left:10px}
-          .printHeader h1,.printHeader h2{margin:0 0 4px}
+          .printHeader h1{margin:0 0 4px;white-space:nowrap;font-size:24px}
+          .printHeader h2{margin:0 0 4px}
           .printHeader p{margin:2px 0}
           .recipePrintBlock{break-inside:avoid;page-break-inside:avoid;margin-bottom:8px}
           table{width:100%;border-collapse:collapse;margin:5px 0 10px;page-break-inside:avoid;break-inside:avoid}
@@ -1636,11 +1677,8 @@ function exportProgramPdf(index){
           h2,h3{margin:5px 0 4px}
           .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:18px}
           .signatureBox{border-top:1px solid #111;text-align:center;padding-top:8px}
-          .pageNo{display:none}
           @media print{
             button{display:none}
-            .pageNo{display:block;position:fixed;right:0;bottom:0;font-size:11px}
-            .pageNo:after{content:"Page " counter(page)}
             @page{margin:12mm}
             body{padding:0}
           }
@@ -1649,7 +1687,6 @@ function exportProgramPdf(index){
       <body>
         <button onclick="window.print()">Print / Save PDF</button>
         ${renderProgramHtml(program)}
-        <div class="pageNo"></div>
       </body>
     </html>
   `);
@@ -1857,6 +1894,18 @@ async function saveProcessHouse(){
   }
 
   let existing = processHouses.find(h => normalizeName(h.name) === normalizeName(payload.name));
+  if(processHouseLocalOnly){
+    if(existing){
+      Object.assign(existing, payload);
+    } else {
+      processHouses.push({...payload, id: "local-" + Date.now()});
+    }
+    saveLocalProcessHouses();
+    renderProcessHouses();
+    alert("Process house saved locally. Run updated Supabase SQL to save it in cloud.");
+    return;
+  }
+
   let error;
   if(existing){
     ({ error } = await supabaseClient.from("process_houses").update(payload).eq("id", existing.id));
@@ -1864,7 +1913,15 @@ async function saveProcessHouse(){
     ({ error } = await supabaseClient.from("process_houses").insert(payload));
   }
   if(error){
-    alert("Process house save failed: " + error.message + ". Run updated Supabase SQL.");
+    if(existing){
+      Object.assign(existing, payload);
+    } else {
+      processHouses.push({...payload, id: "local-" + Date.now()});
+    }
+    processHouseLocalOnly = true;
+    saveLocalProcessHouses();
+    renderProcessHouses();
+    alert("Process house saved locally. Run updated Supabase SQL to save it in cloud.");
     return;
   }
   await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);
@@ -1877,6 +1934,12 @@ async function deleteProcessHouse(index){
   let house = processHouses[index];
   if(!house || !house.id) return;
   if(!confirm("Delete process house: " + house.name + "?")) return;
+  if(processHouseLocalOnly || String(house.id).startsWith("local-")){
+    processHouses.splice(index, 1);
+    saveLocalProcessHouses();
+    renderProcessHouses();
+    return;
+  }
   const { error } = await supabaseClient.from("process_houses").delete().eq("id", house.id);
   if(error){
     alert("Process house delete failed: " + error.message);
@@ -2070,7 +2133,7 @@ console.log("SUPABASE COLORS:", colorData);
     id: c.id,
     name: c.name,
     rate: c.rate,
-    colorType: c.color_type || getDefaultColorType(c.name)
+    colorType: getColorType(c.name, c.color_type)
   })).sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
 
   const { data: recipeData, error: recipeError } =

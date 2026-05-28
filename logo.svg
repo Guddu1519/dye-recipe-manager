@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160">
+  <rect width="160" height="160" rx="22" fill="#0f172a"/>
+  <rect x="12" y="12" width="136" height="136" rx="18" fill="none" stroke="#dbeafe" stroke-width="6"/>
+  <text x="80" y="75" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700" fill="#ffffff">MTM</text>
+  <text x="80" y="106" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#93c5fd">DYEING</text>
+</svg>
