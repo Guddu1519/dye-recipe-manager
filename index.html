@@ -319,16 +319,12 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
   <div class="erpChartGrid">
     <div class="erpChart">
-      <h3>Monthly Program Count</h3>
+      <h3>Monthly Than Dyed Count</h3>
       <div id="dashProgramChart"></div>
     </div>
     <div class="erpChart">
       <h3>Most Used Colors</h3>
       <div id="dashColorChart"></div>
-    </div>
-    <div class="erpChart">
-      <h3>Monthly Dye Cost Trend</h3>
-      <div id="dashCostChart"></div>
     </div>
     <div class="erpChart">
       <h3>Low Stock Summary</h3>
@@ -3510,7 +3506,10 @@ function renderDashboard(){
       let date = new Date();
       date.setMonth(date.getMonth() - (5 - index));
       let key = date.toISOString().slice(0, 7);
-      return {label:key, value:programs.filter(program => isDateInMonth(getProgramDateValue(program), key)).length};
+      let value = programs
+        .filter(program => isDateInMonth(getProgramDateValue(program), key))
+        .reduce((sum, program) => sum + (getProgramRequiredThans(program) * ((program.recipeSnapshot || []).length || 1)), 0);
+      return {label:key, value, display:value + " thans"};
     });
     programChart.innerHTML = renderBarRows(monthItems);
   }
