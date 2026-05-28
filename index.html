@@ -57,6 +57,20 @@ th{background:#dbeafe}
     .contactActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
     .stockSummary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .stockSummary .stat b{font-size:22px}
+    .bellWrap{position:relative;order:12;align-self:center}
+    .bellBtn{position:relative;background:#0f172a!important;color:white!important;border-radius:999px!important;padding:11px 14px!important;box-shadow:0 8px 18px #0f172a22}
+    .bellBtn.hasAlerts{animation:bellPulse 1.5s ease-in-out infinite}
+    .bellCount{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;border-radius:999px;background:#dc2626;color:white;font-size:12px;font-weight:bold;display:none;align-items:center;justify-content:center;padding:0 5px;border:2px solid white}
+    .notificationPanel{display:none;position:absolute;right:0;top:48px;width:340px;max-width:calc(100vw - 28px);background:white;color:#111;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 18px 45px #0003;z-index:9999;overflow:hidden}
+    .notificationPanel.open{display:block;animation:notifyDrop .18s ease-out}
+    .notificationHeader{display:flex;justify-content:space-between;align-items:center;background:#0f172a;color:white;padding:12px 14px;font-weight:bold}
+    .notificationList{max-height:280px;overflow:auto}
+    .notificationItem{padding:12px 14px;border-bottom:1px solid #fee2e2;background:#fff7f7;color:#991b1b;font-size:13px}
+    .notificationEmpty{padding:14px;color:#64748b;font-size:13px}
+    .stockLowRow td{background:#fee2e2!important;color:#991b1b;font-weight:bold}
+    .stockLowBadge{display:inline-block;background:#dc2626;color:white;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:bold}
+    @keyframes bellPulse{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-10deg) scale(1.05)}40%{transform:rotate(10deg) scale(1.05)}60%{transform:rotate(-6deg) scale(1.03)}80%{transform:rotate(6deg) scale(1.03)}}
+    @keyframes notifyDrop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
     .warningBox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:10px;margin-top:10px}
     .dangerBox{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
     .exportBar{display:flex;gap:10px;flex-wrap:wrap}
@@ -108,7 +122,7 @@ th{background:#dbeafe}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}}
   </style>
 </head>
 <body>
@@ -160,8 +174,18 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:12" id="roleBadge" class="role-badge"></span>
-  <button style="order:13" class="logout" onclick="logoutUser()">Logout</button>
+  <div class="bellWrap">
+    <button id="stockBellButton" class="bellBtn" onclick="toggleNotifications()" title="Stock notifications">&#128276; <span id="stockBellCount" class="bellCount">0</span></button>
+    <div id="stockNotificationPanel" class="notificationPanel">
+      <div class="notificationHeader">
+        <span>Stock Notifications</span>
+        <button class="btn danger" style="padding:6px 8px" onclick="clearStockNotifications()">Clear</button>
+      </div>
+      <div id="stockNotificationList" class="notificationList"></div>
+    </div>
+  </div>
+  <span style="order:13" id="roleBadge" class="role-badge"></span>
+  <button style="order:14" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="dashboard" class="active">
@@ -562,10 +586,13 @@ let inactivityTimer = null;
 let localColorTypes = {};
 let processHouseLocalOnly = false;
 let stockLocalOnly = false;
+let stockNotifications = [];
+let stockAlertState = {};
 
 let dataLoaded = false;
 
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
+const LOW_STOCK_THRESHOLD_GRAMS = 5000;
 const ADMIN_EMAILS = new Set(["JAINGARVIT31@GMAIL.COM"]);
 const ADMIN_UIDS = new Set(["2d40e8ad-d9dd-4043-8750-9c09cfc029e6"]);
 
@@ -620,6 +647,21 @@ function loadLocalProcessHouses(){
 
 function saveLocalProcessHouses(){
   localStorage.setItem("processHousesLocal", JSON.stringify(processHouses));
+}
+
+function loadStockNotificationState(){
+  try{
+    stockNotifications = JSON.parse(localStorage.getItem("stockNotifications") || "[]");
+    stockAlertState = JSON.parse(localStorage.getItem("stockAlertState") || "{}");
+  }catch{
+    stockNotifications = [];
+    stockAlertState = {};
+  }
+}
+
+function saveStockNotificationState(){
+  localStorage.setItem("stockNotifications", JSON.stringify(stockNotifications));
+  localStorage.setItem("stockAlertState", JSON.stringify(stockAlertState));
 }
 
 function normalizeName(name){
@@ -743,10 +785,10 @@ function applyRolePermissions(){
   document.querySelectorAll("input, select, button").forEach(el=>{
     let id = el.id || "";
     let text = (el.textContent || "").trim();
-    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch";
+    let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter";
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || text === "Calculate Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "History" || text === "Refresh Cloud Data";
+    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "History" || text === "Refresh Cloud Data" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -837,6 +879,8 @@ async function logoutUser(auto=false){
   stockPurchases = [];
   stockLedger = [];
   programStockUsage = [];
+  stockNotifications = [];
+  stockAlertState = {};
 
   if(refreshTimer){
     clearInterval(refreshTimer);
@@ -855,6 +899,7 @@ async function logoutUser(auto=false){
 async function showDashboard(){
   await loadUserRole();
   loadLocalColorTypes();
+  loadStockNotificationState();
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("appShell").style.display = "block";
 
@@ -864,6 +909,7 @@ async function showDashboard(){
   }
 
   await loadDataFromJson();
+  renderStockNotifications();
   applyRolePermissions();
   resetInactivityTimer();
 
@@ -2042,6 +2088,78 @@ function formatGrams(value){
   return (Number(value) || 0).toLocaleString("en-IN") + " g";
 }
 
+function getLowStockRows(rows){
+  return (rows || []).filter(row => row.balance < LOW_STOCK_THRESHOLD_GRAMS);
+}
+
+function updateLowStockNotifications(rows){
+  let lowRows = getLowStockRows(rows);
+  let lowNames = new Set(lowRows.map(row => row.name));
+
+  rows.forEach(row => {
+    if(row.balance >= LOW_STOCK_THRESHOLD_GRAMS){
+      stockAlertState[row.name] = false;
+    }
+  });
+
+  lowRows.forEach(row => {
+    if(stockAlertState[row.name]) return;
+    stockNotifications.unshift({
+      id: row.name + "-" + Date.now(),
+      chemicalName: row.name,
+      message: "Low Stock Alert: " + row.name + " is below 5 KG. Please order new stock.",
+      createdAt: new Date().toISOString(),
+      unread: true
+    });
+    stockAlertState[row.name] = true;
+  });
+
+  Object.keys(stockAlertState).forEach(name => {
+    if(!lowNames.has(name)){
+      let row = rows.find(item => item.name === name);
+      if(!row || row.balance >= LOW_STOCK_THRESHOLD_GRAMS) stockAlertState[name] = false;
+    }
+  });
+
+  stockNotifications = stockNotifications.slice(0, 50);
+  saveStockNotificationState();
+  renderStockNotifications();
+}
+
+function renderStockNotifications(){
+  let unread = stockNotifications.filter(n => n.unread).length;
+  let button = document.getElementById("stockBellButton");
+  let count = document.getElementById("stockBellCount");
+  let list = document.getElementById("stockNotificationList");
+  if(button) button.classList.toggle("hasAlerts", unread > 0);
+  if(count){
+    count.textContent = unread;
+    count.style.display = unread > 0 ? "flex" : "none";
+  }
+  if(list){
+    list.innerHTML = stockNotifications.length
+      ? stockNotifications.map(n => `<div class="notificationItem">${n.message}<br><span class="muted">${new Date(n.createdAt).toLocaleString()}</span></div>`).join("")
+      : `<div class="notificationEmpty">No stock notifications.</div>`;
+  }
+}
+
+function toggleNotifications(){
+  let panel = document.getElementById("stockNotificationPanel");
+  if(!panel) return;
+  panel.classList.toggle("open");
+  if(panel.classList.contains("open")){
+    stockNotifications = stockNotifications.map(n => ({...n, unread:false}));
+    saveStockNotificationState();
+    renderStockNotifications();
+  }
+}
+
+function clearStockNotifications(){
+  stockNotifications = [];
+  saveStockNotificationState();
+  renderStockNotifications();
+}
+
 function getStockRows(){
   let map = {};
   stockLedger.forEach(entry => {
@@ -2268,11 +2386,12 @@ function renderStock(){
   let purchaseDate = document.getElementById("stockPurchaseDate");
   if(purchaseDate && !purchaseDate.value) purchaseDate.value = new Date().toISOString().slice(0,10);
   let rows = getStockRows();
+  updateLowStockNotifications(rows);
   let q = document.getElementById("stockSearch")?.value.toUpperCase() || "";
   let filter = document.getElementById("stockFilter")?.value || "all";
   let visible = rows.filter(row => {
     if(q && !row.name.includes(q)) return false;
-    if(filter === "low") return row.balance > 0 && row.balance <= 1000;
+    if(filter === "low") return row.balance < LOW_STOCK_THRESHOLD_GRAMS;
     if(filter === "used") return row.used > 0;
     if(filter === "available") return row.balance > 0;
     return true;
@@ -2280,15 +2399,18 @@ function renderStock(){
 
   let table = document.getElementById("stockTable");
   if(table){
-    table.innerHTML = visible.map(row => `
-      <tr>
+    table.innerHTML = visible.map(row => {
+      let isLow = row.balance < LOW_STOCK_THRESHOLD_GRAMS;
+      return `
+      <tr class="${isLow ? "stockLowRow" : ""}">
         <td>${row.name}</td>
         <td>${formatGrams(row.purchased)}</td>
         <td>${formatGrams(row.used)}</td>
         <td>${formatGrams(row.balance)}</td>
-        <td>${row.balance <= 1000 ? "LOW STOCK" : ""}</td>
+        <td>${isLow ? `<span class="stockLowBadge">Below 5 KG</span>` : ""}</td>
       </tr>
-    `).join("") || `<tr><td colspan="5">No stock found.</td></tr>`;
+    `;
+    }).join("") || `<tr><td colspan="5">No stock found.</td></tr>`;
   }
 
   let usageTable = document.getElementById("programStockUsageTable");
@@ -2310,7 +2432,7 @@ function renderStock(){
   let lowCount = document.getElementById("stockLowCount");
   if(itemCount) itemCount.textContent = rows.length;
   if(balanceTotal) balanceTotal.textContent = formatGrams(rows.reduce((sum, row) => sum + row.balance, 0));
-  if(lowCount) lowCount.textContent = rows.filter(row => row.balance > 0 && row.balance <= 1000).length;
+  if(lowCount) lowCount.textContent = getLowStockRows(rows).length;
 }
 
 function importStockExcel(e){
