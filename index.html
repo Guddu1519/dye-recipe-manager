@@ -69,8 +69,24 @@ th{background:#dbeafe}
     .notificationEmpty{padding:14px;color:#64748b;font-size:13px}
     .stockLowRow td{background:#fee2e2!important;color:#991b1b;font-weight:bold}
     .stockLowBadge{display:inline-block;background:#dc2626;color:white;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:bold}
+    .stockHeaderRow{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .stockHeaderRow .bellWrap{order:0;margin-left:auto}
+    .importProgressWrap{display:none;margin-top:12px;background:#f8fafc;border:1px solid #dbeafe;border-radius:12px;padding:12px}
+    .importProgressTrack{height:14px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+    .importProgressBar{height:100%;width:0;background:linear-gradient(90deg,#2563eb,#16a34a);border-radius:999px;transition:width .25s ease}
+    .importProgressText{margin-top:8px;font-weight:bold;color:#1d4ed8}
+    .priceModalOverlay{display:none;position:fixed;inset:0;background:#0f172a99;z-index:10000;align-items:center;justify-content:center;padding:18px}
+    .priceModalOverlay.open{display:flex;animation:modalFade .18s ease-out}
+    .priceModal{width:100%;max-width:460px;background:white;border-radius:14px;box-shadow:0 24px 70px #0005;overflow:hidden;animation:modalPop .2s ease-out}
+    .priceModalHeader{background:#0f172a;color:white;padding:16px 18px;font-weight:bold;font-size:18px}
+    .priceModalBody{padding:18px;color:#111;line-height:1.5}
+    .priceModalBody b{color:#1d4ed8}
+    .priceModalActions{display:flex;gap:10px;justify-content:flex-end;padding:0 18px 18px}
+    .priceHistoryTag{display:inline-block;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:bold}
     @keyframes bellPulse{0%,100%{transform:rotate(0) scale(1)}20%{transform:rotate(-10deg) scale(1.05)}40%{transform:rotate(10deg) scale(1.05)}60%{transform:rotate(-6deg) scale(1.03)}80%{transform:rotate(6deg) scale(1.03)}}
     @keyframes notifyDrop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes modalFade{from{opacity:0}to{opacity:1}}
+    @keyframes modalPop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
     .warningBox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:10px;margin-top:10px}
     .dangerBox{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
     .exportBar{display:flex;gap:10px;flex-wrap:wrap}
@@ -122,7 +138,7 @@ th{background:#dbeafe}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}}
   </style>
 </head>
 <body>
@@ -174,16 +190,6 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <div class="bellWrap">
-    <button id="stockBellButton" class="bellBtn" onclick="toggleNotifications()" title="Stock notifications">&#128276; <span id="stockBellCount" class="bellCount">0</span></button>
-    <div id="stockNotificationPanel" class="notificationPanel">
-      <div class="notificationHeader">
-        <span>Stock Notifications</span>
-        <button class="btn danger" style="padding:6px 8px" onclick="clearStockNotifications()">Clear</button>
-      </div>
-      <div id="stockNotificationList" class="notificationList"></div>
-    </div>
-  </div>
   <span style="order:13" id="roleBadge" class="role-badge"></span>
   <button style="order:14" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
@@ -261,6 +267,19 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </thead>
       <tbody id="colorTable"></tbody>
     </table>
+  </div>
+
+  <div class="card">
+    <h3>Price Change History</h3>
+    <p class="muted">Latest price updates accepted from Chemical Stock purchases and Excel imports.</p>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Chemical Name</th><th>Old Price</th><th>New Price</th><th>Updated By</th><th>Date & Time</th></tr>
+        </thead>
+        <tbody id="priceHistoryTable"></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
@@ -383,8 +402,22 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <section id="stock">
   <div class="card">
-    <h2>Chemical Stock Management</h2>
-    <p class="muted">Stock is stored in grams. Recipe Master does not deduct stock. Program creation deducts stock one time only.</p>
+    <div class="stockHeaderRow">
+      <div>
+        <h2>Chemical Stock Management</h2>
+        <p class="muted">Stock is stored in grams. Recipe Master does not deduct stock. Program creation deducts stock one time only.</p>
+      </div>
+      <div class="bellWrap">
+        <button id="stockBellButton" class="bellBtn" onclick="toggleNotifications()" title="Stock notifications">&#128276; <span id="stockBellCount" class="bellCount">0</span></button>
+        <div id="stockNotificationPanel" class="notificationPanel">
+          <div class="notificationHeader">
+            <span>Stock Notifications</span>
+            <button class="btn danger" style="padding:6px 8px" onclick="clearStockNotifications()">Clear</button>
+          </div>
+          <div id="stockNotificationList" class="notificationList"></div>
+        </div>
+      </div>
+    </div>
     <div class="stockSummary">
       <div class="stat"><span>Stock Items</span><b id="stockItemCount">0</b></div>
       <div class="stat"><span>Total Balance</span><b id="stockBalanceTotal">0 g</b></div>
@@ -440,6 +473,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div class="exportBar">
       <button class="btn" onclick="document.getElementById('stockExcelFile').click()">Import Excel</button>
       <button class="btn green" onclick="exportStockExcel()">Export Excel</button>
+    </div>
+    <div id="stockImportProgress" class="importProgressWrap">
+      <div class="importProgressTrack"><div id="stockImportProgressBar" class="importProgressBar"></div></div>
+      <div id="stockImportProgressText" class="importProgressText">Waiting...</div>
     </div>
     <input type="file" id="stockExcelFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importStockExcel(event)">
   </div>
@@ -565,6 +602,17 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 <footer class="footerLine">Registered & Developed by MONICA TEXTILE MILLS, Pali Rajasthan, India.</footer>
 </div>
 
+<div id="priceConfirmModal" class="priceModalOverlay">
+  <div class="priceModal">
+    <div class="priceModalHeader">Price Difference Detected</div>
+    <div id="priceConfirmBody" class="priceModalBody"></div>
+    <div class="priceModalActions">
+      <button class="btn danger" id="priceConfirmNo">NO</button>
+      <button class="btn green" id="priceConfirmYes">YES</button>
+    </div>
+  </div>
+</div>
+
 <datalist id="processHouseList"></datalist>
 
 <script>
@@ -574,6 +622,7 @@ let programs = [];
 let auditLogs = [];
 let recipeVersions = [];
 let processHouses = [];
+let priceChangeLogs = [];
 let stockPurchases = [];
 let stockLedger = [];
 let programStockUsage = [];
@@ -876,6 +925,7 @@ async function logoutUser(auto=false){
   auditLogs = [];
   recipeVersions = [];
   processHouses = [];
+  priceChangeLogs = [];
   stockPurchases = [];
   stockLedger = [];
   programStockUsage = [];
@@ -1161,6 +1211,101 @@ async function loadAuditLogsFromSupabase(){
   auditLogs = data || [];
 }
 
+function confirmPriceUpdate(name, oldPrice, newPrice){
+  return new Promise(resolve => {
+    let overlay = document.getElementById("priceConfirmModal");
+    let body = document.getElementById("priceConfirmBody");
+    let yes = document.getElementById("priceConfirmYes");
+    let no = document.getElementById("priceConfirmNo");
+    if(!overlay || !body || !yes || !no){
+      resolve(confirm("Price difference detected for " + name + ".\nOld Price: Rs. " + oldPrice + "/KG\nNew Price: Rs. " + newPrice + "/KG\nDo you want to update the Price Master?"));
+      return;
+    }
+    body.innerHTML = `
+      <p>Price difference detected for <b>${name}</b>.</p>
+      <p>Old Price: <b>Rs. ${Number(oldPrice).toFixed(2)}/KG</b><br>
+      New Price: <b>Rs. ${Number(newPrice).toFixed(2)}/KG</b></p>
+      <p>Do you want to update the Price Master?</p>
+    `;
+    overlay.classList.add("open");
+    function cleanup(answer){
+      overlay.classList.remove("open");
+      yes.onclick = null;
+      no.onclick = null;
+      resolve(answer);
+    }
+    yes.onclick = () => cleanup(true);
+    no.onclick = () => cleanup(false);
+  });
+}
+
+async function logPriceChange(name, oldPrice, newPrice){
+  if(!supabaseClient || !currentUser || !isAdmin()) return;
+  let payload = {
+    chemical_name: normalizeName(name),
+    old_price: Number(oldPrice) || 0,
+    new_price: Number(newPrice) || 0,
+    updated_by: currentUser.email || "",
+    created_at: new Date().toISOString()
+  };
+  const { error } = await supabaseClient.from("price_change_logs").insert(payload);
+  if(error) console.warn("Price change log skipped. Run updated Supabase SQL.", error);
+}
+
+async function loadPriceChangeLogsFromSupabase(){
+  if(!supabaseClient || !isLoggedIn() || !isAdmin()){
+    priceChangeLogs = [];
+    return;
+  }
+  const { data, error } = await supabaseClient
+    .from("price_change_logs")
+    .select("*")
+    .order("created_at", {ascending:false})
+    .limit(200);
+  if(error){
+    console.warn("Price history load skipped. Run updated Supabase SQL.", error);
+    priceChangeLogs = [];
+    return;
+  }
+  priceChangeLogs = data || [];
+}
+
+async function checkStockPriceUpdate(name, newPrice){
+  let cleanName = normalizeName(name);
+  let latestPrice = Number(newPrice) || 0;
+  if(!cleanName || latestPrice <= 0 || !isAdmin()) return;
+
+  let existing = colors.find(c => normalizeName(c.name) === cleanName);
+  if(!existing){
+    let newColor = {name: cleanName, rate: latestPrice, colorType: getDefaultColorType(cleanName)};
+    let saved = await saveColorRecord(newColor);
+    if(saved){
+      colors.push(newColor);
+      await logPriceChange(cleanName, 0, latestPrice);
+      await logAudit("create", "Price Master", cleanName, null, newColor);
+    }
+    return;
+  }
+
+  let oldPrice = Number(existing.rate) || 0;
+  if(oldPrice === latestPrice) return;
+  let shouldUpdate = await confirmPriceUpdate(cleanName, oldPrice, latestPrice);
+  if(!shouldUpdate) return;
+
+  let oldValue = {...existing};
+  existing.rate = latestPrice;
+  let saved = await saveColorRecord(existing);
+  if(saved){
+    await logPriceChange(cleanName, oldPrice, latestPrice);
+    await logAudit("update", "Price Master", cleanName, oldValue, existing);
+    await loadPriceChangeLogsFromSupabase();
+    renderColors();
+    renderPriceHistory();
+  } else {
+    existing.rate = oldPrice;
+  }
+}
+
 async function saveRecipeVersion(recipe, actionType){
   if(!supabaseClient || !currentUser || !isAdmin() || !recipe) return;
   const payload = {
@@ -1307,6 +1452,24 @@ if(dl){
   ).join("");
 }
   applyRolePermissions();
+}
+
+function renderPriceHistory(){
+  let table = document.getElementById("priceHistoryTable");
+  if(!table) return;
+  if(!isAdmin()){
+    table.innerHTML = `<tr><td colspan="5">Only admin can view price change history.</td></tr>`;
+    return;
+  }
+  table.innerHTML = (priceChangeLogs || []).map(log => `
+    <tr>
+      <td><span class="priceHistoryTag">${log.chemical_name || ""}</span></td>
+      <td>Rs. ${Number(log.old_price || 0).toFixed(2)}/KG</td>
+      <td>Rs. ${Number(log.new_price || 0).toFixed(2)}/KG</td>
+      <td>${log.updated_by || ""}</td>
+      <td>${log.created_at ? new Date(log.created_at).toLocaleString() : ""}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="5">No price changes found.</td></tr>`;
 }
 
 function editColor(i){
@@ -2088,6 +2251,45 @@ function formatGrams(value){
   return (Number(value) || 0).toLocaleString("en-IN") + " g";
 }
 
+function waitForUi(){
+  return new Promise(resolve => setTimeout(resolve, 20));
+}
+
+function setStockImportProgress(percent, message, show=true){
+  let wrap = document.getElementById("stockImportProgress");
+  let bar = document.getElementById("stockImportProgressBar");
+  let text = document.getElementById("stockImportProgressText");
+  if(wrap) wrap.style.display = show ? "block" : "none";
+  if(bar) bar.style.width = Math.max(0, Math.min(100, percent)) + "%";
+  if(text) text.textContent = percent + "% - " + message;
+}
+
+function excelDateToIso(value){
+  if(!value) return new Date().toISOString().slice(0,10);
+  if(typeof value === "number"){
+    let date = new Date(Math.round((value - 25569) * 86400 * 1000));
+    return date.toISOString().slice(0,10);
+  }
+  let text = String(value).trim();
+  if(!text) return new Date().toISOString().slice(0,10);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  let parsed = new Date(text);
+  if(!isNaN(parsed.getTime())) return parsed.toISOString().slice(0,10);
+  return new Date().toISOString().slice(0,10);
+}
+
+function getExcelValue(row, names){
+  let normalized = {};
+  Object.keys(row || {}).forEach(key => {
+    normalized[String(key).trim().toUpperCase()] = row[key];
+  });
+  for(const name of names){
+    let value = normalized[String(name).trim().toUpperCase()];
+    if(value !== undefined && value !== null && String(value).trim() !== "") return value;
+  }
+  return "";
+}
+
 function getLowStockRows(rows){
   return (rows || []).filter(row => row.balance < LOW_STOCK_THRESHOLD_GRAMS);
 }
@@ -2340,6 +2542,7 @@ async function saveStockPurchase(){
     alert("Stock purchase failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
     return;
   }
+  await checkStockPriceUpdate(name, purchase.rate_per_kg);
   let { error: ledgerError } = await supabaseClient.from("chemical_stock_ledger").insert({
     chemical_name: name,
     entry_type: "purchase",
@@ -2439,30 +2642,44 @@ function importStockExcel(e){
   if(!requireAdmin()) return;
   let file = e.target.files[0];
   if(!file) return;
+  setStockImportProgress(2, "Reading Excel file...");
   let reader = new FileReader();
   reader.onload = async function(evt){
     try{
+      setStockImportProgress(15, "Checking stock rows...");
+      await waitForUi();
       let workbook = XLSX.read(evt.target.result, {type:"array"});
       let sheet = workbook.Sheets[workbook.SheetNames[0]];
       let rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
       let imported = 0;
-      for(const row of rows){
-        let name = normalizeName(row["Chemical Name"] || row["Chemical / Color Name"] || row["Name"]);
-        let qty = Number(row["Purchased Quantity"] || row["Quantity"] || row["Purchased Qty"]);
-        let unit = row["Unit"] || "kg";
+      let skipped = 0;
+      if(!rows.length){
+        setStockImportProgress(0, "No rows found in Excel file.");
+        alert("No stock rows found. Please check Excel headers.");
+        return;
+      }
+      for(let index = 0; index < rows.length; index++){
+        const row = rows[index];
+        let name = normalizeName(getExcelValue(row, ["Chemical Name", "Chemical / Color Name", "Name"]));
+        let qty = Number(getExcelValue(row, ["Purchased Quantity", "Quantity", "Purchased Qty"]));
+        let unit = getExcelValue(row, ["Unit"]) || "kg";
         let grams = gramsFromQty(qty, unit);
-        if(!name || grams <= 0) continue;
+        if(!name || grams <= 0){
+          skipped++;
+          continue;
+        }
         let purchase = {
           chemical_name: name,
           purchased_qty_grams: grams,
           unit,
-          purchase_date: row["Purchase Date"] || new Date().toISOString().slice(0,10),
-          supplier: row["Supplier"] || "",
-          rate_per_kg: Number(row["Rate per kg"] || 0),
-          notes: row["Notes"] || row["Bill Number / Note"] || ""
+          purchase_date: excelDateToIso(getExcelValue(row, ["Purchase Date", "Date"])),
+          supplier: getExcelValue(row, ["Supplier", "Supplier Name"]),
+          rate_per_kg: Number(getExcelValue(row, ["Rate per kg", "Rate per KG", "Rate", "Price per kg", "Price per KG"]) || 0),
+          notes: getExcelValue(row, ["Notes", "Bill Number / Note", "Bill Number", "Note"])
         };
         let { error } = await supabaseClient.from("chemical_stock_purchases").insert(purchase);
         if(error) throw error;
+        await checkStockPriceUpdate(name, purchase.rate_per_kg);
         let { error: ledgerError } = await supabaseClient.from("chemical_stock_ledger").insert({
           chemical_name: name,
           entry_type: "purchase",
@@ -2472,12 +2689,30 @@ function importStockExcel(e){
         });
         if(ledgerError) throw ledgerError;
         imported++;
+        stockPurchases.push(purchase);
+        stockLedger.push({
+          chemicalName: name,
+          entryType: "purchase",
+          qtyDeltaGrams: grams,
+          chemical_name: name,
+          entry_type: "purchase",
+          qty_delta_grams: grams,
+          note: "Excel import",
+          created_at: new Date().toISOString()
+        });
+        let progress = Math.min(99, 15 + Math.round(((index + 1) / rows.length) * 84));
+        setStockImportProgress(progress, imported + " rows uploaded...");
+        if(index % 5 === 0) await waitForUi();
       }
+      setStockImportProgress(99, "Refreshing stock table...");
       await loadStockFromSupabase();
       renderStock();
-      alert(imported + " stock rows imported successfully");
+      setStockImportProgress(100, "Stock from Excel uploaded successfully.");
+      alert("Stock from Excel uploaded successfully.\nImported: " + imported + "\nSkipped: " + skipped);
+      e.target.value = "";
     }catch(err){
       console.error(err);
+      setStockImportProgress(0, "Import failed.");
       alert("Stock import failed: " + (err.message || "Unknown error"));
     }
   };
@@ -2914,6 +3149,7 @@ function importExcelRates(e){
 function renderAll(){
   renderDashboard();
   renderColors();
+  renderPriceHistory();
   renderRecipes();
   renderRecipeSelect();
   renderPrograms();
@@ -2970,6 +3206,7 @@ console.log("SUPABASE RECIPES:", recipeData);
   await loadAuditLogsFromSupabase();
   await loadRecipeVersionsFromSupabase();
   await loadProcessHousesFromSupabase();
+  await loadPriceChangeLogsFromSupabase();
   await loadStockFromSupabase();
   renderAll();
 
