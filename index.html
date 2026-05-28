@@ -1085,15 +1085,24 @@ function renderPrograms(){
 }
 
 function getProgramRecipeRows(recipe){
+  let dyes = recipe.dyes || [];
+  let splitAt = Math.ceil(dyes.length / 2);
+  let left = dyes.slice(0, splitAt);
+  let right = dyes.slice(splitAt);
+  let maxRows = Math.max(left.length, right.length);
   let rows = "";
 
-  (recipe.dyes || []).forEach(d => {
+  for(let i = 0; i < maxRows; i++){
+    let l = left[i];
+    let r = right[i];
     rows += `
       <tr>
-        <td>${d.name}</td>
-        <td>${d.qty} g</td>
+        <td>${l ? l.name : ""}</td>
+        <td>${l ? l.qty + " g" : ""}</td>
+        <td>${r ? r.name : ""}</td>
+        <td>${r ? r.qty + " g" : ""}</td>
       </tr>`;
-  });
+  }
 
   return rows;
 }
@@ -1102,11 +1111,10 @@ function renderProgramHtml(program){
   let recipesHtml = (program.recipeSnapshot || []).map(r => {
     let rows = getProgramRecipeRows(r);
     return `
-      <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}</h3>
-      <p><b>Hex Code:</b> ${r.hexCode || "N/A"} &nbsp; <b>Batch Thans:</b> ${r.recipeThans || ""}</p>
+      <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}, Batch Thans: ${r.recipeThans || ""}</h3>
       <table>
         <thead>
-          <tr><th>Color Name</th><th>Quantity</th></tr>
+          <tr><th>Color Name</th><th>Quantity</th><th>Color Name</th><th>Quantity</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -1118,7 +1126,6 @@ function renderProgramHtml(program){
     <p><b>Program Name:</b> ${program.programName || ""}</p>
     <p><b>Program Date:</b> ${program.programDate || ""}</p>
     <p><b>Created Date/Time:</b> ${program.createdAt ? new Date(program.createdAt).toLocaleString() : ""}</p>
-    <p><b>Selected Recipes:</b> ${(program.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join(", ")}</p>
     ${recipesHtml}
   `;
 }
