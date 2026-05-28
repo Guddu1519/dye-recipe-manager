@@ -182,7 +182,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:8" onclick="showTab('contact',this)">Contact Us</button>
   <button style="order:9" onclick="showTab('importExport',this)">Import / Export</button>
   <button style="order:10" onclick="showTab('history',this)">History</button>
-  <button style="order:11" onclick="loadDataFromJson()">Refresh Cloud Data</button>
+  <button id="refreshCloudBtn" style="order:11" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
 
 <input type="file"
@@ -3332,58 +3332,84 @@ function renderAll(){
   renderStock();
 } 
 
-async function loadDataFromJson(){
+async function refreshCloudData(button){
   if(!requireLogin()) return;
+  let refreshButton = button || document.getElementById("refreshCloudBtn");
+  let oldText = refreshButton ? refreshButton.textContent : "";
+  if(refreshButton){
+    refreshButton.disabled = true;
+    refreshButton.textContent = "Refreshing...";
+  }
+  try{
+    let loaded = await loadDataFromJson();
+    if(loaded) alert("Cloud data refreshed successfully.");
+  }finally{
+    if(refreshButton){
+      refreshButton.disabled = false;
+      refreshButton.textContent = oldText || "Refresh Cloud Data";
+    }
+  }
+}
+
+async function loadDataFromJson(){
+  if(!requireLogin()) return false;
 
   if(!supabaseClient){
     alert("Supabase is not connected. Please check your internet connection.");
-    return;
+    return false;
   }
 
-  const { data: colorData, error: colorError } =
-    await supabaseClient.from("colors").select("*");
+  try{
+    const { data: colorData, error: colorError } =
+      await supabaseClient.from("colors").select("*");
 
-  if(colorError){
-    alert("Color load error");
-    console.error(colorError);
-    return;
-  }
+    if(colorError){
+      alert("Color load error: " + explainSupabaseError(colorError, ""));
+      console.error(colorError);
+      return false;
+    }
 console.log("SUPABASE COLORS:", colorData);
-  colors = (colorData || []).map(c => ({
-    id: c.id,
-    name: c.name,
-    rate: c.rate,
-    colorType: getColorType(c.name, c.color_type)
-  })).sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
+    colors = (colorData || []).map(c => ({
+      id: c.id,
+      name: c.name,
+      rate: c.rate,
+      colorType: getColorType(c.name, c.color_type)
+    })).sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
 
-  const { data: recipeData, error: recipeError } =
-    await supabaseClient.from("recipes").select("*");
+    const { data: recipeData, error: recipeError } =
+      await supabaseClient.from("recipes").select("*");
 
-  if(recipeError){
-    alert("Recipe load error");
-    console.error(recipeError);
-    return;
-  }
+    if(recipeError){
+      alert("Recipe load error: " + explainSupabaseError(recipeError, ""));
+      console.error(recipeError);
+      return false;
+    }
 console.log("SUPABASE RECIPES:", recipeData);
-  recipes = (recipeData || []).map(r => ({
-    id: r.id,
-    recipeNo: r.recipe_no,
-    colorName: r.color_name,
-    recipeThans: r.than_count,
-    hexCode: r.hex_code || "N/A",
-    dyes: r.dyes || []
-  }));
-  sortRecipesInPlace();
+    recipes = (recipeData || []).map(r => ({
+      id: r.id,
+      recipeNo: r.recipe_no,
+      colorName: r.color_name,
+      recipeThans: r.than_count,
+      hexCode: r.hex_code || "N/A",
+      dyes: r.dyes || []
+    }));
+    sortRecipesInPlace();
 
-  await loadProgramsFromSupabase();
-  await loadAuditLogsFromSupabase();
-  await loadRecipeVersionsFromSupabase();
-  await loadProcessHousesFromSupabase();
-  await loadPriceChangeLogsFromSupabase();
-  await loadStockFromSupabase();
-  renderAll();
+    await loadProgramsFromSupabase();
+    await loadAuditLogsFromSupabase();
+    await loadRecipeVersionsFromSupabase();
+    await loadProcessHousesFromSupabase();
+    await loadPriceChangeLogsFromSupabase();
+    await loadStockFromSupabase();
+    renderAll();
 
-  console.log("Loaded from Supabase");
+    console.log("Loaded from Supabase");
+    return true;
+  }catch(error){
+    alert("Cloud refresh failed: " + explainSupabaseError(error, ""));
+    console.error(error);
+    return false;
+  }
 }
 </script>
 
