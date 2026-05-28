@@ -51,6 +51,12 @@ th{background:#dbeafe}
     .dashItem b{color:#0f172a}
     .quickActions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .quickActions .btn{text-align:center;text-decoration:none}
+    .footerLine{text-align:center;color:#64748b;font-size:12px;padding:14px 10px;border-top:1px solid #e2e8f0;background:#fff}
+    .contactGrid,.stockGrid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+    .contactHero{background:linear-gradient(135deg,#eff6ff,#fff);border:1px solid #bfdbfe;border-radius:12px;padding:18px}
+    .contactActions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+    .stockSummary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .stockSummary .stat b{font-size:22px}
     .warningBox{background:#fff7ed;border:1px solid #fdba74;color:#9a3412;padding:12px;border-radius:10px;margin-top:10px}
     .dangerBox{background:#fee2e2;border-color:#fca5a5;color:#991b1b}
     .exportBar{display:flex;gap:10px;flex-wrap:wrap}
@@ -101,8 +107,8 @@ th{background:#dbeafe}
 .logout{margin-left:auto;background:#dc2626;color:white}
 button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 .role-badge{align-self:center;font-size:13px;font-weight:bold;color:#475569;padding:10px 12px;background:#fff;border-radius:8px}
-    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}}
+    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{flex-direction:column;align-items:flex-start}.brandLeft{align-items:flex-start}.siteLogo{width:54px;height:54px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:10px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}}
   </style>
 </head>
 <body>
@@ -142,9 +148,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:4" onclick="showTab('price',this)">Price Master</button>
   <button style="order:5" onclick="showTab('program',this)">Program</button>
   <button style="order:6" onclick="showTab('customers',this)">Process House</button>
-  <button style="order:7" onclick="showTab('importExport',this)">Import / Export</button>
-  <button style="order:8" onclick="showTab('history',this)">History</button>
-  <button style="order:9" onclick="loadDataFromJson()">Refresh Cloud Data</button>
+  <button style="order:7" onclick="showTab('stock',this)">Chemical Stock</button>
+  <button style="order:8" onclick="showTab('contact',this)">Contact Us</button>
+  <button style="order:9" onclick="showTab('importExport',this)">Import / Export</button>
+  <button style="order:10" onclick="showTab('history',this)">History</button>
+  <button style="order:11" onclick="loadDataFromJson()">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
 
 <input type="file"
@@ -152,8 +160,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
        accept=".xlsx,.xls,.csv"
        style="display:none"
        onchange="importExcelRates(event)">
-  <span style="order:10" id="roleBadge" class="role-badge"></span>
-  <button style="order:11" class="logout" onclick="logoutUser()">Logout</button>
+  <span style="order:12" id="roleBadge" class="role-badge"></span>
+  <button style="order:13" class="logout" onclick="logoutUser()">Logout</button>
 </nav>
 
 <section id="dashboard" class="active">
@@ -239,7 +247,6 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <input id="recipeNo" placeholder="Recipe No">
       <input id="recipeColor" placeholder="Color Name">
     </div>
-    <button class="btn" onclick="useNextRecipeNo()">Use Next Recipe No</button>
     <input id="hexCode" placeholder="Hex Code e.g. #6A4F22">
     <input id="recipeThans" type="number" placeholder="Batch Thans (20/22/24)">
     <h3>Dyes</h3>
@@ -290,6 +297,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <input id="programName" list="processHouseList" placeholder="Dyeing Name / Process House Name">
     </div>
     <div class="row">
+      <input id="programRequiredThans" type="number" min="1" placeholder="Batch = How many thans?">
       <select id="programStatus">
         <option value="Pending">Pending</option>
         <option value="In dyeing">In dyeing</option>
@@ -314,7 +322,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch = How many thans?</th><th>Export</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -346,6 +354,135 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <tbody id="processHouseTable"></tbody>
       </table>
     </div>
+  </div>
+</section>
+
+<section id="stock">
+  <div class="card">
+    <h2>Chemical Stock Management</h2>
+    <p class="muted">Stock is stored in grams. Recipe Master does not deduct stock. Program creation deducts stock one time only.</p>
+    <div class="stockSummary">
+      <div class="stat"><span>Stock Items</span><b id="stockItemCount">0</b></div>
+      <div class="stat"><span>Total Balance</span><b id="stockBalanceTotal">0 g</b></div>
+      <div class="stat"><span>Low Stock</span><b id="stockLowCount">0</b></div>
+    </div>
+  </div>
+
+  <div class="stockGrid">
+    <div class="card">
+      <h3>Stock Purchase Entry</h3>
+      <input id="stockChemicalName" list="dyeSuggestions" placeholder="Chemical / Color Name">
+      <div class="row">
+        <input id="stockPurchaseQty" type="number" placeholder="Purchased Quantity">
+        <select id="stockPurchaseUnit">
+          <option value="kg">kg</option>
+          <option value="grams">grams</option>
+        </select>
+      </div>
+      <div class="row">
+        <input id="stockPurchaseDate" type="date">
+        <input id="stockSupplier" placeholder="Supplier Name, optional">
+      </div>
+      <div class="row">
+        <input id="stockRate" type="number" placeholder="Rate per kg, optional">
+        <input id="stockNote" placeholder="Bill Number / Note, optional">
+      </div>
+      <button class="btn green" onclick="saveStockPurchase()">Save Stock Purchase</button>
+    </div>
+
+    <div class="card">
+      <h3>Manual Stock Adjustment</h3>
+      <input id="adjustChemicalName" list="dyeSuggestions" placeholder="Chemical / Color Name">
+      <div class="row">
+        <input id="adjustQty" type="number" placeholder="Adjustment Quantity">
+        <select id="adjustUnit">
+          <option value="kg">kg</option>
+          <option value="grams">grams</option>
+        </select>
+      </div>
+      <select id="adjustReason">
+        <option value="Opening balance">Opening balance</option>
+        <option value="Damage">Damage</option>
+        <option value="Correction">Correction</option>
+        <option value="Physical stock difference">Physical stock difference</option>
+      </select>
+      <input id="adjustNote" placeholder="Adjustment note">
+      <button class="btn" onclick="saveStockAdjustment()">Save Adjustment</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Stock Import / Export</h3>
+    <div class="exportBar">
+      <button class="btn" onclick="document.getElementById('stockExcelFile').click()">Import Excel</button>
+      <button class="btn green" onclick="exportStockExcel()">Export Excel</button>
+    </div>
+    <input type="file" id="stockExcelFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importStockExcel(event)">
+  </div>
+
+  <div class="card">
+    <h3>Current Stock</h3>
+    <div class="row">
+      <input id="stockSearch" oninput="renderStock()" placeholder="Search chemical name">
+      <select id="stockFilter" onchange="renderStock()">
+        <option value="all">All stock</option>
+        <option value="low">Low stock</option>
+        <option value="used">Used chemicals</option>
+        <option value="available">Available chemicals</option>
+      </select>
+    </div>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Chemical Name</th><th>Total Purchased</th><th>Total Used</th><th>Available Balance</th><th>Low Stock Warning</th></tr>
+        </thead>
+        <tbody id="stockTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Program Stock Usage Report</h3>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Program</th><th>Date</th><th>Chemical</th><th>Used</th><th>Before Stock</th><th>After Stock</th></tr>
+        </thead>
+        <tbody id="programStockUsageTable"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="contact">
+  <div class="contactHero">
+    <h2>Contact Us</h2>
+    <h1>MONICA TEXTILE MILLS</h1>
+    <p>F 238, Mandia Road, Pali Marwar, Rajasthan</p>
+    <div class="contactActions">
+      <a class="btn green" href="https://wa.me/919462023854" target="_blank">WhatsApp</a>
+      <a class="btn" href="tel:7014334854">Call</a>
+      <a class="btn" href="mailto:jaingarvit31@gmail.com">Email</a>
+      <a class="btn" href="https://maps.app.goo.gl/hofnV5Pw8FQWHkCm6" target="_blank">Google Maps</a>
+    </div>
+  </div>
+  <div class="contactGrid">
+    <div class="card">
+      <h3>Contact Details</h3>
+      <p><b>Call:</b> 7014334854</p>
+      <p><b>WhatsApp:</b> 9462023854</p>
+      <p><b>Email:</b> jaingarvit31@gmail.com</p>
+      <p><b>City/State:</b> Pali, Rajasthan</p>
+    </div>
+    <div class="card">
+      <h3>Working Hours</h3>
+      <p><b>Monday to Saturday:</b> 9:00 AM to 8:00 PM</p>
+      <p><b>Sunday:</b> 9:00 AM to 3:00 PM</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3>About Monica Textile Mills</h3>
+    <p>Monica Textile Mills is a premier textile cloth manufacturing company, renowned for its unparalleled quality and vast color palette. We proudly offer an extensive range of 400 colors, crafted with the finest dyeing techniques to ensure exceptional brightness and vibrancy. At Monica Textile Mills, quality is our topmost priority, and we strive to deliver only the best products to our customers.</p>
   </div>
 </section>
 
@@ -401,6 +538,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </div>
   </div>
 </section>
+<footer class="footerLine">Registered & Developed by MONICA TEXTILE MILLS, Pali Rajasthan, India.</footer>
 </div>
 
 <datalist id="processHouseList"></datalist>
@@ -412,6 +550,9 @@ let programs = [];
 let auditLogs = [];
 let recipeVersions = [];
 let processHouses = [];
+let stockPurchases = [];
+let stockLedger = [];
+let programStockUsage = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let currentUser = null;
@@ -420,6 +561,7 @@ let refreshTimer = null;
 let inactivityTimer = null;
 let localColorTypes = {};
 let processHouseLocalOnly = false;
+let stockLocalOnly = false;
 
 let dataLoaded = false;
 
@@ -482,6 +624,30 @@ function saveLocalProcessHouses(){
 
 function normalizeName(name){
   return String(name || "").trim().toUpperCase();
+}
+
+function parseRecipeNo(value){
+  let raw = String(value || "").trim().toUpperCase();
+  let prefixMatch = raw.match(/^[A-Z]+/);
+  let prefix = prefixMatch ? prefixMatch[0] : "";
+  let numberMatch = raw.match(/\d+/);
+  let number = numberMatch ? Number(numberMatch[0]) : Number.MAX_SAFE_INTEGER;
+  let priority = prefix === "" ? 1 : prefix === "D" ? 2 : prefix === "L" ? 3 : 4;
+  return {raw, number, priority};
+}
+
+function compareRecipeNo(a, b){
+  let left = parseRecipeNo(typeof a === "object" ? a.recipeNo : a);
+  let right = parseRecipeNo(typeof b === "object" ? b.recipeNo : b);
+  return left.number - right.number || left.priority - right.priority || left.raw.localeCompare(right.raw);
+}
+
+function sortRecipes(list){
+  return (list || []).slice().sort(compareRecipeNo);
+}
+
+function sortRecipesInPlace(){
+  recipes = sortRecipes(recipes);
 }
 
 function findColorByName(name){
@@ -580,7 +746,7 @@ function applyRolePermissions(){
     let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch";
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || text === "Calculate Cost";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Import / Export" || text === "History" || text === "Refresh Cloud Data";
+    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Process House" || text === "Chemical Stock" || text === "Contact Us" || text === "Import / Export" || text === "History" || text === "Refresh Cloud Data";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -668,6 +834,9 @@ async function logoutUser(auto=false){
   auditLogs = [];
   recipeVersions = [];
   processHouses = [];
+  stockPurchases = [];
+  stockLedger = [];
+  programStockUsage = [];
 
   if(refreshTimer){
     clearInterval(refreshTimer);
@@ -1262,6 +1431,7 @@ if(!saved) return;
 if(oldValue) await saveRecipeVersion(oldValue, "before update");
 await saveRecipeVersion(obj, actionType);
 await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldValue, obj);
+sortRecipesInPlace();
 clearRecipeForm();
 await loadDataFromJson();
 }
@@ -1298,7 +1468,7 @@ function renderRecipes(){
 
   let q = document.getElementById("recipeSearch")?.value.toUpperCase() || "";
 
-  recipes.filter(r => {
+  sortRecipes(recipes).filter(r => {
     let dyeNames = (r.dyes || []).map(d => d.name).join(" ");
     return String(r.recipeNo || "").toUpperCase().includes(q) ||
       String(r.colorName || "").toUpperCase().includes(q) ||
@@ -1383,9 +1553,7 @@ async function deleteRecipe(i){
 function renderRecipeSelect(){
   let select = document.getElementById("recipeSelect");
   select.innerHTML = `<option value="">Select Recipe</option>`;
-  recipes
-  .slice()
-  .sort((a,b) => Number(a.recipeNo) - Number(b.recipeNo) || String(a.recipeNo).localeCompare(String(b.recipeNo)))
+  sortRecipes(recipes)
   .forEach(r=>{
     let i = recipes.indexOf(r);
     select.innerHTML += `<option value="${i}">${r.recipeNo} - ${r.colorName}</option>`;
@@ -1505,6 +1673,32 @@ function makeRecipeSnapshot(recipe){
   };
 }
 
+function roundConvertedQty(qty){
+  let value = Number(qty) || 0;
+  if(value < 200) return Math.round(value);
+  return Math.round(value / 10) * 10;
+}
+
+function convertRecipeForPdf(recipe, requiredThans){
+  let savedThans = Number(recipe.recipeThans);
+  if(!savedThans || savedThans <= 0){
+    throw new Error("Batch thans missing for this recipe: " + (recipe.recipeNo || ""));
+  }
+  return {
+    ...recipe,
+    requiredThans,
+    dyes: (recipe.dyes || []).map(d => ({
+      ...d,
+      qty: roundConvertedQty(Number(d.qty) / savedThans * requiredThans)
+    }))
+  };
+}
+
+function getProgramRequiredThans(program, index){
+  let input = document.getElementById("programBatchThans_" + index);
+  return Number(input?.value || program.requiredThans || program.batchThans || 0);
+}
+
 async function createProgram(){
   if(!requireAdmin()) return;
 
@@ -1517,6 +1711,7 @@ async function createProgram(){
   let selectedRecipes = selectedNos
     .map(no => recipes.find(r => String(r.recipeNo) === String(no)))
     .filter(Boolean);
+  selectedRecipes = sortRecipes(selectedRecipes);
 
   if(selectedRecipes.length === 0){
     alert("No matching recipes found");
@@ -1530,10 +1725,22 @@ async function createProgram(){
   let programDate = document.getElementById("programDate").value || new Date().toISOString().slice(0, 10);
   let programName = document.getElementById("programName").value.trim();
   let programStatus = document.getElementById("programStatus").value || "Pending";
+  let requiredThans = Number(document.getElementById("programRequiredThans").value);
   if(!programName){
     alert("Dyeing Name / Process House Name required");
     return;
   }
+  if(!requiredThans || requiredThans <= 0){
+    alert("Required thans must be greater than 0");
+    return;
+  }
+  let missingBatchRecipe = selectedRecipes.find(r => !Number(r.recipeThans) || Number(r.recipeThans) <= 0);
+  if(missingBatchRecipe){
+    alert("Batch thans missing for this recipe: " + (missingBatchRecipe.recipeNo || ""));
+    return;
+  }
+  let stockOk = await confirmProgramStock(selectedRecipes, requiredThans);
+  if(!stockOk) return;
 
   let createdAt = new Date().toISOString();
   let programNo = getNextProgramNo();
@@ -1544,14 +1751,18 @@ async function createProgram(){
     program_name: programName,
     status: programStatus,
     program_date: programDate,
+    required_thans: requiredThans,
+    stock_deducted: false,
     created_at: createdAt,
     selected_recipe_numbers: snapshot.map(r => r.recipeNo),
     recipe_snapshot: snapshot
   };
-  let { error } = await supabaseClient.from("programs").insert(programPayload);
-  if(error && String(error.message || "").includes("status")){
+  let { data: insertedRows, error } = await supabaseClient.from("programs").insert(programPayload).select("*");
+  if(error && (String(error.message || "").includes("status") || String(error.message || "").includes("required_thans") || String(error.message || "").includes("stock_deducted"))){
     delete programPayload.status;
-    ({ error } = await supabaseClient.from("programs").insert(programPayload));
+    delete programPayload.required_thans;
+    delete programPayload.stock_deducted;
+    ({ data: insertedRows, error } = await supabaseClient.from("programs").insert(programPayload).select("*"));
   }
 
   if(error){
@@ -1559,20 +1770,32 @@ async function createProgram(){
     return;
   }
 
+  let insertedProgram = insertedRows && insertedRows[0] ? insertedRows[0] : null;
+  let stockDeducted = await deductStockForProgram({
+    id: insertedProgram?.id,
+    programNo,
+    programName,
+    programDate,
+    recipeSnapshot: snapshot,
+    requiredThans,
+    stockDeducted: false
+  });
   await logAudit("create", "Program", programNo + " - " + programName, null, {
     programNo,
     programName,
     programStatus,
     programDate,
+    requiredThans,
     selectedRecipeNumbers: snapshot.map(r => r.recipeNo)
   });
   document.getElementById("programName").value = "";
+  document.getElementById("programRequiredThans").value = "";
   document.querySelectorAll(".programRecipeCheck").forEach(cb => cb.checked = false);
   await loadProgramsFromSupabase();
   await loadAuditLogsFromSupabase();
   renderPrograms();
   renderAuditLogs();
-  alert("Program " + programNo + " created");
+  alert("Program " + programNo + " created" + (stockDeducted ? " and stock deducted." : "."));
 }
 
 async function loadProgramsFromSupabase(){
@@ -1595,9 +1818,11 @@ async function loadProgramsFromSupabase(){
     programName: p.program_name || "",
     status: p.status || "Pending",
     programDate: p.program_date,
+    requiredThans: p.required_thans || "",
+    stockDeducted: !!p.stock_deducted,
     createdAt: p.created_at,
     selectedRecipeNumbers: p.selected_recipe_numbers || [],
-    recipeSnapshot: p.recipe_snapshot || []
+    recipeSnapshot: sortRecipes(p.recipe_snapshot || [])
   })).sort((a,b) => Number(a.programNo) - Number(b.programNo));
 }
 
@@ -1612,9 +1837,7 @@ function renderPrograms(){
 
   let recipeTable = document.getElementById("programRecipeTable");
   if(recipeTable){
-    recipeTable.innerHTML = recipes
-    .slice()
-    .sort((a,b) => Number(a.recipeNo) - Number(b.recipeNo) || String(a.recipeNo).localeCompare(String(b.recipeNo)))
+    recipeTable.innerHTML = sortRecipes(recipes)
     .map(r => `
       <tr>
         <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${isAdmin() ? "" : "disabled"}></td>
@@ -1638,6 +1861,7 @@ function renderPrograms(){
         </td>
         <td>${p.programDate || ""}</td>
         <td>${(p.recipeSnapshot || []).map(r => `${r.recipeNo || ""} - ${r.colorName || ""}`).join("<br>")}</td>
+        <td><input id="programBatchThans_${index}" type="number" min="1" value="${p.requiredThans || ""}" placeholder="Batch thans"></td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
@@ -1674,12 +1898,13 @@ function getProgramRecipeRows(recipe){
   return rows;
 }
 
-function renderProgramHtml(program){
-  let recipesHtml = (program.recipeSnapshot || []).map(r => {
+function renderProgramHtml(program, requiredThans){
+  let convertedRecipes = sortRecipes(program.recipeSnapshot || []).map(r => convertRecipeForPdf(r, requiredThans));
+  let recipesHtml = convertedRecipes.map(r => {
     let rows = getProgramRecipeRows(r);
     return `
       <div class="recipePrintBlock">
-      <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}, Batch Thans: ${r.recipeThans || ""}</h3>
+      <h3>Recipe ${r.recipeNo || ""} - ${r.colorName || ""}, Batch Thans: ${requiredThans || ""}</h3>
       <table>
         <thead>
           <tr><th>Polyster Color Name</th><th>Quantity</th><th>Cotton Color Name</th><th>Quantity</th></tr>
@@ -1717,6 +1942,17 @@ function renderProgramHtml(program){
 function exportProgramPdf(index){
   let program = programs[index];
   if(!program) return;
+  let requiredThans = getProgramRequiredThans(program, index);
+  if(!requiredThans || requiredThans <= 0){
+    alert("Required thans must be greater than 0");
+    return;
+  }
+  try{
+    (program.recipeSnapshot || []).forEach(r => convertRecipeForPdf(r, requiredThans));
+  }catch(err){
+    alert(err.message || "Batch thans missing for this recipe");
+    return;
+  }
 
   let win = window.open("", "_blank");
   win.document.write(`
@@ -1750,7 +1986,7 @@ function exportProgramPdf(index){
       </head>
       <body>
         <button onclick="window.print()">Print / Save PDF</button>
-        ${renderProgramHtml(program)}
+        ${renderProgramHtml(program, requiredThans)}
       </body>
     </html>
   `);
@@ -1795,6 +2031,348 @@ async function deleteProgram(index){
   await loadAuditLogsFromSupabase();
   renderPrograms();
   renderAuditLogs();
+}
+
+function gramsFromQty(qty, unit){
+  let value = Number(qty) || 0;
+  return String(unit || "").toLowerCase().startsWith("kg") ? value * 1000 : value;
+}
+
+function formatGrams(value){
+  return (Number(value) || 0).toLocaleString("en-IN") + " g";
+}
+
+function getStockRows(){
+  let map = {};
+  stockLedger.forEach(entry => {
+    let name = normalizeName(entry.chemicalName || entry.chemical_name);
+    if(!name) return;
+    if(!map[name]){
+      map[name] = {name, purchased:0, used:0, balance:0};
+    }
+    let delta = Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0);
+    let type = entry.entryType || entry.entry_type || "";
+    if(delta > 0) map[name].purchased += delta;
+    if(delta < 0 || type === "program_usage") map[name].used += Math.abs(delta);
+    map[name].balance += delta;
+  });
+  return Object.values(map).sort((a,b) => a.name.localeCompare(b.name));
+}
+
+function getProgramUsageMap(recipesForProgram, requiredThans){
+  let usage = {};
+  recipesForProgram.forEach(recipe => {
+    let savedThans = Number(recipe.recipeThans);
+    if(!savedThans || savedThans <= 0){
+      throw new Error("Batch thans missing for this recipe: " + (recipe.recipeNo || ""));
+    }
+    (recipe.dyes || []).forEach(d => {
+      let name = normalizeName(d.name);
+      if(!name) return;
+      usage[name] = (usage[name] || 0) + roundConvertedQty(Number(d.qty) / savedThans * requiredThans);
+    });
+  });
+  return usage;
+}
+
+async function confirmProgramStock(recipesForProgram, requiredThans){
+  try{
+    let usage = getProgramUsageMap(recipesForProgram, requiredThans);
+    let current = getStockRows();
+    let insufficient = Object.entries(usage).map(([name, required]) => {
+      let row = current.find(s => s.name === name);
+      let available = row ? row.balance : 0;
+      return required > available ? {name, required, available} : null;
+    }).filter(Boolean);
+
+    if(insufficient.length){
+      let message = insufficient.map(item =>
+        `Insufficient stock for ${item.name}. Required: ${formatGrams(item.required)}, Available: ${formatGrams(item.available)}.`
+      ).join("\n");
+      return confirm(message + "\n\nDo you still want to create this program and deduct stock?");
+    }
+    return true;
+  }catch(err){
+    alert(err.message || "Batch thans missing for this recipe");
+    return false;
+  }
+}
+
+async function deductStockForProgram(program){
+  if(!supabaseClient || !program || program.stockDeducted) return false;
+  let requiredThans = Number(program.requiredThans);
+  if(!requiredThans || requiredThans <= 0) return false;
+
+  let usage;
+  try{
+    usage = getProgramUsageMap(program.recipeSnapshot || [], requiredThans);
+  }catch(err){
+    alert(err.message || "Batch thans missing for this recipe");
+    return false;
+  }
+
+  let now = new Date().toISOString();
+  let stockRows = getStockRows();
+  let ledgerRows = [];
+  let usageRows = [];
+
+  Object.entries(usage).forEach(([name, qty]) => {
+    let before = stockRows.find(s => s.name === name)?.balance || 0;
+    let after = before - qty;
+    ledgerRows.push({
+      chemical_name: name,
+      entry_type: "program_usage",
+      qty_delta_grams: -qty,
+      program_id: program.id || null,
+      program_no: String(program.programNo || ""),
+      note: "Program " + (program.programNo || "") + " - " + (program.programName || ""),
+      created_at: now
+    });
+    usageRows.push({
+      program_id: program.id || null,
+      program_no: String(program.programNo || ""),
+      program_name: program.programName || "",
+      program_date: program.programDate || null,
+      chemical_name: name,
+      quantity_used_grams: qty,
+      before_stock_grams: before,
+      after_stock_grams: after,
+      created_at: now
+    });
+  });
+
+  if(!ledgerRows.length) return false;
+
+  let { error: ledgerError } = await supabaseClient.from("chemical_stock_ledger").insert(ledgerRows);
+  if(ledgerError){
+    alert("Stock deduction failed: " + ledgerError.message + ". Run the updated Supabase SQL for stock tables.");
+    return false;
+  }
+
+  let { error: usageError } = await supabaseClient.from("program_stock_usage").insert(usageRows);
+  if(usageError){
+    alert("Program stock usage save failed: " + usageError.message + ". Run the updated Supabase SQL for stock tables.");
+    return false;
+  }
+
+  if(program.id){
+    let { error: programError } = await supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id);
+    if(programError) console.warn("Program stock flag update failed", programError);
+  }
+
+  await loadStockFromSupabase();
+  renderStock();
+  return true;
+}
+
+async function loadStockFromSupabase(){
+  if(!supabaseClient || !isLoggedIn()){
+    stockPurchases = [];
+    stockLedger = [];
+    programStockUsage = [];
+    return;
+  }
+
+  let purchaseResult = await supabaseClient.from("chemical_stock_purchases").select("*").order("purchase_date", {ascending:true});
+  let ledgerResult = await supabaseClient.from("chemical_stock_ledger").select("*").order("created_at", {ascending:true});
+  let usageResult = await supabaseClient.from("program_stock_usage").select("*").order("created_at", {ascending:false});
+
+  if(purchaseResult.error || ledgerResult.error || usageResult.error){
+    console.warn("Stock load skipped. Run updated Supabase SQL.", purchaseResult.error || ledgerResult.error || usageResult.error);
+    stockPurchases = [];
+    stockLedger = [];
+    programStockUsage = [];
+    stockLocalOnly = true;
+    return;
+  }
+
+  stockLocalOnly = false;
+  stockPurchases = purchaseResult.data || [];
+  stockLedger = (ledgerResult.data || []).map(row => ({
+    ...row,
+    chemicalName: row.chemical_name,
+    entryType: row.entry_type,
+    qtyDeltaGrams: row.qty_delta_grams
+  }));
+  programStockUsage = usageResult.data || [];
+}
+
+async function saveStockPurchase(){
+  if(!requireAdmin()) return;
+  let name = normalizeName(document.getElementById("stockChemicalName").value);
+  let qty = Number(document.getElementById("stockPurchaseQty").value);
+  let unit = document.getElementById("stockPurchaseUnit").value;
+  let grams = gramsFromQty(qty, unit);
+  if(!name || grams <= 0){
+    alert("Chemical name and purchase quantity required");
+    return;
+  }
+
+  let purchase = {
+    chemical_name: name,
+    purchased_qty_grams: grams,
+    unit,
+    purchase_date: document.getElementById("stockPurchaseDate").value || new Date().toISOString().slice(0,10),
+    supplier: document.getElementById("stockSupplier").value.trim(),
+    rate_per_kg: Number(document.getElementById("stockRate").value) || 0,
+    notes: document.getElementById("stockNote").value.trim()
+  };
+  let { error } = await supabaseClient.from("chemical_stock_purchases").insert(purchase);
+  if(error){
+    alert("Stock purchase failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
+    return;
+  }
+  let { error: ledgerError } = await supabaseClient.from("chemical_stock_ledger").insert({
+    chemical_name: name,
+    entry_type: "purchase",
+    qty_delta_grams: grams,
+    note: purchase.notes || "Purchase",
+    created_at: new Date().toISOString()
+  });
+  if(ledgerError){
+    alert("Stock ledger failed: " + ledgerError.message);
+    return;
+  }
+  ["stockChemicalName","stockPurchaseQty","stockSupplier","stockRate","stockNote"].forEach(id => document.getElementById(id).value = "");
+  await loadStockFromSupabase();
+  renderStock();
+  alert("Stock purchase saved");
+}
+
+async function saveStockAdjustment(){
+  if(!requireAdmin()) return;
+  let name = normalizeName(document.getElementById("adjustChemicalName").value);
+  let grams = gramsFromQty(Number(document.getElementById("adjustQty").value), document.getElementById("adjustUnit").value);
+  if(!name || !grams){
+    alert("Chemical name and adjustment quantity required");
+    return;
+  }
+  let { error } = await supabaseClient.from("chemical_stock_ledger").insert({
+    chemical_name: name,
+    entry_type: "adjustment",
+    qty_delta_grams: grams,
+    note: document.getElementById("adjustReason").value + " - " + document.getElementById("adjustNote").value.trim(),
+    created_at: new Date().toISOString()
+  });
+  if(error){
+    alert("Stock adjustment failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
+    return;
+  }
+  ["adjustChemicalName","adjustQty","adjustNote"].forEach(id => document.getElementById(id).value = "");
+  await loadStockFromSupabase();
+  renderStock();
+  alert("Stock adjustment saved");
+}
+
+function renderStock(){
+  let purchaseDate = document.getElementById("stockPurchaseDate");
+  if(purchaseDate && !purchaseDate.value) purchaseDate.value = new Date().toISOString().slice(0,10);
+  let rows = getStockRows();
+  let q = document.getElementById("stockSearch")?.value.toUpperCase() || "";
+  let filter = document.getElementById("stockFilter")?.value || "all";
+  let visible = rows.filter(row => {
+    if(q && !row.name.includes(q)) return false;
+    if(filter === "low") return row.balance > 0 && row.balance <= 1000;
+    if(filter === "used") return row.used > 0;
+    if(filter === "available") return row.balance > 0;
+    return true;
+  });
+
+  let table = document.getElementById("stockTable");
+  if(table){
+    table.innerHTML = visible.map(row => `
+      <tr>
+        <td>${row.name}</td>
+        <td>${formatGrams(row.purchased)}</td>
+        <td>${formatGrams(row.used)}</td>
+        <td>${formatGrams(row.balance)}</td>
+        <td>${row.balance <= 1000 ? "LOW STOCK" : ""}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="5">No stock found.</td></tr>`;
+  }
+
+  let usageTable = document.getElementById("programStockUsageTable");
+  if(usageTable){
+    usageTable.innerHTML = (programStockUsage || []).map(row => `
+      <tr>
+        <td>${row.program_no || ""} - ${row.program_name || ""}</td>
+        <td>${row.program_date || ""}</td>
+        <td>${row.chemical_name || ""}</td>
+        <td>${formatGrams(row.quantity_used_grams)}</td>
+        <td>${formatGrams(row.before_stock_grams)}</td>
+        <td>${formatGrams(row.after_stock_grams)}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="6">No program usage yet.</td></tr>`;
+  }
+
+  let itemCount = document.getElementById("stockItemCount");
+  let balanceTotal = document.getElementById("stockBalanceTotal");
+  let lowCount = document.getElementById("stockLowCount");
+  if(itemCount) itemCount.textContent = rows.length;
+  if(balanceTotal) balanceTotal.textContent = formatGrams(rows.reduce((sum, row) => sum + row.balance, 0));
+  if(lowCount) lowCount.textContent = rows.filter(row => row.balance > 0 && row.balance <= 1000).length;
+}
+
+function importStockExcel(e){
+  if(!requireAdmin()) return;
+  let file = e.target.files[0];
+  if(!file) return;
+  let reader = new FileReader();
+  reader.onload = async function(evt){
+    try{
+      let workbook = XLSX.read(evt.target.result, {type:"array"});
+      let sheet = workbook.Sheets[workbook.SheetNames[0]];
+      let rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
+      let imported = 0;
+      for(const row of rows){
+        let name = normalizeName(row["Chemical Name"] || row["Chemical / Color Name"] || row["Name"]);
+        let qty = Number(row["Purchased Quantity"] || row["Quantity"] || row["Purchased Qty"]);
+        let unit = row["Unit"] || "kg";
+        let grams = gramsFromQty(qty, unit);
+        if(!name || grams <= 0) continue;
+        let purchase = {
+          chemical_name: name,
+          purchased_qty_grams: grams,
+          unit,
+          purchase_date: row["Purchase Date"] || new Date().toISOString().slice(0,10),
+          supplier: row["Supplier"] || "",
+          rate_per_kg: Number(row["Rate per kg"] || 0),
+          notes: row["Notes"] || row["Bill Number / Note"] || ""
+        };
+        let { error } = await supabaseClient.from("chemical_stock_purchases").insert(purchase);
+        if(error) throw error;
+        let { error: ledgerError } = await supabaseClient.from("chemical_stock_ledger").insert({
+          chemical_name: name,
+          entry_type: "purchase",
+          qty_delta_grams: grams,
+          note: "Excel import",
+          created_at: new Date().toISOString()
+        });
+        if(ledgerError) throw ledgerError;
+        imported++;
+      }
+      await loadStockFromSupabase();
+      renderStock();
+      alert(imported + " stock rows imported successfully");
+    }catch(err){
+      console.error(err);
+      alert("Stock import failed: " + (err.message || "Unknown error"));
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function exportStockExcel(){
+  let workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(getStockRows().map(row => ({
+    "Chemical Name": row.name,
+    "Purchased Qty": row.purchased,
+    "Used Qty": row.used,
+    "Balance Qty": row.balance
+  }))), "Current Stock");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(stockLedger), "Stock Ledger");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(programStockUsage), "Program Usage");
+  XLSX.writeFile(workbook, "chemical-stock.xlsx");
 }
 
 function renderDashboard(){
@@ -2151,6 +2729,7 @@ function importData(e){
       let data = JSON.parse(reader.result);
       colors = data.colors || [];
       recipes = data.recipes || [];
+      sortRecipesInPlace();
       saveAll().then(saved=>{
         if(saved){
           loadDataFromJson();
@@ -2219,6 +2798,7 @@ function renderAll(){
   renderAuditLogs();
   renderRecipeVersions();
   renderProcessHouses();
+  renderStock();
 } 
 
 async function loadDataFromJson(){
@@ -2261,12 +2841,14 @@ console.log("SUPABASE RECIPES:", recipeData);
     recipeThans: r.than_count,
     hexCode: r.hex_code || "N/A",
     dyes: r.dyes || []
-  })).sort((a,b) => Number(a.recipeNo) - Number(b.recipeNo) || String(a.recipeNo).localeCompare(String(b.recipeNo)));
+  }));
+  sortRecipesInPlace();
 
   await loadProgramsFromSupabase();
   await loadAuditLogsFromSupabase();
   await loadRecipeVersionsFromSupabase();
   await loadProcessHousesFromSupabase();
+  await loadStockFromSupabase();
   renderAll();
 
   console.log("Loaded from Supabase");
