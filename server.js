@@ -140,18 +140,45 @@ async function supabaseRead(table, select){
   return response.json();
 }
 
+function isSchemaReadError(error){
+  const message = String(error?.message || error || "");
+  return message.includes("42703") ||
+    message.includes("42P01") ||
+    message.includes("does not exist") ||
+    message.includes("schema cache");
+}
+
+async function supabaseReadFallback(table, selectOptions, required=false){
+  const options = Array.isArray(selectOptions) ? selectOptions : [selectOptions];
+  let lastError = null;
+
+  for(const select of options){
+    try{
+      return await supabaseRead(table, select);
+    }catch(error){
+      lastError = error;
+      if(!isSchemaReadError(error)) throw error;
+      console.warn(`AI Assistant fallback for ${table}: ${error.message}`);
+    }
+  }
+
+  if(required) throw lastError;
+  console.warn(`AI Assistant skipped optional table ${table}: ${lastError?.message || "unknown error"}`);
+  return [];
+}
+
 function compactRows(rows, limit){
   return Array.isArray(rows) ? rows.slice(0, limit) : [];
 }
 
 async function loadAssistantContext(){
   const [colors, recipes, programs, purchases, ledger, usage] = await Promise.all([
-    supabaseRead("colors", "id,name,rate,color_type"),
-    supabaseRead("recipes", "id,recipe_no,color_name,than_count,hex_code,dyes,created_at"),
-    supabaseRead("programs", "id,program_no,program_name,status,program_date,required_thans,stock_deducted,selected_recipe_numbers,recipe_snapshot,created_at"),
-    supabaseRead("chemical_stock_purchases", "id,chemical_name,purchased_qty_grams,unit,purchase_date,supplier,rate_per_kg,notes,created_at"),
-    supabaseRead("chemical_stock_ledger", "id,chemical_name,entry_type,qty_delta_grams,program_id,program_no,note,created_at"),
-    supabaseRead("program_stock_usage", "id,program_id,program_no,program_name,program_date,chemical_name,quantity_used_grams,before_stock_grams,after_stock_grams,created_at")
+    supabaseReadFallback("colors", ["id,name,rate,color_type", "id,name,rate", "*"], true),
+    supabaseReadFallback("recipes", ["id,recipe_no,color_name,than_count,hex_code,dyes,created_at", "id,recipe_no,color_name,than_count,dyes", "*"], true),
+    supabaseReadFallback("programs", ["id,program_no,program_name,status,program_date,required_thans,stock_deducted,selected_recipe_numbers,recipe_snapshot,created_at", "id,program_no,program_name,program_date,selected_recipe_numbers,recipe_snapshot,created_at", "*"]),
+    supabaseReadFallback("chemical_stock_purchases", ["id,chemical_name,purchased_qty_grams,unit,purchase_date,supplier,rate_per_kg,notes,created_at", "*"]),
+    supabaseReadFallback("chemical_stock_ledger", ["id,chemical_name,entry_type,qty_delta_grams,program_id,program_no,note,created_at", "*"]),
+    supabaseReadFallback("program_stock_usage", ["id,program_id,program_no,program_name,program_date,chemical_name,quantity_used_grams,before_stock_grams,after_stock_grams,created_at", "*"])
   ]);
 
   return {
@@ -184,7 +211,7 @@ function extractResponseText(responseJson){
   return parts.join("\n").trim();
 }
 
-app.post("/api/ai-assistant", async (req, res) => {
+async function handleAiAssistant(req, res){
   try{
     const limit = checkAssistantLimit(req);
     if(!limit.allowed){
@@ -241,7 +268,10 @@ app.post("/api/ai-assistant", async (req, res) => {
     console.error("AI Assistant error", error);
     res.status(500).json({error: error.message || "AI Assistant failed."});
   }
-});
+}
+
+app.post("/api/ai-assistant", handleAiAssistant);
+app.post("/api/chat-assistant", handleAiAssistant);
 
 const PORT = process.env.PORT || 3000;
 
