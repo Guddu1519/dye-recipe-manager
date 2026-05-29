@@ -3081,7 +3081,10 @@ function makeProgramStoredRecipe(recipe, requiredThans=""){
 function resolveProgramRecipes(program){
   let snapshot = normalizeProgramRecipeSnapshot(program?.recipeSnapshot || program?.recipe_snapshot || []);
   let selectedNumbers = parseProgramList(program?.selectedRecipeNumbers || program?.selected_recipe_numbers || program?.recipeNumbers || program?.recipe_numbers);
-  let source = snapshot.length ? snapshot : selectedNumbers.map(no => ({recipeNo: no}));
+  let snapshotByNo = new Map(snapshot.map(item => [String(item.recipeNo || ""), item]));
+  let source = selectedNumbers.length
+    ? selectedNumbers.map(no => ({...(snapshotByNo.get(String(no || "")) || {}), recipeNo: no}))
+    : snapshot;
   return sortRecipes(source.map(item => {
     let savedRecipe = recipes.find(recipe => String(recipe.recipeNo || "") === String(item.recipeNo || ""));
     if(savedRecipe){
@@ -3361,6 +3364,7 @@ async function loadProgramsFromSupabase(){
   programs = (data || []).map(p => {
     let recipeSnapshot = normalizeProgramRecipeSnapshot(p.recipe_snapshot);
     let selectedRecipeNumbers = parseProgramList(p.selected_recipe_numbers);
+    if(!selectedRecipeNumbers.length) selectedRecipeNumbers = recipeSnapshot.map(r => r.recipeNo).filter(Boolean);
     let program = {
       id: p.id,
       programNo: p.program_no,
@@ -3651,9 +3655,10 @@ async function updateProgramRecipes(index, details){
     let savedRecipeNumbers = parseProgramList(savedProgramRow.selected_recipe_numbers);
     let savedSnapshotNumbers = normalizeProgramRecipeSnapshot(savedProgramRow.recipe_snapshot).map(r => String(r.recipeNo || ""));
     let expectedNumbers = selectedRecipeNumbers.map(no => String(no || ""));
-    let missingRemoval = savedRecipeNumbers.some(no => !expectedNumbers.includes(String(no || ""))) ||
-      savedSnapshotNumbers.some(no => !expectedNumbers.includes(String(no || "")));
-    if(missingRemoval){
+    let sortedExpected = [...expectedNumbers].sort().join("|");
+    let selectedMismatch = [...savedRecipeNumbers.map(no => String(no || ""))].sort().join("|") !== sortedExpected;
+    let snapshotMismatch = [...savedSnapshotNumbers].sort().join("|") !== sortedExpected;
+    if(selectedMismatch || snapshotMismatch){
       alert("Program update did not save the changed recipe list. Please refresh and try again.");
       await loadDataFromJson();
       return;
