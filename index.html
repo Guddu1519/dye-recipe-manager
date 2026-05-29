@@ -543,7 +543,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <option value="Delivered">Delivered</option>
       </select>
     </div>
-    <button class="btn green" onclick="createProgram()">Proceed</button>
+    <button id="programProceedBtn" class="btn green" onclick="createProgram()">Proceed</button>
   </div>
 
   <div class="card">
@@ -2009,8 +2009,8 @@ async function saveRecipe(){
     if(name && qty > 0) dyes.push({name, qty});
   });
 
-  if(!recipeNo || !colorName || dyes.length < 2){
-    alert("Recipe No, Color Name and minimum 2 dyes required");
+  if(!recipeNo || !colorName || !recipeThans || Number(recipeThans) <= 0 || dyes.length < 2){
+    alert("Recipe No, Color Name, Batch Thans and minimum 2 dyes required");
     return;
   }
 
@@ -3024,8 +3024,19 @@ function getProgramThanDyedCount(program){
   return getProgramRequiredThans(program) * getProgramRecipeCount(program);
 }
 
+function setProgramProceedBusy(isBusy){
+  const button = document.getElementById("programProceedBtn");
+  if(!button) return;
+  button.disabled = isBusy;
+  button.textContent = isBusy ? "Proceeding..." : "Proceed";
+}
+
 async function createProgram(){
   if(!requireAdmin()) return;
+  if(!supabaseClient){
+    alert("Supabase is not connected. Program was not saved.");
+    return;
+  }
 
   let selectedNos = parseProgramNumbers();
   if(selectedNos.length === 0){
@@ -3064,11 +3075,15 @@ async function createProgram(){
     alert("Batch thans missing for this recipe: " + (missingBatchRecipe.recipeNo || ""));
     return;
   }
+  setProgramProceedBusy(true);
+  let programNo = null;
+  let stockDeducted = false;
+  try{
   let stockOk = await confirmProgramStock(selectedRecipes, requiredThans);
   if(!stockOk) return;
 
   let createdAt = new Date().toISOString();
-  let programNo = getNextProgramNo();
+  programNo = getNextProgramNo();
   let snapshot = selectedRecipes.map(recipe => makeRecipeSnapshot(recipe, requiredThans));
 
   let programPayload = {
@@ -3096,7 +3111,7 @@ async function createProgram(){
   }
 
   let insertedProgram = insertedRows && insertedRows[0] ? insertedRows[0] : null;
-  let stockDeducted = await deductStockForProgram({
+  stockDeducted = await deductStockForProgram({
     id: insertedProgram?.id,
     programNo,
     programName,
@@ -3120,7 +3135,10 @@ async function createProgram(){
   await loadAuditLogsFromSupabase();
   renderPrograms();
   renderAuditLogs();
-  alert("Program " + programNo + " created" + (stockDeducted ? " and stock deducted." : "."));
+  showSuccessToast("Program successfully created" + (stockDeducted ? " and stock deducted" : ""));
+  }finally{
+    setProgramProceedBusy(false);
+  }
 }
 
 async function loadProgramsFromSupabase(){
