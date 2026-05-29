@@ -571,7 +571,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <h3>Program History</h3>
     <table>
       <thead>
-        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch Size</th><th>Stock</th><th>Export</th><th>Delete</th></tr>
+        <tr><th>Program No</th><th>Dyeing / Process House</th><th>Status</th><th>Date</th><th>Recipes</th><th>Batch Size</th><th>Stock</th><th>Export</th><th>Edit</th><th>Delete</th></tr>
       </thead>
       <tbody id="programHistoryTable"></tbody>
     </table>
@@ -854,6 +854,7 @@ let stockLedger = [];
 let programStockUsage = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
+let editProgramIndex = null;
 let currentUser = null;
 let currentRole = "viewer";
 let refreshTimer = null;
@@ -3193,7 +3194,26 @@ function setProgramProceedBusy(isBusy){
   const button = document.getElementById("programProceedBtn");
   if(!button) return;
   button.disabled = isBusy;
-  button.textContent = isBusy ? "Proceeding..." : "Proceed";
+  button.textContent = isBusy ? "Proceeding..." : (editProgramIndex !== null ? "Update Program" : "Proceed");
+}
+
+function setProgramBaseMode(){
+  editProgramIndex = null;
+  const button = document.getElementById("programProceedBtn");
+  if(button) button.textContent = "Proceed";
+}
+
+function getSelectedProgramRecipes(selectedNos){
+  return sortRecipes(selectedNos
+    .map(no => recipes.find(r => String(r.recipeNo) === String(no)))
+    .filter(Boolean));
+}
+
+function clearProgramForm(){
+  document.getElementById("programName").value = "";
+  document.getElementById("programRequiredThans").value = "";
+  document.querySelectorAll(".programRecipeCheck").forEach(cb => cb.checked = false);
+  setProgramBaseMode();
 }
 
 async function createProgram(){
@@ -3209,10 +3229,7 @@ async function createProgram(){
     return;
   }
 
-  let selectedRecipes = selectedNos
-    .map(no => recipes.find(r => String(r.recipeNo) === String(no)))
-    .filter(Boolean);
-  selectedRecipes = sortRecipes(selectedRecipes);
+  let selectedRecipes = getSelectedProgramRecipes(selectedNos);
 
   if(selectedRecipes.length === 0){
     alert("No matching recipes found");
@@ -3246,6 +3263,17 @@ async function createProgram(){
   try{
   let stockOk = await confirmProgramStock(selectedRecipes, requiredThans);
   if(!stockOk) return;
+
+  if(editProgramIndex !== null){
+    await updateProgramRecipes(editProgramIndex, {
+      selectedRecipes,
+      programName,
+      programStatus,
+      programDate,
+      requiredThans
+    });
+    return;
+  }
 
   let createdAt = new Date().toISOString();
   programNo = getNextProgramNo();
@@ -3302,9 +3330,7 @@ async function createProgram(){
     requiredThans,
     selectedRecipeNumbers: snapshot.map(r => r.recipeNo)
   });
-  document.getElementById("programName").value = "";
-  document.getElementById("programRequiredThans").value = "";
-  document.querySelectorAll(".programRecipeCheck").forEach(cb => cb.checked = false);
+  clearProgramForm();
   await loadProgramsFromSupabase();
   await loadAuditLogsFromSupabase();
   renderPrograms();
@@ -3363,11 +3389,13 @@ function renderPrograms(){
   }
 
   let recipeTable = document.getElementById("programRecipeTable");
+  let editingProgram = editProgramIndex !== null ? programs[editProgramIndex] : null;
+  let editingRecipeNos = new Set((editingProgram?.recipeSnapshot || []).map(r => String(r.recipeNo || "")));
   if(recipeTable){
     recipeTable.innerHTML = sortRecipes(recipes)
     .map(r => `
       <tr>
-        <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${isAdmin() ? "" : "disabled"}></td>
+        <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${editingRecipeNos.has(String(r.recipeNo || "")) ? "checked" : ""} ${isAdmin() ? "" : "disabled"}></td>
         <td>${r.recipeNo || ""}</td>
         <td>${r.colorName || ""}</td>
         <td>${r.recipeThans || ""}</td>
@@ -3391,6 +3419,7 @@ function renderPrograms(){
         <td><span class="stockLowBadge" style="background:#2563eb">${getProgramRequiredThans(p, index) || ""} Thans</span></td>
         <td>${renderProgramStockBadge(p)}</td>
         <td><button onclick="exportProgramPdf(${index})">Export</button></td>
+        <td><button ${isAdmin() ? "" : "disabled"} onclick="editProgram(${index})">Edit</button></td>
         <td><button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteProgram(${index})">Delete</button></td>
       </tr>
     `).join("");
@@ -3545,6 +3574,107 @@ async function exportProgramPdf(index, options={}){
     renderAuditLogs();
   }
   return {program, requiredThans};
+}
+
+function editProgram(index){
+  if(!requireAdmin()) return;
+  let program = programs[index];
+  if(!program) return;
+  editProgramIndex = index;
+  document.getElementById("programDate").value = program.programDate || new Date().toISOString().slice(0, 10);
+  document.getElementById("programName").value = program.programName || "";
+  document.getElementById("programStatus").value = program.status || "Pending";
+  document.getElementById("programRequiredThans").value = getProgramRequiredThans(program, index) || "";
+  renderPrograms();
+  document.getElementById("program")?.scrollIntoView({behavior:"smooth", block:"start"});
+  setProgramProceedBusy(false);
+}
+
+async function updateProgramRecipes(index, details){
+  let program = programs[index];
+  if(!program || !program.id) return;
+
+  let oldValue = {...program, recipeSnapshot: resolveProgramRecipes(program)};
+  let selectedRecipes = details.selectedRecipes || [];
+  let requiredThans = Number(details.requiredThans);
+  let fullSnapshot = selectedRecipes.map(recipe => makeRecipeSnapshot(recipe, requiredThans));
+  let storedSnapshot = selectedRecipes.map(recipe => makeProgramStoredRecipe(recipe, requiredThans));
+  let selectedRecipeNumbers = fullSnapshot.map(r => r.recipeNo);
+
+  let restored = await restoreProgramStock(program, "editing Program " + (program.programNo || ""));
+  if(!restored){
+    await loadDataFromJson();
+    return;
+  }
+
+  let usageDeleted = await deleteProgramStockUsage(program);
+  if(!usageDeleted){
+    await loadDataFromJson();
+    return;
+  }
+
+  let stockOk = await confirmProgramStock(fullSnapshot, requiredThans);
+  if(!stockOk){
+    await supabaseClient.from("programs").update({stock_deducted:false}).eq("id", program.id);
+    await loadDataFromJson();
+    return;
+  }
+
+  let updatePayload = {
+    program_name: details.programName,
+    status: details.programStatus,
+    program_date: details.programDate,
+    required_thans: requiredThans,
+    stock_deducted: false,
+    selected_recipe_numbers: selectedRecipeNumbers,
+    recipe_snapshot: storedSnapshot
+  };
+
+  let { error } = await withTimeout(
+    supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
+    CLOUD_SAVE_TIMEOUT_MS,
+    "Program update timed out after 45 seconds."
+  );
+  if(error && (String(error.message || "").includes("status") || String(error.message || "").includes("required_thans") || String(error.message || "").includes("stock_deducted"))){
+    delete updatePayload.status;
+    delete updatePayload.required_thans;
+    delete updatePayload.stock_deducted;
+    ({ error } = await withTimeout(
+      supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Program update timed out after 45 seconds."
+    ));
+  }
+
+  if(error){
+    alert("Program update failed: " + error.message);
+    await loadDataFromJson();
+    return;
+  }
+
+  let updatedProgram = {
+    ...program,
+    programName: details.programName,
+    status: details.programStatus,
+    programDate: details.programDate,
+    requiredThans,
+    selectedRecipeNumbers,
+    recipeSnapshot: fullSnapshot,
+    stockDeducted: false
+  };
+  let deducted = await deductStockForProgram(updatedProgram);
+  if(!deducted){
+    await loadDataFromJson();
+    return;
+  }
+
+  await logAudit("update", "Program", program.programNo + " - " + details.programName, oldValue, {...updatedProgram, stockDeducted:true});
+  clearProgramForm();
+  await loadProgramsFromSupabase();
+  await loadAuditLogsFromSupabase();
+  renderPrograms();
+  renderAuditLogs();
+  showSuccessToast("Program updated and stock recalculated");
 }
 
 async function updateProgramStatus(index, status){
