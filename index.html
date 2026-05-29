@@ -3052,7 +3052,7 @@ function getNextProgramNo(){
 }
 
 function parseProgramNumbers(){
-  return Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => cb.value);
+  return Array.from(new Set(Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => String(cb.value || "").trim()).filter(Boolean)));
 }
 
 function makeRecipeSnapshot(recipe, requiredThans=""){
@@ -3204,8 +3204,8 @@ function setProgramBaseMode(){
 }
 
 function getSelectedProgramRecipes(selectedNos){
-  return sortRecipes(selectedNos
-    .map(no => recipes.find(r => String(r.recipeNo) === String(no)))
+  return sortRecipes((selectedNos || [])
+    .map(no => recipes.find(r => String(r.recipeNo || "").trim() === String(no || "").trim()))
     .filter(Boolean));
 }
 
@@ -3625,8 +3625,8 @@ async function updateProgramRecipes(index, details){
     recipe_snapshot: storedSnapshot
   };
 
-  let { error } = await withTimeout(
-    supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
+  let { data: savedRows, error } = await withTimeout(
+    supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id,selected_recipe_numbers,recipe_snapshot"),
     CLOUD_SAVE_TIMEOUT_MS,
     "Program update timed out after 45 seconds."
   );
@@ -3634,8 +3634,8 @@ async function updateProgramRecipes(index, details){
     delete updatePayload.status;
     delete updatePayload.required_thans;
     delete updatePayload.stock_deducted;
-    ({ error } = await withTimeout(
-      supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
+    ({ data: savedRows, error } = await withTimeout(
+      supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id,selected_recipe_numbers,recipe_snapshot"),
       CLOUD_SAVE_TIMEOUT_MS,
       "Program update timed out after 45 seconds."
     ));
@@ -3645,6 +3645,19 @@ async function updateProgramRecipes(index, details){
     alert("Program update failed: " + error.message);
     await loadDataFromJson();
     return;
+  }
+  let savedProgramRow = savedRows && savedRows[0] ? savedRows[0] : null;
+  if(savedProgramRow){
+    let savedRecipeNumbers = parseProgramList(savedProgramRow.selected_recipe_numbers);
+    let savedSnapshotNumbers = normalizeProgramRecipeSnapshot(savedProgramRow.recipe_snapshot).map(r => String(r.recipeNo || ""));
+    let expectedNumbers = selectedRecipeNumbers.map(no => String(no || ""));
+    let missingRemoval = savedRecipeNumbers.some(no => !expectedNumbers.includes(String(no || ""))) ||
+      savedSnapshotNumbers.some(no => !expectedNumbers.includes(String(no || "")));
+    if(missingRemoval){
+      alert("Program update did not save the changed recipe list. Please refresh and try again.");
+      await loadDataFromJson();
+      return;
+    }
   }
 
   let updatedProgram = {
@@ -3664,6 +3677,7 @@ async function updateProgramRecipes(index, details){
   }
 
   await logAudit("update", "Program", program.programNo + " - " + details.programName, oldValue, {...updatedProgram, stockDeducted:true});
+  programs[index] = {...updatedProgram, stockDeducted:true};
   clearProgramForm();
   await loadProgramsFromSupabase();
   await loadAuditLogsFromSupabase();
