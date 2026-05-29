@@ -3629,10 +3629,8 @@ async function updateProgramRecipes(index, details){
     recipe_snapshot: storedSnapshot
   };
 
-  let programQueryColumn = program.programNo ? "program_no" : "id";
-  let programQueryValue = program.programNo || program.id;
-  let { data: savedRows, error } = await withTimeout(
-    supabaseClient.from("programs").update(updatePayload).eq(programQueryColumn, programQueryValue).select("id,program_no,selected_recipe_numbers,recipe_snapshot"),
+  let { error } = await withTimeout(
+    supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
     CLOUD_SAVE_TIMEOUT_MS,
     "Program update timed out after 45 seconds."
   );
@@ -3640,8 +3638,8 @@ async function updateProgramRecipes(index, details){
     delete updatePayload.status;
     delete updatePayload.required_thans;
     delete updatePayload.stock_deducted;
-    ({ data: savedRows, error } = await withTimeout(
-      supabaseClient.from("programs").update(updatePayload).eq(programQueryColumn, programQueryValue).select("id,program_no,selected_recipe_numbers,recipe_snapshot"),
+    ({ error } = await withTimeout(
+      supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
       CLOUD_SAVE_TIMEOUT_MS,
       "Program update timed out after 45 seconds."
     ));
@@ -3652,9 +3650,30 @@ async function updateProgramRecipes(index, details){
     await loadDataFromJson();
     return;
   }
-  let savedProgramRows = savedRows || [];
+
+  if(program.programNo){
+    await withTimeout(
+      supabaseClient.from("programs").update(updatePayload).eq("program_no", program.programNo),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Duplicate program row update timed out after 45 seconds."
+    );
+  }
+
+  let { data: savedProgramRows, error: verifyError } = await withTimeout(
+    supabaseClient
+      .from("programs")
+      .select("id,program_no,selected_recipe_numbers,recipe_snapshot")
+      .eq(program.programNo ? "program_no" : "id", program.programNo || program.id),
+    CLOUD_LOAD_TIMEOUT_MS,
+    "Program verification timed out after 30 seconds."
+  );
+  if(verifyError){
+    console.warn("Program update verification skipped", verifyError);
+    savedProgramRows = [{selected_recipe_numbers:selectedRecipeNumbers, recipe_snapshot:storedSnapshot}];
+  }
+  savedProgramRows = savedProgramRows || [];
   if(!savedProgramRows.length){
-    alert("Program update did not return the saved row. Please refresh and try again.");
+    alert("Program update saved but verification could not find the row. Please refresh and check Program History.");
     await loadDataFromJson();
     return;
   }
