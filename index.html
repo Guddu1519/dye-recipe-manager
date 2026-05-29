@@ -131,8 +131,6 @@ th{background:#dbeafe}
   background:white;
   border:1px solid #2563eb;
   border-radius:8px;
-  max-height:220px;
-  overflow-y:auto;
   z-index:9999;
   box-shadow:0 6px 20px #0002;
 }
@@ -144,7 +142,7 @@ th{background:#dbeafe}
   font-size:14px;
 }
 
-.suggestionItem:hover{
+.suggestionItem:hover,.suggestionItem.active{
   background:#dbeafe;
 }
 
@@ -1176,8 +1174,7 @@ async function showDashboard(){
   document.getElementById("appShell").style.display = "block";
 
   if(document.querySelectorAll(".dyeRow").length === 0){
-    addDyeLine("", "", true);
-    addDyeLine("", "", true);
+    ensureDefaultDyeLines();
   }
 
   await loadDataFromJson();
@@ -1323,6 +1320,10 @@ async function deleteColorRecord(color){
 
 async function saveRecipeRecord(recipe){
   if(!requireAdmin()) return false;
+  if(!supabaseClient){
+    alert("Supabase is not connected. Data was not saved.");
+    return false;
+  }
 
   const payload = {
     recipe_no: recipe.recipeNo || "",
@@ -1333,10 +1334,10 @@ async function saveRecipeRecord(recipe){
   };
 
   if(recipe.id){
-    const { error } = await supabaseClient
+    const { error } = await withTimeout(supabaseClient
       .from("recipes")
       .update(payload)
-      .eq("id", recipe.id);
+      .eq("id", recipe.id), 30000, "Cloud recipe update timed out after 30 seconds. Please check your internet connection and Supabase recipes policy.");
 
     if(error){
       alert("Recipe update failed: " + error.message);
@@ -1344,7 +1345,7 @@ async function saveRecipeRecord(recipe){
     }
   } else {
     const { data: existing, error: selectError } =
-      await supabaseClient.from("recipes").select("id").eq("recipe_no", payload.recipe_no).limit(1);
+      await withTimeout(supabaseClient.from("recipes").select("id").eq("recipe_no", payload.recipe_no).limit(1), 30000, "Cloud recipe lookup timed out after 30 seconds. Please check your internet connection.");
 
     if(selectError){
       alert("Recipe lookup failed: " + selectError.message);
@@ -1352,10 +1353,10 @@ async function saveRecipeRecord(recipe){
     }
 
     if(existing && existing.length){
-      const { error } = await supabaseClient
+      const { error } = await withTimeout(supabaseClient
         .from("recipes")
         .update(payload)
-        .eq("id", existing[0].id);
+        .eq("id", existing[0].id), 30000, "Cloud recipe update timed out after 30 seconds. Please check your internet connection and Supabase recipes policy.");
 
       if(error){
         alert("Recipe update failed: " + error.message);
@@ -1366,7 +1367,7 @@ async function saveRecipeRecord(recipe){
       return true;
     }
 
-    const { data: insertedRows, error } = await supabaseClient.from("recipes").insert(payload).select("id");
+    const { data: insertedRows, error } = await withTimeout(supabaseClient.from("recipes").insert(payload).select("id"), 30000, "Cloud recipe insert timed out after 30 seconds. Please check your internet connection and Supabase recipes policy.");
 
     if(error){
       alert("Recipe insert failed: " + error.message);
@@ -1378,6 +1379,17 @@ async function saveRecipeRecord(recipe){
   }
 
   return true;
+}
+
+function setRecipeSaveBusy(isBusy, actionType){
+  const saveBtn = document.getElementById("recipeSaveBtn");
+  if(!saveBtn) return;
+  saveBtn.disabled = isBusy;
+  if(isBusy){
+    saveBtn.textContent = actionType === "update" ? "Updating..." : "Saving...";
+  } else {
+    saveBtn.textContent = editRecipeIndex !== null ? "Update Recipe" : "Save Recipe";
+  }
 }
 
 async function deleteRecipeRecord(recipe){
@@ -1813,6 +1825,7 @@ function addDyeLine(name="", qty="", force=false){
         placeholder="Type dye name" 
         value="${name}"
         oninput="showDyeSuggestions(this)"
+        onkeydown="handleDyeSuggestionKey(event, this)"
         onblur="hideSuggestionsLater(this)"
         autocomplete="off"
       >
@@ -1827,13 +1840,71 @@ function addDyeLine(name="", qty="", force=false){
   document.getElementById("dyeLines").appendChild(div);
   applyRolePermissions();
 }
+
+function ensureDefaultDyeLines(minRows=8){
+  let box = document.getElementById("dyeLines");
+  if(!box) return;
+  while(box.querySelectorAll(".dyeRow").length < minRows){
+    addDyeLine("", "", true);
+  }
+}
+
+function setActiveSuggestion(input, index){
+  let box = input.parentElement.querySelector(".suggestionBox");
+  if(!box) return;
+  let items = Array.from(box.querySelectorAll(".suggestionItem"));
+  items.forEach(item => item.classList.remove("active"));
+  if(!items.length){
+    input.dataset.suggestionIndex = "-1";
+    return;
+  }
+  let safeIndex = ((index % items.length) + items.length) % items.length;
+  input.dataset.suggestionIndex = String(safeIndex);
+  items[safeIndex].classList.add("active");
+}
+
+function chooseDyeSuggestion(input, item){
+  if(!item) return;
+  let box = input.parentElement.querySelector(".suggestionBox");
+  input.value = item.dataset.name || item.textContent.trim();
+  input.dataset.suggestionIndex = "-1";
+  if(box) box.style.display = "none";
+}
+
+function handleDyeSuggestionKey(event, input){
+  let box = input.parentElement.querySelector(".suggestionBox");
+  if(!box) return;
+  let items = Array.from(box.querySelectorAll(".suggestionItem"));
+
+  if(event.key === "ArrowDown" || event.key === "ArrowUp"){
+    event.preventDefault();
+    if(box.style.display === "none" || !items.length){
+      showDyeSuggestions(input);
+      items = Array.from(box.querySelectorAll(".suggestionItem"));
+    }
+    if(!items.length) return;
+    let current = Number(input.dataset.suggestionIndex || -1);
+    setActiveSuggestion(input, event.key === "ArrowDown" ? current + 1 : current - 1);
+    return;
+  }
+
+  if(event.key === "Enter"){
+    let activeIndex = Number(input.dataset.suggestionIndex || -1);
+    if(box.style.display !== "none" && items.length){
+      event.preventDefault();
+      chooseDyeSuggestion(input, items[activeIndex >= 0 ? activeIndex : 0]);
+    }
+  }
+}
+
 function showDyeSuggestions(input){
   let text = input.value.trim().toUpperCase();
   let box = input.parentElement.querySelector(".suggestionBox");
 
   box.innerHTML = "";
+  input.dataset.suggestionIndex = "-1";
 
-  if(text.length < 1){
+  if(text.length < 2){
     box.style.display = "none";
     return;
   }
@@ -1851,11 +1922,11 @@ function showDyeSuggestions(input){
   matches.forEach(c => {
     let item = document.createElement("div");
     item.className = "suggestionItem";
+    item.dataset.name = c.name;
     item.innerHTML = `${c.name} <span>₹${c.rate}/kg</span>`;
 
     item.onclick = function(){
-      input.value = c.name;
-      box.style.display = "none";
+      chooseDyeSuggestion(input, item);
     };
 
     box.appendChild(item);
@@ -1918,6 +1989,10 @@ function setRecipeBaseMode(){
 
 async function saveRecipe(){
   if(!requireAdmin()) return;
+  if(!supabaseClient){
+    alert("Supabase is not connected. Data was not saved.");
+    return;
+  }
 
   let recipeNo = document.getElementById("recipeNo").value.trim();
   let colorName = document.getElementById("recipeColor").value.trim();
@@ -1956,9 +2031,10 @@ async function saveRecipe(){
 
   let actionType = "create";
   let oldValue = null;
+  let targetRecipeIndex = editRecipeIndex;
 
-  if(editRecipeIndex !== null){
-  let oldRecipe = recipes[editRecipeIndex];
+  if(targetRecipeIndex !== null){
+  let oldRecipe = recipes[targetRecipeIndex];
   oldValue = {...oldRecipe};
   obj.id = oldRecipe.id;
   actionType = "update";
@@ -1967,7 +2043,6 @@ async function saveRecipe(){
     alert("Recipe No already exists");
     return;
   }
-  editRecipeIndex = null;
 } else {
   if(recipes.some(r=>r.recipeNo === recipeNo)){
     alert("Recipe No already exists");
@@ -1975,16 +2050,33 @@ async function saveRecipe(){
   }
 }
 
-const saved = await saveRecipeRecord(obj);
-if(!saved) return;
+setRecipeSaveBusy(true, actionType);
+let savedOk = false;
+try{
+  const saved = await saveRecipeRecord(obj);
+  if(!saved) return;
 
-if(oldValue) await saveRecipeVersion(oldValue, "before update");
-await saveRecipeVersion(obj, actionType);
-await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldValue, obj);
-sortRecipesInPlace();
-clearRecipeForm();
-await loadDataFromJson();
-showSuccessToast(actionType === "update" ? "Successfully Edited" : "Successfully Saved");
+  if(actionType === "update" && oldValue && targetRecipeIndex !== null){
+    recipes[targetRecipeIndex] = obj;
+  } else {
+    recipes.push(obj);
+  }
+  editRecipeIndex = null;
+
+  if(oldValue) await saveRecipeVersion(oldValue, "before update");
+  await saveRecipeVersion(obj, actionType);
+  await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldValue, obj);
+  sortRecipesInPlace();
+  clearRecipeForm();
+  renderAll();
+  showSuccessToast(actionType === "update" ? "Successfully Edited" : "Successfully Saved");
+  savedOk = true;
+}finally{
+  setRecipeSaveBusy(false, actionType);
+}
+if(savedOk){
+  loadDataFromJson();
+}
 }
 
 function getImportValue(row, aliases){
@@ -2147,8 +2239,7 @@ function clearRecipeForm(){
 
   document.getElementById("dyeLines").innerHTML = "";
 
-  addDyeLine("", "", true);
-  addDyeLine("", "", true);
+  ensureDefaultDyeLines();
   document.getElementById("recipeNo").placeholder = "Recipe No (next: " + getNextRecipeNo() + ")";
   applyRolePermissions();
 }
@@ -2216,6 +2307,7 @@ function duplicateRecipe(i){
   document.getElementById("recipeThans").value = r.recipeThans || "";
   document.getElementById("dyeLines").innerHTML = "";
   (r.dyes || []).forEach(d => addDyeLine(d.name, d.qty, true));
+  ensureDefaultDyeLines();
   showTab("recipe", document.querySelector("nav button[onclick*=\"recipe\"]"));
   applyRolePermissions();
 }
@@ -2234,6 +2326,7 @@ function editRecipe(i){
   document.getElementById("dyeLines").innerHTML = "";
 
   (r.dyes || []).forEach(d=>addDyeLine(d.name,d.qty,true));
+  ensureDefaultDyeLines();
   setRecipeEditMode(r);
   document.getElementById("recipe")?.scrollIntoView({behavior:"smooth", block:"start"});
   setTimeout(()=>document.getElementById("recipeNo")?.focus(), 250);
