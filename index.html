@@ -415,6 +415,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div id="dyeLines"></div>
     <button class="btn" onclick="addDyeLine()">Add Dye</button>
     <button class="btn green" onclick="saveRecipe()">Save Recipe</button>
+    <button class="btn" onclick="document.getElementById('recipeImportFile').click()">Import Recipe</button>
+    <input type="file" id="recipeImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importRecipeExcel(event)">
   </div>
 
   <div class="card">
@@ -1839,6 +1841,123 @@ await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldVal
 sortRecipesInPlace();
 clearRecipeForm();
 await loadDataFromJson();
+}
+
+function getImportValue(row, aliases){
+  let keys = Object.keys(row || {});
+  for(let alias of aliases){
+    let cleanAlias = normalizeName(alias).replace(/[^A-Z0-9]/g, "");
+    let found = keys.find(key => normalizeName(key).replace(/[^A-Z0-9]/g, "") === cleanAlias);
+    if(found) return row[found];
+  }
+  return "";
+}
+
+function parseRecipeImportRows(rows){
+  let grouped = new Map();
+  let errors = [];
+  let priceNames = new Set(colors.map(color => normalizeName(color.name)));
+
+  rows.forEach((row, index) => {
+    let rowNo = index + 2;
+    let recipeNo = String(getImportValue(row, ["Recipe No", "Recipe Number", "Recipe"]) || "").trim();
+    let colorName = String(getImportValue(row, ["Color Name", "Colour Name", "Shade Name"]) || "").trim();
+    let batchThans = String(getImportValue(row, ["Batch Thans", "Batch Than", "Thans", "Than Count"]) || "").trim();
+    let dyeName = normalizeName(getImportValue(row, ["Dye Name", "Color/Dye Name", "Chemical Name", "Colour Name"]));
+    let qty = Number(getImportValue(row, ["Quantity in grams", "Quantity", "Qty", "Qty grams", "Grams"]));
+
+    if(!recipeNo && !colorName && !batchThans && !dyeName && !qty) return;
+    if(!recipeNo) errors.push("Row " + rowNo + ": Recipe No is missing");
+    if(!colorName) errors.push("Row " + rowNo + ": Color Name is missing");
+    if(!batchThans || Number(batchThans) <= 0) errors.push("Row " + rowNo + ": Batch Thans is missing");
+    if(!dyeName) errors.push("Row " + rowNo + ": Dye Name is missing");
+    if(dyeName && !priceNames.has(dyeName)) errors.push("Row " + rowNo + ": unmatched dye name - " + dyeName);
+    if(!qty || qty <= 0) errors.push("Row " + rowNo + ": Quantity in grams is missing");
+    if(!recipeNo || !colorName || !batchThans || !dyeName || !qty || qty <= 0) return;
+
+    if(!grouped.has(recipeNo)){
+      grouped.set(recipeNo, {
+        recipeNo,
+        colorName,
+        hexCode: "N/A",
+        recipeThans: batchThans,
+        dyes: []
+      });
+    }
+
+    let recipe = grouped.get(recipeNo);
+    if(recipe.colorName !== colorName) errors.push("Row " + rowNo + ": Recipe " + recipeNo + " has different Color Name");
+    if(String(recipe.recipeThans) !== String(batchThans)) errors.push("Row " + rowNo + ": Recipe " + recipeNo + " has different Batch Thans");
+    recipe.dyes.push({name: dyeName, qty});
+  });
+
+  grouped.forEach(recipe => {
+    if(recipe.dyes.length < 1){
+      errors.push("Recipe " + recipe.recipeNo + ": no dye rows found");
+    }
+  });
+
+  return {recipesToImport: Array.from(grouped.values()), errors};
+}
+
+async function importRecipeExcel(event){
+  if(!requireAdmin()) return;
+  let input = event.target;
+  let file = input.files[0];
+  if(!file) return;
+
+  let reader = new FileReader();
+  reader.onload = async function(evt){
+    try{
+      let workbook = XLSX.read(evt.target.result, {type:"array"});
+      let sheet = workbook.Sheets[workbook.SheetNames[0]];
+      let rows = XLSX.utils.sheet_to_json(sheet, {defval:""});
+      if(!rows.length){
+        alert("No recipe rows found. Please check Excel headers.");
+        return;
+      }
+
+      let parsed = parseRecipeImportRows(rows);
+      if(parsed.errors.length){
+        alert("Recipe import stopped. Correct these errors first:\n\n" + parsed.errors.join("\n"));
+        return;
+      }
+
+      let recipesToImport = parsed.recipesToImport;
+      if(!recipesToImport.length){
+        alert("No valid recipes found to import.");
+        return;
+      }
+
+      let duplicateNos = recipesToImport
+        .filter(recipe => recipes.some(existing => String(existing.recipeNo) === String(recipe.recipeNo)))
+        .map(recipe => recipe.recipeNo);
+      let preview = "Import " + recipesToImport.length + " recipe(s) from " + rows.length + " row(s)?";
+      if(duplicateNos.length){
+        preview += "\n\nThese existing Recipe No values will be updated:\n" + duplicateNos.join(", ");
+      }
+      if(!confirm(preview)) return;
+
+      for(let recipe of recipesToImport){
+        let existing = recipes.find(item => String(item.recipeNo) === String(recipe.recipeNo));
+        let oldValue = existing ? {...existing} : null;
+        if(existing) recipe.id = existing.id;
+        let saved = await saveRecipeRecord(recipe);
+        if(!saved) return;
+        if(oldValue) await saveRecipeVersion(oldValue, "before import update");
+        await saveRecipeVersion(recipe, oldValue ? "import update" : "import create");
+        await logAudit(oldValue ? "import update" : "import create", "Recipe Master", recipe.recipeNo + " - " + recipe.colorName, oldValue, recipe);
+      }
+
+      await loadDataFromJson();
+      alert("Recipe imported successfully");
+    }catch(err){
+      alert("Recipe import failed: " + (err.message || err));
+    }finally{
+      input.value = "";
+    }
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 function clearRecipeForm(){
