@@ -1874,6 +1874,7 @@ await logAudit(actionType, "Recipe Master", recipeNo + " - " + colorName, oldVal
 sortRecipesInPlace();
 clearRecipeForm();
 await loadDataFromJson();
+alert(actionType === "update" ? "Edit saved" : "Recipe saved");
 }
 
 function getImportValue(row, aliases){
