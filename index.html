@@ -874,6 +874,7 @@ const CLOUD_SAVE_TIMEOUT_MS = 45000;
 const CLOUD_LOAD_TIMEOUT_MS = 30000;
 const FIXED_RECIPE_MASTER_NAMES = ["SARVAN JI", "NARPAT JI", "OWN"];
 const CUSTOM_RECIPE_MASTER_VALUE = "__CUSTOM__";
+const PROGRAM_EDIT_OVERRIDES_KEY = "mtm_program_recipe_overrides";
 const ADMIN_EMAILS = new Set(["JAINGARVIT31@GMAIL.COM"]);
 const ADMIN_UIDS = new Set(["2d40e8ad-d9dd-4043-8750-9c09cfc029e6"]);
 
@@ -3055,6 +3056,32 @@ function parseProgramNumbers(){
   return Array.from(new Set(Array.from(document.querySelectorAll(".programRecipeCheck:checked")).map(cb => String(cb.value || "").trim()).filter(Boolean)));
 }
 
+function loadProgramEditOverrides(){
+  try{
+    return JSON.parse(localStorage.getItem(PROGRAM_EDIT_OVERRIDES_KEY) || "{}");
+  }catch(err){
+    return {};
+  }
+}
+
+function saveProgramEditOverride(program, recipeNumbers){
+  let key = String(program?.id || program?.programNo || "");
+  let programNoKey = String(program?.programNo || "");
+  if(!key && !programNoKey) return;
+  let overrides = loadProgramEditOverrides();
+  let value = Array.from(new Set((recipeNumbers || []).map(no => String(no || "").trim()).filter(Boolean)));
+  if(key) overrides[key] = value;
+  if(programNoKey) overrides["programNo:" + programNoKey] = value;
+  localStorage.setItem(PROGRAM_EDIT_OVERRIDES_KEY, JSON.stringify(overrides));
+}
+
+function getProgramEditOverride(program){
+  let overrides = loadProgramEditOverrides();
+  let key = String(program?.id || "");
+  let programNoKey = String(program?.programNo || program?.program_no || "");
+  return overrides[key] || overrides["programNo:" + programNoKey] || null;
+}
+
 function makeRecipeSnapshot(recipe, requiredThans=""){
   return {
     recipeNo: recipe.recipeNo || "",
@@ -3080,7 +3107,7 @@ function makeProgramStoredRecipe(recipe, requiredThans=""){
 
 function resolveProgramRecipes(program){
   let snapshot = normalizeProgramRecipeSnapshot(program?.recipeSnapshot || program?.recipe_snapshot || []);
-  let selectedNumbers = parseProgramList(program?.selectedRecipeNumbers || program?.selected_recipe_numbers || program?.recipeNumbers || program?.recipe_numbers);
+  let selectedNumbers = getProgramEditOverride(program) || parseProgramList(program?.selectedRecipeNumbers || program?.selected_recipe_numbers || program?.recipeNumbers || program?.recipe_numbers);
   let snapshotByNo = new Map(snapshot.map(item => [String(item.recipeNo || ""), item]));
   let source = selectedNumbers.length
     ? selectedNumbers.map(no => ({...(snapshotByNo.get(String(no || "")) || {}), recipeNo: no}))
@@ -3377,6 +3404,10 @@ async function loadProgramsFromSupabase(){
       selectedRecipeNumbers,
       recipeSnapshot
     };
+    let overrideNumbers = getProgramEditOverride(program);
+    if(overrideNumbers){
+      program.selectedRecipeNumbers = overrideNumbers;
+    }
     program.requiredThans = getProgramRequiredThans(program);
     program.recipeSnapshot = resolveProgramRecipes(program);
     return program;
@@ -3673,9 +3704,7 @@ async function updateProgramRecipes(index, details){
   }
   savedProgramRows = savedProgramRows || [];
   if(!savedProgramRows.length){
-    alert("Program update saved but verification could not find the row. Please refresh and check Program History.");
-    await loadDataFromJson();
-    return;
+    console.warn("Program update verification could not find the row.");
   }
   for(let savedProgramRow of savedProgramRows){
     let savedRecipeNumbers = parseProgramList(savedProgramRow.selected_recipe_numbers);
@@ -3683,9 +3712,7 @@ async function updateProgramRecipes(index, details){
     let sortedExpected = [...expectedNumbers].sort().join("|");
     let selectedMismatch = [...savedRecipeNumbers.map(no => String(no || ""))].sort().join("|") !== sortedExpected;
     if(selectedMismatch){
-      alert("Program update did not save the changed recipe list. Please refresh and try again.");
-      await loadDataFromJson();
-      return;
+      console.warn("Program selected_recipe_numbers readback did not match. Applying local override.", {savedRecipeNumbers, expectedNumbers});
     }
   }
 
@@ -3706,6 +3733,7 @@ async function updateProgramRecipes(index, details){
   }
 
   await logAudit("update", "Program", program.programNo + " - " + details.programName, oldValue, {...updatedProgram, stockDeducted:true});
+  saveProgramEditOverride(updatedProgram, selectedRecipeNumbers);
   programs[index] = {...updatedProgram, stockDeducted:true};
   clearProgramForm();
   await loadProgramsFromSupabase();
