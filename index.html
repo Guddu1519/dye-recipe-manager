@@ -220,9 +220,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .workflowSteps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
     .workflowStep{background:#f8fafc;border:1px solid #dbeafe;border-radius:12px;padding:10px;color:#334155;font-weight:700;font-size:13px}
     .workflowStep span{display:block;color:#2563eb;font-size:12px;text-transform:uppercase;margin-bottom:4px}
-    .smartAssistantButton{position:fixed;right:22px;bottom:22px;width:64px;height:64px;border-radius:999px;border:0;background:linear-gradient(135deg,#2563eb,#0f172a);color:white;font-size:20px;font-weight:800;box-shadow:0 18px 46px #0f172a55;z-index:9998}
+    .smartAssistantButton{display:none;position:fixed;right:22px;bottom:22px;width:64px;height:64px;border-radius:999px;border:0;background:linear-gradient(135deg,#2563eb,#0f172a);color:white;font-size:20px;font-weight:800;box-shadow:0 18px 46px #0f172a55;z-index:9998}
+    body.appReady .smartAssistantButton{display:block}
     .smartAssistantWindow{display:none;position:fixed;right:22px;bottom:96px;width:390px;max-width:calc(100vw - 28px);height:560px;max-height:calc(100vh - 120px);background:white;border:1px solid #dbeafe;border-radius:16px;box-shadow:0 24px 70px #0f172a55;z-index:9999;overflow:hidden}
-    .smartAssistantWindow.open{display:flex;flex-direction:column}
+    body.appReady .smartAssistantWindow.open{display:flex;flex-direction:column}
     .smartAssistantHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f172a;color:white;padding:12px 14px;font-weight:bold}
     .smartAssistantHeader button{background:#1e293b;color:white;border:0;border-radius:8px;padding:7px 10px;cursor:pointer}
     .footerLine{margin-left:0;background:transparent;border:0}
@@ -435,6 +436,16 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <input id="recipeNo" placeholder="Recipe No">
       <input id="recipeColor" placeholder="Color Name">
     </div>
+    <div class="row">
+      <select id="recipeMasterName" onchange="toggleRecipeMasterCustom()">
+        <option value="">Select Recipe Master Name</option>
+        <option value="SARVAN JI">SARVAN JI</option>
+        <option value="NARPAT JI">NARPAT JI</option>
+        <option value="OWN">OWN</option>
+        <option value="__CUSTOM__">Custom</option>
+      </select>
+      <input id="recipeMasterCustom" placeholder="Custom Recipe Master Name" style="display:none">
+    </div>
     <input id="hexCode" placeholder="Hex Code e.g. #6A4F22">
     <input id="recipeThans" type="number" placeholder="Batch Thans (20/22/24)">
     <h3>Dyes</h3>
@@ -449,7 +460,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="recipeSearch" oninput="renderRecipes()" placeholder="Search recipe no, color, dye name, or thans">
     <table>
       <thead>
-        <tr><th>Recipe No</th><th>Color</th><th>Hex</th><th>Thans</th><th>Dyes</th><th>Action</th></tr>
+        <tr><th>Recipe No</th><th>Color</th><th>Master Name</th><th>Hex</th><th>Thans</th><th>Dyes</th><th>Action</th></tr>
       </thead>
       <tbody id="recipeTable"></tbody>
     </table>
@@ -858,6 +869,10 @@ let dataLoaded = false;
 const LOCAL_AUDIT_KEY = "mtm_audit_logs";
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 const LOW_STOCK_THRESHOLD_GRAMS = 5000;
+const CLOUD_SAVE_TIMEOUT_MS = 45000;
+const CLOUD_LOAD_TIMEOUT_MS = 30000;
+const FIXED_RECIPE_MASTER_NAMES = ["SARVAN JI", "NARPAT JI", "OWN"];
+const CUSTOM_RECIPE_MASTER_VALUE = "__CUSTOM__";
 const ADMIN_EMAILS = new Set(["JAINGARVIT31@GMAIL.COM"]);
 const ADMIN_UIDS = new Set(["2d40e8ad-d9dd-4043-8750-9c09cfc029e6"]);
 
@@ -1179,6 +1194,8 @@ async function logoutUser(auto=false){
 
   document.getElementById("appShell").style.display = "none";
   document.getElementById("loginPage").style.display = "flex";
+  document.body.classList.remove("appReady");
+  toggleSmartAssistant(false);
   if(auto) showLoginError("Session expired after 5 minutes of inactivity.");
 }
 
@@ -1188,6 +1205,7 @@ async function showDashboard(){
   loadStockNotificationState();
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("appShell").style.display = "block";
+  document.body.classList.add("appReady");
 
   if(document.querySelectorAll(".dyeRow").length === 0){
     ensureDefaultDyeLines();
@@ -1214,6 +1232,8 @@ async function initAuth(){
   currentRole = "viewer";
   document.getElementById("appShell").style.display = "none";
   document.getElementById("loginPage").style.display = "flex";
+  document.body.classList.remove("appReady");
+  toggleSmartAssistant(false);
   startInactivityWatch();
 
   supabaseClient.auth.onAuthStateChange(async function(event, session){
@@ -1226,6 +1246,8 @@ async function initAuth(){
       currentRole = "viewer";
       document.getElementById("appShell").style.display = "none";
       document.getElementById("loginPage").style.display = "flex";
+      document.body.classList.remove("appReady");
+      toggleSmartAssistant(false);
     }
   });
 }
@@ -1344,23 +1366,35 @@ async function saveRecipeRecord(recipe){
   const payload = {
     recipe_no: recipe.recipeNo || "",
     color_name: recipe.colorName || "",
+    recipe_master_name: recipe.recipeMasterName || "",
     than_count: recipe.recipeThans || 0,
     hex_code: recipe.hexCode || "N/A",
     dyes: recipe.dyes || []
   };
+  const fallbackPayload = {...payload};
+  delete fallbackPayload.recipe_master_name;
 
   if(recipe.id){
-    const { error } = await withTimeout(supabaseClient
+    let { error } = await withTimeout(supabaseClient
       .from("recipes")
       .update(payload)
       .eq("id", recipe.id), 30000, "Cloud recipe update timed out after 30 seconds. Please check your internet connection and Supabase recipes policy.");
+    if(error && String(error.message || "").includes("recipe_master_name")){
+      ({ error } = await withTimeout(supabaseClient
+        .from("recipes")
+        .update(fallbackPayload)
+        .eq("id", recipe.id), 30000, "Cloud recipe update timed out after 30 seconds. Please check your internet connection and Supabase recipes policy."));
+    }
 
     if(error){
       alert("Recipe update failed: " + error.message);
       return false;
     }
   } else {
-    const { data: insertedRows, error } = await withTimeout(supabaseClient.from("recipes").insert(payload).select("id"), 30000, "Cloud recipe insert timed out after 30 seconds. Please check your internet connection and Supabase recipes policy.");
+    let { data: insertedRows, error } = await withTimeout(supabaseClient.from("recipes").insert(payload).select("id"), 30000, "Cloud recipe insert timed out after 30 seconds. Please check your internet connection and Supabase recipes policy.");
+    if(error && String(error.message || "").includes("recipe_master_name")){
+      ({ data: insertedRows, error } = await withTimeout(supabaseClient.from("recipes").insert(fallbackPayload).select("id"), 30000, "Cloud recipe insert timed out after 30 seconds. Please check your internet connection and Supabase recipes policy."));
+    }
 
     if(error){
       alert("Recipe insert failed: " + error.message);
@@ -1415,7 +1449,11 @@ async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
   };
 
   saveLocalAuditLog(payload);
-  const { error } = await supabaseClient.from("audit_logs").insert(payload);
+  const { error } = await withTimeout(
+    supabaseClient.from("audit_logs").insert(payload),
+    CLOUD_SAVE_TIMEOUT_MS,
+    "Audit log save timed out after 45 seconds."
+  );
   if(error){
     console.warn("Audit log skipped. Run the updated Supabase SQL for audit_logs.", error);
   }
@@ -1456,11 +1494,15 @@ async function loadAuditLogsFromSupabase(){
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .from("audit_logs")
-    .select("*")
-    .order("created_at", {ascending:false})
-    .limit(1000);
+  const { data, error } = await withTimeout(
+    supabaseClient
+      .from("audit_logs")
+      .select("*")
+      .order("created_at", {ascending:false})
+      .limit(1000),
+    CLOUD_LOAD_TIMEOUT_MS,
+    "Audit log load timed out after 30 seconds."
+  );
 
   if(error){
     console.warn("Audit log load skipped", error);
@@ -1572,6 +1614,7 @@ async function saveRecipeVersion(recipe, actionType){
     recipe_id: String(recipe.id || ""),
     recipe_no: recipe.recipeNo || "",
     color_name: recipe.colorName || "",
+    recipe_master_name: recipe.recipeMasterName || "",
     snapshot: recipe,
     saved_by: currentUser.email || "",
     action_type: actionType || "update",
@@ -1991,6 +2034,47 @@ function setRecipeBaseMode(){
   if(saveBtn) saveBtn.textContent = "Save Recipe";
 }
 
+function normalizeRecipeMasterName(value){
+  return String(value || "").trim().toUpperCase();
+}
+
+function toggleRecipeMasterCustom(){
+  let select = document.getElementById("recipeMasterName");
+  let custom = document.getElementById("recipeMasterCustom");
+  if(!select || !custom) return;
+  let isCustom = select.value === CUSTOM_RECIPE_MASTER_VALUE;
+  custom.style.display = isCustom ? "" : "none";
+  if(!isCustom) custom.value = "";
+}
+
+function setRecipeMasterNameField(value){
+  let select = document.getElementById("recipeMasterName");
+  let custom = document.getElementById("recipeMasterCustom");
+  if(!select || !custom) return;
+  let cleanValue = normalizeRecipeMasterName(value);
+  if(!cleanValue){
+    select.value = "";
+    custom.value = "";
+  } else if(FIXED_RECIPE_MASTER_NAMES.includes(cleanValue)){
+    select.value = cleanValue;
+    custom.value = "";
+  } else {
+    select.value = CUSTOM_RECIPE_MASTER_VALUE;
+    custom.value = cleanValue;
+  }
+  toggleRecipeMasterCustom();
+}
+
+function getRecipeMasterNameValue(){
+  let select = document.getElementById("recipeMasterName");
+  let custom = document.getElementById("recipeMasterCustom");
+  if(!select) return "";
+  if(select.value === CUSTOM_RECIPE_MASTER_VALUE){
+    return normalizeRecipeMasterName(custom?.value);
+  }
+  return normalizeRecipeMasterName(select.value);
+}
+
 async function saveRecipe(){
   if(!requireAdmin()) return;
   if(!supabaseClient){
@@ -2000,6 +2084,7 @@ async function saveRecipe(){
 
   let recipeNo = document.getElementById("recipeNo").value.trim();
   let colorName = document.getElementById("recipeColor").value.trim();
+  let recipeMasterName = getRecipeMasterNameValue();
   let hexCode = document.getElementById("hexCode").value.trim() || "N/A";
   let recipeThans = document.getElementById("recipeThans").value;
 
@@ -2010,8 +2095,8 @@ async function saveRecipe(){
     if(name && qty > 0) dyes.push({name, qty});
   });
 
-  if(!recipeNo || !colorName || !recipeThans || Number(recipeThans) <= 0 || dyes.length < 2){
-    alert("Recipe No, Color Name, Batch Thans and minimum 2 dyes required");
+  if(!recipeNo || !colorName || !recipeMasterName || !recipeThans || Number(recipeThans) <= 0 || dyes.length < 2){
+    alert("Recipe No, Color Name, Recipe Master Name, Batch Thans and minimum 2 dyes required");
     return;
   }
 
@@ -2028,6 +2113,7 @@ async function saveRecipe(){
   let obj = {
   recipeNo,
   colorName,
+  recipeMasterName,
   hexCode,
   recipeThans,
   dyes
@@ -2102,6 +2188,7 @@ function parseRecipeImportRows(rows){
     let rowNo = index + 2;
     let recipeNo = String(getImportValue(row, ["Recipe No", "Recipe Number", "Recipe"]) || "").trim();
     let colorName = String(getImportValue(row, ["Color Name", "Colour Name", "Shade Name"]) || "").trim();
+    let recipeMasterName = normalizeRecipeMasterName(getImportValue(row, ["Recipe Master Name", "Master Name", "Recipe Master"]));
     let batchThans = String(getImportValue(row, ["Batch Thans", "Batch Than", "Thans", "Than Count"]) || "").trim();
     let dyeName = normalizeName(getImportValue(row, ["Dye Name", "Color/Dye Name", "Chemical Name", "Colour Name"]));
     let qty = Number(getImportValue(row, ["Quantity in grams", "Quantity", "Qty", "Qty grams", "Grams"]));
@@ -2119,6 +2206,7 @@ function parseRecipeImportRows(rows){
       grouped.set(recipeNo, {
         recipeNo,
         colorName,
+        recipeMasterName,
         hexCode: "N/A",
         recipeThans: batchThans,
         dyes: []
@@ -2127,6 +2215,8 @@ function parseRecipeImportRows(rows){
 
     let recipe = grouped.get(recipeNo);
     if(recipe.colorName !== colorName) errors.push("Row " + rowNo + ": Recipe " + recipeNo + " has different Color Name");
+    if(recipeMasterName && recipe.recipeMasterName && recipe.recipeMasterName !== recipeMasterName) errors.push("Row " + rowNo + ": Recipe " + recipeNo + " has different Recipe Master Name");
+    if(recipeMasterName && !recipe.recipeMasterName) recipe.recipeMasterName = recipeMasterName;
     if(String(recipe.recipeThans) !== String(batchThans)) errors.push("Row " + rowNo + ": Recipe " + recipeNo + " has different Batch Thans");
     recipe.dyes.push({name: dyeName, qty});
   });
@@ -2235,6 +2325,7 @@ function clearRecipeForm(){
 
   document.getElementById("recipeNo").value = "";
   document.getElementById("recipeColor").value = "";
+  setRecipeMasterNameField("");
   document.getElementById("hexCode").value = "";
 
   if(document.getElementById("recipeThans")){
@@ -2266,6 +2357,7 @@ function renderRecipes(){
     let dyeNames = (r.dyes || []).map(d => d.name).join(" ");
     return String(r.recipeNo || "").toUpperCase().includes(q) ||
       String(r.colorName || "").toUpperCase().includes(q) ||
+      String(r.recipeMasterName || "").toUpperCase().includes(q) ||
       String(r.recipeThans || "").toUpperCase().includes(q) ||
       dyeNames.toUpperCase().includes(q);
   }).forEach((r,index)=>{
@@ -2279,6 +2371,7 @@ function renderRecipes(){
       <tr>
         <td>${r.recipeNo || ""}</td>
         <td>${r.colorName || ""}</td>
+        <td>${r.recipeMasterName || ""}</td>
         <td>${r.hexCode || "N/A"}</td>
         <td>${r.recipeThans || ""}</td>
         <td>${dyeText}</td>
@@ -2307,6 +2400,7 @@ function duplicateRecipe(i){
   setRecipeBaseMode();
   document.getElementById("recipeNo").value = getNextRecipeNo();
   document.getElementById("recipeColor").value = (r.colorName || "") + " COPY";
+  setRecipeMasterNameField(r.recipeMasterName || "");
   document.getElementById("hexCode").value = r.hexCode || "N/A";
   document.getElementById("recipeThans").value = r.recipeThans || "";
   document.getElementById("dyeLines").innerHTML = "";
@@ -2325,6 +2419,7 @@ function editRecipe(i){
 
   document.getElementById("recipeNo").value = r.recipeNo;
   document.getElementById("recipeColor").value = r.colorName;
+  setRecipeMasterNameField(r.recipeMasterName || "");
   document.getElementById("hexCode").value = r.hexCode || "N/A";
   document.getElementById("recipeThans").value = r.recipeThans || "";
   document.getElementById("dyeLines").innerHTML = "";
@@ -2838,7 +2933,7 @@ function getProgramDyeCost(program){
   let requiredThans = Number(program.requiredThans) || Number((program.recipeSnapshot || []).find(r => Number(r.requiredThans) > 0)?.requiredThans) || 0;
   let total = 0;
 
-  (program.recipeSnapshot || []).forEach(recipe => {
+  resolveProgramRecipes(program).forEach(recipe => {
     let savedThans = getRecipeSavedThans(recipe);
     let targetThans = requiredThans || savedThans;
     if(!savedThans || !targetThans) return;
@@ -2927,11 +3022,43 @@ function makeRecipeSnapshot(recipe, requiredThans=""){
   return {
     recipeNo: recipe.recipeNo || "",
     colorName: recipe.colorName || "",
+    recipeMasterName: recipe.recipeMasterName || "",
     hexCode: recipe.hexCode || "N/A",
     recipeThans: recipe.recipeThans || "",
     requiredThans: requiredThans || "",
     dyes: recipe.dyes || []
   };
+}
+
+function makeProgramStoredRecipe(recipe, requiredThans=""){
+  return {
+    recipeNo: recipe.recipeNo || "",
+    colorName: recipe.colorName || "",
+    recipeMasterName: recipe.recipeMasterName || "",
+    hexCode: recipe.hexCode || "N/A",
+    recipeThans: recipe.recipeThans || "",
+    requiredThans: requiredThans || ""
+  };
+}
+
+function resolveProgramRecipes(program){
+  let snapshot = normalizeProgramRecipeSnapshot(program?.recipeSnapshot || program?.recipe_snapshot || []);
+  let selectedNumbers = parseProgramList(program?.selectedRecipeNumbers || program?.selected_recipe_numbers || program?.recipeNumbers || program?.recipe_numbers);
+  let source = snapshot.length ? snapshot : selectedNumbers.map(no => ({recipeNo: no}));
+  return sortRecipes(source.map(item => {
+    let savedRecipe = recipes.find(recipe => String(recipe.recipeNo || "") === String(item.recipeNo || ""));
+    if(savedRecipe){
+      return {
+        ...makeRecipeSnapshot(savedRecipe, item.requiredThans || program?.requiredThans || program?.required_thans || ""),
+        colorName: item.colorName || savedRecipe.colorName || "",
+        recipeMasterName: item.recipeMasterName || savedRecipe.recipeMasterName || "",
+        hexCode: item.hexCode || savedRecipe.hexCode || "N/A",
+        recipeThans: item.recipeThans || savedRecipe.recipeThans || "",
+        requiredThans: item.requiredThans || program?.requiredThans || program?.required_thans || ""
+      };
+    }
+    return item;
+  }));
 }
 
 function roundConvertedQty(qty){
@@ -2983,6 +3110,7 @@ function normalizeProgramRecipeSnapshot(value){
   return sortRecipes(parseProgramList(value).map(recipe => ({
     recipeNo: recipe.recipeNo || recipe.recipe_no || recipe.no || recipe.number || "",
     colorName: recipe.colorName || recipe.color_name || recipe.name || "",
+    recipeMasterName: recipe.recipeMasterName || recipe.recipe_master_name || recipe.masterName || recipe.master_name || "",
     hexCode: recipe.hexCode || recipe.hex_code || "N/A",
     recipeThans: recipe.recipeThans || recipe.recipe_thans || recipe.than_count || recipe.batchThans || recipe.batch_thans || "",
     requiredThans: recipe.requiredThans || recipe.required_thans || recipe.programThans || recipe.program_thans || "",
@@ -3086,6 +3214,7 @@ async function createProgram(){
   let createdAt = new Date().toISOString();
   programNo = getNextProgramNo();
   let snapshot = selectedRecipes.map(recipe => makeRecipeSnapshot(recipe, requiredThans));
+  let storedSnapshot = selectedRecipes.map(recipe => makeProgramStoredRecipe(recipe, requiredThans));
 
   let programPayload = {
     program_no: programNo,
@@ -3096,18 +3225,26 @@ async function createProgram(){
     stock_deducted: false,
     created_at: createdAt,
     selected_recipe_numbers: snapshot.map(r => r.recipeNo),
-    recipe_snapshot: snapshot
+    recipe_snapshot: storedSnapshot
   };
-  let { data: insertedRows, error } = await supabaseClient.from("programs").insert(programPayload).select("*");
+  let { data: insertedRows, error } = await withTimeout(
+    supabaseClient.from("programs").insert(programPayload).select("id"),
+    CLOUD_SAVE_TIMEOUT_MS,
+    "Program save timed out after 45 seconds. Please try again with fewer recipes or check your Supabase connection."
+  );
   if(error && (String(error.message || "").includes("status") || String(error.message || "").includes("required_thans") || String(error.message || "").includes("stock_deducted"))){
     delete programPayload.status;
     delete programPayload.required_thans;
     delete programPayload.stock_deducted;
-    ({ data: insertedRows, error } = await supabaseClient.from("programs").insert(programPayload).select("*"));
+    ({ data: insertedRows, error } = await withTimeout(
+      supabaseClient.from("programs").insert(programPayload).select("id"),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Program save timed out after 45 seconds. Please try again with fewer recipes or check your Supabase connection."
+    ));
   }
 
   if(error){
-    alert("Program save failed: " + error.message + ". Run the updated Supabase SQL for programs table.");
+    alert("Program save failed: " + error.message);
     return;
   }
 
@@ -3145,14 +3282,17 @@ async function createProgram(){
 async function loadProgramsFromSupabase(){
   if(!supabaseClient || !isLoggedIn()) return;
 
-  const { data, error } = await supabaseClient
-    .from("programs")
-    .select("*")
-    .order("created_at", {ascending:true});
+  const { data, error } = await withTimeout(
+    supabaseClient
+      .from("programs")
+      .select("*")
+      .order("created_at", {ascending:true}),
+    CLOUD_LOAD_TIMEOUT_MS,
+    "Program load timed out after 30 seconds."
+  );
 
   if(error){
     console.warn("Program load skipped", error);
-    programs = [];
     return;
   }
 
@@ -3172,6 +3312,7 @@ async function loadProgramsFromSupabase(){
       recipeSnapshot
     };
     program.requiredThans = getProgramRequiredThans(program);
+    program.recipeSnapshot = resolveProgramRecipes(program);
     return program;
   }).sort((a,b) => Number(a.programNo) - Number(b.programNo));
 }
@@ -3265,7 +3406,7 @@ function getProgramRecipeRows(recipe){
 }
 
 function renderProgramHtml(program, requiredThans){
-  let convertedRecipes = sortRecipes(program.recipeSnapshot || []).map(r => convertRecipeForPdf(r, requiredThans));
+  let convertedRecipes = resolveProgramRecipes(program).map(r => convertRecipeForPdf(r, requiredThans));
   let recipesHtml = convertedRecipes.map(r => {
     let rows = getProgramRecipeRows(r);
     return `
@@ -3314,7 +3455,7 @@ async function exportProgramPdf(index, options={}){
     return null;
   }
   try{
-    (program.recipeSnapshot || []).forEach(r => convertRecipeForPdf(r, requiredThans));
+    resolveProgramRecipes(program).forEach(r => convertRecipeForPdf(r, requiredThans));
   }catch(err){
     alert(err.message || "Batch thans missing for this recipe");
     return null;
@@ -3413,7 +3554,7 @@ async function updateProgramBatchThans(index, value){
     return;
   }
 
-  let stockOk = await confirmProgramStock(program.recipeSnapshot || [], requiredThans);
+  let stockOk = await confirmProgramStock(resolveProgramRecipes(program), requiredThans);
   if(!stockOk){
     await supabaseClient.from("programs").update({stock_deducted:false}).eq("id", program.id);
     await loadDataFromJson();
@@ -3456,7 +3597,7 @@ async function restoreProgramStock(program, reason){
     }
     let usageMap;
     try{
-      usageMap = getProgramUsageMap(program.recipeSnapshot || [], requiredThans);
+      usageMap = getProgramUsageMap(resolveProgramRecipes(program), requiredThans);
     }catch(err){
       alert(err.message || "Cannot restore stock for this program.");
       return false;
@@ -3678,6 +3819,9 @@ function clearStockNotifications(){
 }
 
 function toggleSmartAssistant(forceOpen){
+  if(!isLoggedIn()){
+    forceOpen = false;
+  }
   let panel = document.getElementById("smartAssistantWindow");
   if(!panel) return;
   let open = typeof forceOpen === "boolean" ? forceOpen : !panel.classList.contains("open");
@@ -3835,7 +3979,11 @@ async function deductStockForProgram(program){
   });
   if(existingUsage){
     if(program.id){
-      let { error } = await supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id);
+      let { error } = await withTimeout(
+        supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id),
+        CLOUD_SAVE_TIMEOUT_MS,
+        "Program stock flag update timed out after 45 seconds."
+      );
       if(error) console.warn("Program stock flag update failed", error);
     }
     return true;
@@ -3846,7 +3994,7 @@ async function deductStockForProgram(program){
 
   let usage;
   try{
-    usage = getProgramUsageMap(program.recipeSnapshot || [], requiredThans);
+    usage = getProgramUsageMap(resolveProgramRecipes(program), requiredThans);
   }catch(err){
     alert(err.message || "Batch thans missing for this recipe");
     return false;
@@ -3884,29 +4032,45 @@ async function deductStockForProgram(program){
 
   if(!ledgerRows.length) return false;
 
-  let { error: ledgerError } = await supabaseClient.from("chemical_stock_ledger").insert(ledgerRows);
+  let { error: ledgerError } = await withTimeout(
+    supabaseClient.from("chemical_stock_ledger").insert(ledgerRows),
+    CLOUD_SAVE_TIMEOUT_MS,
+    "Stock ledger save timed out after 45 seconds."
+  );
   if(ledgerError){
     alert("Stock deduction failed: " + ledgerError.message + ". Run the updated Supabase SQL for stock tables.");
     return false;
   }
 
-  let { error: usageError } = await supabaseClient.from("program_stock_usage").insert(usageRows);
+  let { error: usageError } = await withTimeout(
+    supabaseClient.from("program_stock_usage").insert(usageRows),
+    CLOUD_SAVE_TIMEOUT_MS,
+    "Program stock usage save timed out after 45 seconds."
+  );
   if(usageError){
-    await supabaseClient.from("chemical_stock_ledger").insert(ledgerRows.map(row => ({
-      chemical_name: row.chemical_name,
-      entry_type: "program_delete_restore",
-      qty_delta_grams: Math.abs(Number(row.qty_delta_grams) || 0),
-      program_id: row.program_id,
-      program_no: row.program_no,
-      note: "Auto rollback after failed program stock usage save",
-      created_at: new Date().toISOString()
-    })));
+    await withTimeout(
+      supabaseClient.from("chemical_stock_ledger").insert(ledgerRows.map(row => ({
+        chemical_name: row.chemical_name,
+        entry_type: "program_delete_restore",
+        qty_delta_grams: Math.abs(Number(row.qty_delta_grams) || 0),
+        program_id: row.program_id,
+        program_no: row.program_no,
+        note: "Auto rollback after failed program stock usage save",
+        created_at: new Date().toISOString()
+      }))),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Stock rollback save timed out after 45 seconds."
+    );
     alert("Program stock usage save failed: " + usageError.message + ". Run the updated Supabase SQL for stock tables.");
     return false;
   }
 
   if(program.id){
-    let { error: programError } = await supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id);
+    let { error: programError } = await withTimeout(
+      supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Program stock flag update timed out after 45 seconds."
+    );
     if(programError) console.warn("Program stock flag update failed", programError);
   }
 
@@ -3923,15 +4087,26 @@ async function loadStockFromSupabase(){
     return;
   }
 
-  let purchaseResult = await supabaseClient.from("chemical_stock_purchases").select("*").order("purchase_date", {ascending:true});
-  let ledgerResult = await supabaseClient.from("chemical_stock_ledger").select("*").order("created_at", {ascending:true});
-  let usageResult = await supabaseClient.from("program_stock_usage").select("*").order("created_at", {ascending:false});
+  let [purchaseResult, ledgerResult, usageResult] = await Promise.all([
+    withTimeout(
+      supabaseClient.from("chemical_stock_purchases").select("*").order("purchase_date", {ascending:true}),
+      CLOUD_LOAD_TIMEOUT_MS,
+      "Stock purchase load timed out after 30 seconds."
+    ),
+    withTimeout(
+      supabaseClient.from("chemical_stock_ledger").select("*").order("created_at", {ascending:true}),
+      CLOUD_LOAD_TIMEOUT_MS,
+      "Stock ledger load timed out after 30 seconds."
+    ),
+    withTimeout(
+      supabaseClient.from("program_stock_usage").select("*").order("created_at", {ascending:false}),
+      CLOUD_LOAD_TIMEOUT_MS,
+      "Program stock usage load timed out after 30 seconds."
+    )
+  ]);
 
   if(purchaseResult.error || ledgerResult.error || usageResult.error){
     console.warn("Stock load skipped. Run updated Supabase SQL.", purchaseResult.error || ledgerResult.error || usageResult.error);
-    stockPurchases = [];
-    stockLedger = [];
-    programStockUsage = [];
     stockLocalOnly = true;
     return;
   }
@@ -4399,6 +4574,7 @@ function exportRecipeBookExcel(){
       rows.push({
         "Recipe No": r.recipeNo || "",
         "Color Name": r.colorName || "",
+        "Recipe Master Name": r.recipeMasterName || "",
         "Hex Code": r.hexCode || "N/A",
         "Batch Thans": r.recipeThans || "",
         "Dye Name": d.name || "",
@@ -4430,6 +4606,7 @@ function exportProgramHistoryExcel(){
         "Created Date/Time": p.createdAt || "",
         "Recipe No": r.recipeNo || "",
         "Color Name": r.colorName || "",
+        "Recipe Master Name": r.recipeMasterName || "",
         "Batch Thans": r.recipeThans || ""
       });
     });
@@ -4610,6 +4787,7 @@ function exportDailyBackupExcel(){
   XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(recipes.flatMap(r => (r.dyes || []).map(d => ({
     "Recipe No": r.recipeNo || "",
     "Color Name": r.colorName || "",
+    "Recipe Master Name": r.recipeMasterName || "",
     "Batch Thans": r.recipeThans || "",
     "Dye Name": d.name || "",
     "Quantity": d.qty || ""
@@ -4781,6 +4959,7 @@ console.log("SUPABASE RECIPES:", recipeData);
       id: r.id,
       recipeNo: r.recipe_no,
       colorName: r.color_name,
+      recipeMasterName: r.recipe_master_name || "",
       recipeThans: r.than_count,
       hexCode: r.hex_code || "N/A",
       createdAt: r.created_at || "",

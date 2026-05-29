@@ -193,7 +193,7 @@ function compactRows(rows, limit){
 async function loadAssistantContext(){
   const [colors, recipes, programs, purchases, ledger, usage] = await Promise.all([
     supabaseReadFallback("colors", ["id,name,rate,color_type", "id,name,rate", "*"], true),
-    supabaseReadFallback("recipes", ["id,recipe_no,color_name,than_count,hex_code,dyes,created_at", "id,recipe_no,color_name,than_count,dyes", "*"], true),
+    supabaseReadFallback("recipes", ["id,recipe_no,color_name,recipe_master_name,than_count,hex_code,dyes,created_at", "id,recipe_no,color_name,than_count,hex_code,dyes,created_at", "id,recipe_no,color_name,than_count,dyes", "*"], true),
     supabaseReadFallback("programs", ["id,program_no,program_name,status,program_date,required_thans,stock_deducted,selected_recipe_numbers,recipe_snapshot,created_at", "id,program_no,program_name,program_date,selected_recipe_numbers,recipe_snapshot,created_at", "*"]),
     supabaseReadFallback("chemical_stock_purchases", ["id,chemical_name,purchased_qty_grams,unit,purchase_date,supplier,rate_per_kg,notes,created_at", "*"]),
     supabaseReadFallback("chemical_stock_ledger", ["id,chemical_name,entry_type,qty_delta_grams,program_id,program_no,note,created_at", "*"]),
