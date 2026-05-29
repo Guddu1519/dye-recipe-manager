@@ -1193,6 +1193,11 @@ async function initAuth(){
     return;
   }
 
+  await supabaseClient.auth.signOut();
+  currentUser = null;
+  currentRole = "viewer";
+  document.getElementById("appShell").style.display = "none";
+  document.getElementById("loginPage").style.display = "flex";
   startInactivityWatch();
 
   supabaseClient.auth.onAuthStateChange(async function(event, session){
@@ -1207,17 +1212,6 @@ async function initAuth(){
       document.getElementById("loginPage").style.display = "flex";
     }
   });
-
-  const { data } = await supabaseClient.auth.getSession();
-  currentUser = data?.session?.user || null;
-  if(currentUser){
-    await loadUserRole();
-    await showDashboard();
-  } else {
-    currentRole = "viewer";
-    document.getElementById("appShell").style.display = "none";
-    document.getElementById("loginPage").style.display = "flex";
-  }
 }
 
 async function saveAll(){
@@ -4798,9 +4792,8 @@ if(window.supabase){
     SUPABASE_KEY,
     {
       auth: {
-        persistSession: true,
-        storage: window.sessionStorage,
-        autoRefreshToken: true,
+        persistSession: false,
+        autoRefreshToken: false,
         detectSessionInUrl: false
       }
     }
