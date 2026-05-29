@@ -3662,8 +3662,8 @@ async function updateProgramRecipes(index, details){
   let { data: savedProgramRows, error: verifyError } = await withTimeout(
     supabaseClient
       .from("programs")
-      .select("id,program_no,selected_recipe_numbers,recipe_snapshot")
-      .eq(program.programNo ? "program_no" : "id", program.programNo || program.id),
+      .select("id,program_no,selected_recipe_numbers")
+      .eq("id", program.id),
     CLOUD_LOAD_TIMEOUT_MS,
     "Program verification timed out after 30 seconds."
   );
@@ -3679,12 +3679,10 @@ async function updateProgramRecipes(index, details){
   }
   for(let savedProgramRow of savedProgramRows){
     let savedRecipeNumbers = parseProgramList(savedProgramRow.selected_recipe_numbers);
-    let savedSnapshotNumbers = normalizeProgramRecipeSnapshot(savedProgramRow.recipe_snapshot).map(r => String(r.recipeNo || ""));
     let expectedNumbers = selectedRecipeNumbers.map(no => String(no || ""));
     let sortedExpected = [...expectedNumbers].sort().join("|");
     let selectedMismatch = [...savedRecipeNumbers.map(no => String(no || ""))].sort().join("|") !== sortedExpected;
-    let snapshotMismatch = [...savedSnapshotNumbers].sort().join("|") !== sortedExpected;
-    if(selectedMismatch || snapshotMismatch){
+    if(selectedMismatch){
       alert("Program update did not save the changed recipe list. Please refresh and try again.");
       await loadDataFromJson();
       return;
