@@ -170,6 +170,12 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .companyHeader .companyName{font-size:20px;color:#0f172a}
     .companyHeader .companyAddress{color:#64748b}
     .siteLogo{width:48px;height:48px;border-radius:12px;box-shadow:0 8px 22px #0f172a18}
+    .mobileMenuBtn{position:fixed;left:14px;top:18px;width:44px;height:44px;display:grid;place-items:center;gap:4px;background:#0f172a;color:white;border:1px solid #334155;border-radius:12px;padding:10px;box-shadow:0 14px 34px #0f172a30;z-index:1100;cursor:pointer}
+    .mobileMenuBtn span{display:block;width:20px;height:2px;background:white;border-radius:999px;transition:.2s ease}
+    .sidebarOpen .mobileMenuBtn,.sidebarHoverOpen .mobileMenuBtn{background:#dc2626;border-color:#ef4444}
+    .sidebarOpen .mobileMenuBtn span:nth-child(1),.sidebarHoverOpen .mobileMenuBtn span:nth-child(1){transform:translateY(6px) rotate(45deg)}
+    .sidebarOpen .mobileMenuBtn span:nth-child(2),.sidebarHoverOpen .mobileMenuBtn span:nth-child(2){opacity:0}
+    .sidebarOpen .mobileMenuBtn span:nth-child(3),.sidebarHoverOpen .mobileMenuBtn span:nth-child(3){transform:translateY(-6px) rotate(-45deg)}
     .sidebarOverlay{display:none;position:fixed;inset:0;background:#0f172a80;z-index:950}
     .sidebarHotspot{position:fixed;top:0;left:0;bottom:0;width:24px;z-index:999;cursor:pointer}
     nav{position:fixed;top:0;left:0;bottom:0;width:252px;display:flex;flex-direction:column;gap:clamp(2px,.45vh,4px);padding:clamp(10px,1.5vh,14px) 12px;background:linear-gradient(180deg,#0b1220,#111827);box-shadow:16px 0 42px #0f172a22;z-index:1000;overflow:hidden;box-sizing:border-box;transform:translateX(-108%);transition:transform .22s ease,box-shadow .22s ease}
@@ -223,7 +229,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid,.compareGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left;min-width:0}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
     @media(max-width:900px){header{left:0}.sidebarHotspot{display:block;width:22px;z-index:1100}.sidebarOpen .sidebarOverlay{display:block}nav,nav:hover{width:min(82vw,260px);transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section{margin-left:0;padding-left:18px;padding-right:18px}.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
     @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:column;align-items:flex-start}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}.smartAssistantButton{right:16px;bottom:16px}.smartAssistantWindow{right:14px;bottom:88px;height:72vh}section{padding-top:150px}.toastContainer{left:16px;right:16px;top:18px}.successToast{text-align:center}}
-    @media(max-width:700px){nav{width:min(82vw,260px);gap:3px;padding:10px 10px}nav:before{font-size:20px;padding:5px 8px 12px;margin-bottom:5px}nav button{padding:8px 10px!important;font-size:13px;line-height:1.05;border-radius:10px;min-height:0}nav button:before{width:22px!important;height:22px!important;flex-basis:22px!important}nav .logout{padding:9px 10px!important;margin-top:auto}nav .role-badge{padding:8px 8px!important;font-size:12px}}
+    @media(max-width:700px){.mobileMenuBtn{left:10px;top:12px;width:42px;height:42px}nav{width:min(82vw,260px);gap:3px;padding:10px 10px}nav:before{font-size:20px;padding:5px 8px 12px;margin-bottom:5px}nav button{padding:8px 10px!important;font-size:13px;line-height:1.05;border-radius:10px;min-height:0}nav button:before{width:22px!important;height:22px!important;flex-basis:22px!important}nav .logout{padding:9px 10px!important;margin-top:auto}nav .role-badge{padding:8px 8px!important;font-size:12px}}
   </style>
 </head>
 <body>
@@ -242,6 +248,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="appShell">
 <header>
+  <button id="mobileMenuBtn" class="mobileMenuBtn" onclick="toggleSidebar()" onmouseenter="openSidebarOnHover()" onmouseleave="scheduleSidebarHoverClose()" aria-label="Open menu">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
   <div class="brandLeft">
     <img class="siteLogo" src="logo.svg" alt="Monica Textile Mills Logo">
     <div class="appTitle">
@@ -989,12 +1000,16 @@ function requireLogin(){
 }
 
 function isAdmin(){
-  return currentRole === "admin";
+  return currentRole === "admin" ||
+    (currentUser && (ADMIN_UIDS.has(currentUser.id) || ADMIN_EMAILS.has(normalizeName(currentUser.email))));
 }
 
 function requireAdmin(){
   if(!requireLogin()) return false;
-  if(isAdmin()) return true;
+  if(isAdmin()){
+    currentRole = "admin";
+    return true;
+  }
   alert("Viewers can only search, view recipes, and calculate costing.");
   return false;
 }
@@ -1034,7 +1049,8 @@ async function loadUserRole(){
 function applyRolePermissions(){
   let viewer = !isAdmin();
   let badge = document.getElementById("roleBadge");
-  if(badge) badge.textContent = "Role: " + currentRole.toUpperCase();
+  if(!viewer) currentRole = "admin";
+  if(badge) badge.textContent = "Role: " + (viewer ? currentRole : "admin").toUpperCase();
 
   document.querySelectorAll("input, select, button").forEach(el=>{
     let id = el.id || "";
@@ -1043,7 +1059,7 @@ function applyRolePermissions(){
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || id === "multiCostSelectAll" || id === "compareThans" || id === "compareCount" || el.classList.contains("multiCostRecipeCheck") || el.classList.contains("recipeCompareSelect") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost" || text === "Compare Recipes" || text === "Print / Export PDF";
     let isProgramView = text === "Export" || text === "Export PDF";
     let isAiAssistant = id === "smartAssistantButton" || id === "aiSendBtn" || text === "Send" || text === "Clear" || text === "Minimize";
-    let isNavigation = text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Recipe Compare" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
+    let isNavigation = id === "mobileMenuBtn" || text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Recipe Compare" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isAiAssistant || isLogout || isLogin;
@@ -1653,8 +1669,9 @@ function scheduleSidebarHoverClose(){
   if(sidebarHoverCloseTimer) clearTimeout(sidebarHoverCloseTimer);
   sidebarHoverCloseTimer = setTimeout(()=>{
     const nav = document.querySelector("nav");
+    const button = document.getElementById("mobileMenuBtn");
     const hotspot = document.getElementById("sidebarHotspot");
-    const stillHovering = nav?.matches(":hover") || hotspot?.matches(":hover");
+    const stillHovering = nav?.matches(":hover") || button?.matches(":hover") || hotspot?.matches(":hover");
     if(!stillHovering){
       document.body.classList.remove("sidebarHoverOpen");
       updateMobileMenuButton();
@@ -1678,7 +1695,16 @@ function closeSidebar(){
 }
 
 function updateMobileMenuButton(){
+  let button = document.getElementById("mobileMenuBtn");
+  if(!button) return;
+  button.setAttribute("aria-label", document.body.classList.contains("sidebarOpen") || document.body.classList.contains("sidebarHoverOpen") ? "Close menu" : "Open menu");
 }
+
+document.addEventListener("click", function(event){
+  if(!document.body.classList.contains("sidebarOpen") && !document.body.classList.contains("sidebarHoverOpen")) return;
+  if(event.target.closest("nav") || event.target.closest("#mobileMenuBtn") || event.target.closest("#sidebarHotspot")) return;
+  closeSidebar();
+});
 
 function goToTab(id){
   let navButton = Array.from(document.querySelectorAll("nav button")).find(button => {
