@@ -3629,8 +3629,10 @@ async function updateProgramRecipes(index, details){
     recipe_snapshot: storedSnapshot
   };
 
+  let programQueryColumn = program.programNo ? "program_no" : "id";
+  let programQueryValue = program.programNo || program.id;
   let { data: savedRows, error } = await withTimeout(
-    supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id,selected_recipe_numbers,recipe_snapshot"),
+    supabaseClient.from("programs").update(updatePayload).eq(programQueryColumn, programQueryValue).select("id,program_no,selected_recipe_numbers,recipe_snapshot"),
     CLOUD_SAVE_TIMEOUT_MS,
     "Program update timed out after 45 seconds."
   );
@@ -3639,7 +3641,7 @@ async function updateProgramRecipes(index, details){
     delete updatePayload.required_thans;
     delete updatePayload.stock_deducted;
     ({ data: savedRows, error } = await withTimeout(
-      supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id,selected_recipe_numbers,recipe_snapshot"),
+      supabaseClient.from("programs").update(updatePayload).eq(programQueryColumn, programQueryValue).select("id,program_no,selected_recipe_numbers,recipe_snapshot"),
       CLOUD_SAVE_TIMEOUT_MS,
       "Program update timed out after 45 seconds."
     ));
@@ -3650,8 +3652,13 @@ async function updateProgramRecipes(index, details){
     await loadDataFromJson();
     return;
   }
-  let savedProgramRow = savedRows && savedRows[0] ? savedRows[0] : null;
-  if(savedProgramRow){
+  let savedProgramRows = savedRows || [];
+  if(!savedProgramRows.length){
+    alert("Program update did not return the saved row. Please refresh and try again.");
+    await loadDataFromJson();
+    return;
+  }
+  for(let savedProgramRow of savedProgramRows){
     let savedRecipeNumbers = parseProgramList(savedProgramRow.selected_recipe_numbers);
     let savedSnapshotNumbers = normalizeProgramRecipeSnapshot(savedProgramRow.recipe_snapshot).map(r => String(r.recipeNo || ""));
     let expectedNumbers = selectedRecipeNumbers.map(no => String(no || ""));
@@ -3800,9 +3807,11 @@ async function applyProgramStockDelta(program, stockDelta){
   let usageSaved = await replaceProgramStockUsage(program, stockDelta?.newUsage || {});
   if(!usageSaved) return false;
 
-  if(program.id){
+  if(program.id || program.programNo){
+    let programQueryColumn = program.programNo ? "program_no" : "id";
+    let programQueryValue = program.programNo || program.id;
     let { error: programError } = await withTimeout(
-      supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id),
+      supabaseClient.from("programs").update({stock_deducted:true}).eq(programQueryColumn, programQueryValue),
       CLOUD_SAVE_TIMEOUT_MS,
       "Program stock flag update timed out after 45 seconds."
     );
