@@ -3261,9 +3261,6 @@ async function createProgram(){
   let programNo = null;
   let stockDeducted = false;
   try{
-  let stockOk = await confirmProgramStock(selectedRecipes, requiredThans);
-  if(!stockOk) return;
-
   if(editProgramIndex !== null){
     await updateProgramRecipes(editProgramIndex, {
       selectedRecipes,
@@ -3274,6 +3271,9 @@ async function createProgram(){
     });
     return;
   }
+
+  let stockOk = await confirmProgramStock(selectedRecipes, requiredThans);
+  if(!stockOk) return;
 
   let createdAt = new Date().toISOString();
   programNo = getNextProgramNo();
@@ -3597,25 +3597,20 @@ async function updateProgramRecipes(index, details){
   let oldValue = {...program, recipeSnapshot: resolveProgramRecipes(program)};
   let selectedRecipes = details.selectedRecipes || [];
   let requiredThans = Number(details.requiredThans);
+  let oldRequiredThans = getProgramRequiredThans(program, index);
   let fullSnapshot = selectedRecipes.map(recipe => makeRecipeSnapshot(recipe, requiredThans));
   let storedSnapshot = selectedRecipes.map(recipe => makeProgramStoredRecipe(recipe, requiredThans));
   let selectedRecipeNumbers = fullSnapshot.map(r => r.recipeNo);
 
-  let restored = await restoreProgramStock(program, "editing Program " + (program.programNo || ""));
-  if(!restored){
-    await loadDataFromJson();
+  let stockDelta;
+  try{
+    stockDelta = getProgramStockDelta(resolveProgramRecipes(program), oldRequiredThans, fullSnapshot, requiredThans);
+  }catch(err){
+    alert(err.message || "Cannot calculate program stock change.");
     return;
   }
-
-  let usageDeleted = await deleteProgramStockUsage(program);
-  if(!usageDeleted){
-    await loadDataFromJson();
-    return;
-  }
-
-  let stockOk = await confirmProgramStock(fullSnapshot, requiredThans);
-  if(!stockOk){
-    await supabaseClient.from("programs").update({stock_deducted:false}).eq("id", program.id);
+  let deltaOk = confirmProgramStockDelta(stockDelta);
+  if(!deltaOk){
     await loadDataFromJson();
     return;
   }
@@ -3662,8 +3657,8 @@ async function updateProgramRecipes(index, details){
     recipeSnapshot: fullSnapshot,
     stockDeducted: false
   };
-  let deducted = await deductStockForProgram(updatedProgram);
-  if(!deducted){
+  let stockUpdated = await applyProgramStockDelta(updatedProgram, stockDelta);
+  if(!stockUpdated){
     await loadDataFromJson();
     return;
   }
@@ -3675,6 +3670,129 @@ async function updateProgramRecipes(index, details){
   renderPrograms();
   renderAuditLogs();
   showSuccessToast("Program updated and stock recalculated");
+}
+
+function getProgramStockDelta(oldRecipes, oldRequiredThans, newRecipes, newRequiredThans){
+  let oldUsage = oldRequiredThans ? getProgramUsageMap(oldRecipes || [], oldRequiredThans) : {};
+  let newUsage = newRequiredThans ? getProgramUsageMap(newRecipes || [], newRequiredThans) : {};
+  let names = new Set([...Object.keys(oldUsage), ...Object.keys(newUsage)]);
+  let delta = {};
+  names.forEach(name => {
+    let change = (Number(newUsage[name]) || 0) - (Number(oldUsage[name]) || 0);
+    if(Math.abs(change) > 0.001) delta[name] = Math.round(change);
+  });
+  return {oldUsage, newUsage, delta};
+}
+
+function confirmProgramStockDelta(stockDelta){
+  let current = getStockRows();
+  let insufficient = Object.entries(stockDelta?.delta || {}).map(([name, change]) => {
+    if(change <= 0) return null;
+    let row = current.find(s => s.name === name);
+    let available = row ? row.balance : 0;
+    return change > available ? {name, required: change, available} : null;
+  }).filter(Boolean);
+
+  if(insufficient.length){
+    let message = insufficient.map(item =>
+      `Insufficient stock for ${item.name}. Extra Required: ${formatGrams(item.required)}, Available: ${formatGrams(item.available)}.`
+    ).join("\n");
+    alert(message + "\n\nOnly added/increased recipe quantities are checked while editing a program.");
+    return false;
+  }
+  return true;
+}
+
+async function replaceProgramStockUsage(program, newUsage){
+  let usageDeleted = await deleteProgramStockUsage(program);
+  if(!usageDeleted) return false;
+
+  let now = new Date().toISOString();
+  let stockRows = getStockRows();
+  let usageRows = Object.entries(newUsage || {}).map(([name, qty]) => {
+    let after = stockRows.find(s => s.name === name)?.balance || 0;
+    return {
+      program_id: program.id || null,
+      program_no: String(program.programNo || ""),
+      program_name: program.programName || "",
+      program_date: program.programDate || null,
+      chemical_name: name,
+      quantity_used_grams: qty,
+      before_stock_grams: after + qty,
+      after_stock_grams: after,
+      created_at: now
+    };
+  }).filter(row => row.chemical_name && Number(row.quantity_used_grams) > 0);
+
+  if(!usageRows.length) return true;
+
+  let { error } = await withTimeout(
+    supabaseClient.from("program_stock_usage").insert(usageRows),
+    CLOUD_SAVE_TIMEOUT_MS,
+    "Program stock usage save timed out after 45 seconds."
+  );
+  if(error){
+    alert("Program stock usage save failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
+    return false;
+  }
+
+  programStockUsage = [...programStockUsage, ...usageRows];
+  return true;
+}
+
+async function applyProgramStockDelta(program, stockDelta){
+  if(!supabaseClient || !program) return false;
+  let now = new Date().toISOString();
+  let ledgerRows = Object.entries(stockDelta?.delta || {}).map(([name, change]) => {
+    if(!change) return null;
+    return {
+      chemical_name: name,
+      entry_type: change > 0 ? "program_usage" : "program_delete_restore",
+      qty_delta_grams: change > 0 ? -Math.abs(change) : Math.abs(change),
+      program_id: program.id || null,
+      program_no: String(program.programNo || ""),
+      note: (change > 0 ? "Program edit extra usage " : "Program edit stock restore ") + (program.programNo || "") + " - " + (program.programName || ""),
+      created_at: now
+    };
+  }).filter(Boolean);
+
+  if(ledgerRows.length){
+    let { error: ledgerError } = await withTimeout(
+      supabaseClient.from("chemical_stock_ledger").insert(ledgerRows),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Program stock change save timed out after 45 seconds."
+    );
+    if(ledgerError){
+      alert("Program stock change failed: " + ledgerError.message + ". Run the updated Supabase SQL for stock tables.");
+      return false;
+    }
+  }
+
+  stockLedger = [
+    ...stockLedger,
+    ...ledgerRows.map(row => ({
+      ...row,
+      chemicalName: row.chemical_name,
+      entryType: row.entry_type,
+      qtyDeltaGrams: row.qty_delta_grams
+    }))
+  ];
+
+  let usageSaved = await replaceProgramStockUsage(program, stockDelta?.newUsage || {});
+  if(!usageSaved) return false;
+
+  if(program.id){
+    let { error: programError } = await withTimeout(
+      supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id),
+      CLOUD_SAVE_TIMEOUT_MS,
+      "Program stock flag update timed out after 45 seconds."
+    );
+    if(programError) console.warn("Program stock flag update failed", programError);
+  }
+
+  await loadStockFromSupabase();
+  renderStock();
+  return true;
 }
 
 async function updateProgramStatus(index, status){
