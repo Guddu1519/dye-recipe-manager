@@ -35,6 +35,13 @@ th{background:#dbeafe}
     .successToast.hide{animation:toastOut .22s ease-in forwards}
     .recipeEditBanner{display:none;margin:8px 0 12px;padding:10px 12px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;border-radius:10px;font-weight:800}
     .recipeEditBanner.active{display:block}
+    .compareGrid{display:grid;grid-template-columns:repeat(4,minmax(180px,1fr));gap:10px}
+    .compareControls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:8px}
+    .compareResultTable th,.compareResultTable td{vertical-align:top}
+    .compareLowest{background:#dcfce7!important;color:#166534;font-weight:bold}
+    .compareHighest{background:#fee2e2!important;color:#991b1b;font-weight:bold}
+    .compareDyeList{margin:0;padding-left:16px}
+    .compareDyeList li{margin:2px 0}
     @keyframes toastIn{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
     @keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-8px) scale(.98)}}
     .muted{color:#64748b;font-size:13px}
@@ -214,7 +221,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .smartAssistantHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f172a;color:white;padding:12px 14px;font-weight:bold}
     .smartAssistantHeader button{background:#1e293b;color:white;border:0;border-radius:8px;padding:7px 10px;cursor:pointer}
     .footerLine{margin-left:260px;background:transparent;border:0}
-    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left;min-width:0}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
+    @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid,.compareGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left;min-width:0}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
     @media(max-width:900px){header{left:0}.mobileMenuBtn{display:inline-block}.sidebarOpen .sidebarOverlay{display:block}nav{transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section,.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
     @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions,.chatInputBar{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:column;align-items:flex-start}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}.chatShell{height:70vh}.chatMsg{max-width:100%}.smartAssistantButton{right:16px;bottom:16px}.smartAssistantWindow{right:14px;bottom:88px;height:72vh}section{padding-top:150px}.toastContainer{left:16px;right:16px;top:18px}.successToast{text-align:center}}
     @media(max-width:700px){nav{width:min(82vw,260px);gap:3px;padding:10px 10px}nav:before{font-size:20px;padding:5px 8px 12px;margin-bottom:5px}nav button{padding:8px 10px!important;font-size:13px;line-height:1.05;border-radius:10px;min-height:0}nav button:before{width:22px!important;height:22px!important;flex-basis:22px!important}nav .logout{padding:9px 10px!important;margin-top:auto}nav .role-badge{padding:8px 8px!important;font-size:12px}}
@@ -254,15 +261,16 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <button style="order:1" class="active" onclick="showTab('dashboard',this)">Dashboard</button>
   <button style="order:2" onclick="showTab('recipe',this)">Recipe Master</button>
   <button style="order:3" onclick="showTab('costing',this)">Batch Costing</button>
-  <button style="order:4" onclick="showTab('price',this)">Price Master</button>
-  <button style="order:5" onclick="showTab('program',this)">Program Management</button>
-  <button style="order:6" onclick="showTab('customers',this)">Process House</button>
-  <button style="order:7" onclick="showTab('stock',this)">Stock Master</button>
-  <button style="order:8" onclick="showTab('contact',this)">Contact Us</button>
-  <button style="order:9" onclick="showTab('importExport',this)">Settings / Backup</button>
-  <button style="order:10" onclick="showTab('reports',this)">Reports</button>
-  <button style="order:11" onclick="showTab('history',this)">Activity Logs</button>
-  <button id="refreshCloudBtn" style="order:12" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
+  <button style="order:4" onclick="showTab('recipeCompare',this)">Recipe Compare</button>
+  <button style="order:5" onclick="showTab('price',this)">Price Master</button>
+  <button style="order:6" onclick="showTab('program',this)">Program Management</button>
+  <button style="order:7" onclick="showTab('customers',this)">Process House</button>
+  <button style="order:8" onclick="showTab('stock',this)">Stock Master</button>
+  <button style="order:9" onclick="showTab('contact',this)">Contact Us</button>
+  <button style="order:10" onclick="showTab('importExport',this)">Settings / Backup</button>
+  <button style="order:11" onclick="showTab('reports',this)">Reports</button>
+  <button style="order:12" onclick="showTab('history',this)">Activity Logs</button>
+  <button id="refreshCloudBtn" style="order:13" onclick="refreshCloudData(this)">Refresh Cloud Data</button>
   <input type="file" id="importFile" style="display:none" onchange="importData(event)">
 
 <input type="file"
@@ -475,6 +483,30 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 
   <div class="card" id="multiCostResult"></div>
+</section>
+
+<section id="recipeCompare">
+  <div class="card">
+    <h2>Recipe Compare</h2>
+    <p class="muted">Compare 2 to 4 recipes after converting all quantities to one common batch size.</p>
+    <div class="row">
+      <input id="compareThans" type="number" min="1" value="20" placeholder="Compare for how many Thans?">
+      <select id="compareCount" onchange="renderRecipeCompareSelectors()">
+        <option value="2">Compare 2 Recipes</option>
+        <option value="3">Compare 3 Recipes</option>
+        <option value="4">Compare 4 Recipes</option>
+      </select>
+    </div>
+    <div id="recipeCompareSelectors" class="compareGrid"></div>
+    <div class="compareControls">
+      <button class="btn green" onclick="calculateRecipeCompare()">Compare Recipes</button>
+      <button class="btn" onclick="printRecipeCompare()">Print / Export PDF</button>
+    </div>
+  </div>
+
+  <div class="card" id="recipeCompareResult">
+    <p class="muted">Select recipes above and click Compare Recipes.</p>
+  </div>
 </section>
 
 <section id="program">
@@ -1009,10 +1041,10 @@ function applyRolePermissions(){
     let id = el.id || "";
     let text = (el.textContent || "").trim();
     let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth" || id === "aiQuestionInput";
-    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || id === "multiCostSelectAll" || el.classList.contains("multiCostRecipeCheck") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost";
+    let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || id === "multiCostSelectAll" || id === "compareThans" || id === "compareCount" || el.classList.contains("multiCostRecipeCheck") || el.classList.contains("recipeCompareSelect") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost" || text === "Compare Recipes" || text === "Print / Export PDF";
     let isProgramView = text === "Export" || text === "Export PDF";
     let isAiAssistant = id === "smartAssistantButton" || id === "aiSendBtn" || text === "Send" || text === "Clear" || text === "Minimize";
-    let isNavigation = text === "Menu" || text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
+    let isNavigation = text === "Menu" || text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Recipe Compare" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isAiAssistant || isLogout || isLogin;
@@ -2379,6 +2411,259 @@ function calculateMultiRecipeCost(){
       </tbody>
     </table>
   `;
+}
+
+function renderRecipeCompareSelectors(){
+  const wrap = document.getElementById("recipeCompareSelectors");
+  if(!wrap) return;
+
+  let count = Number(document.getElementById("compareCount")?.value) || 2;
+  count = Math.min(4, Math.max(2, count));
+  const options = sortRecipes(recipes).map(recipe => {
+    let index = recipes.indexOf(recipe);
+    return `<option value="${index}">${recipe.recipeNo || ""} - ${recipe.colorName || ""}</option>`;
+  }).join("");
+
+  wrap.innerHTML = Array.from({length: count}, (_, index) => `
+    <div>
+      <label><b>Recipe ${index + 1}</b></label>
+      <select class="recipeCompareSelect">
+        <option value="">Select Recipe</option>
+        ${options}
+      </select>
+    </div>
+  `).join("");
+}
+
+function getComparedRecipeData(recipe, compareThans){
+  const recipeThans = Number(recipe.recipeThans);
+  if(!recipeThans || recipeThans <= 0){
+    throw new Error("Batch Thans missing for this recipe: " + (recipe.recipeNo || ""));
+  }
+
+  let polyester = [];
+  let cotton = [];
+  let totalPolyesterQty = 0;
+  let totalCottonQty = 0;
+  let polyesterCost = 0;
+  let cottonCost = 0;
+  let missingPrices = [];
+  let dyeMap = {};
+
+  (recipe.dyes || []).forEach(dye => {
+    const name = normalizeName(dye.name);
+    const finalQty = Number(dye.qty || 0) / recipeThans * compareThans;
+    const price = findColorByName(name);
+    const rate = price ? Number(price.rate) || 0 : 0;
+    const cost = finalQty / 1000 * rate;
+    const colorType = getDyeColorType(name);
+    const item = {name, qty: finalQty, cost, rate};
+
+    if(!price) missingPrices.push(name);
+    dyeMap[name] = (dyeMap[name] || 0) + finalQty;
+
+    if(colorType === "COTTON"){
+      cotton.push(item);
+      totalCottonQty += finalQty;
+      cottonCost += cost;
+    }else{
+      polyester.push(item);
+      totalPolyesterQty += finalQty;
+      polyesterCost += cost;
+    }
+  });
+
+  return {
+    recipe,
+    recipeNo: recipe.recipeNo || "",
+    colorName: recipe.colorName || "",
+    originalThans: recipeThans,
+    compareThans,
+    polyester,
+    cotton,
+    dyeMap,
+    missingPrices,
+    totalPolyesterQty,
+    totalCottonQty,
+    totalDyeQty: totalPolyesterQty + totalCottonQty,
+    polyesterCost,
+    cottonCost,
+    totalCost: polyesterCost + cottonCost
+  };
+}
+
+function renderCompareDyeList(items){
+  if(!items.length) return "<span class='muted'>None</span>";
+  return `<ul class="compareDyeList">${items.map(item => `<li>${item.name}: ${formatGrams(Math.round(item.qty))}</li>`).join("")}</ul>`;
+}
+
+function getCompareRowClass(value, minValue, maxValue){
+  if(value === minValue && minValue !== maxValue) return "compareLowest";
+  if(value === maxValue && minValue !== maxValue) return "compareHighest";
+  return "";
+}
+
+function calculateRecipeCompare(){
+  const result = document.getElementById("recipeCompareResult");
+  if(!result) return;
+
+  const compareThans = Number(document.getElementById("compareThans")?.value) || 0;
+  if(compareThans <= 0){
+    result.innerHTML = `<div class="warningBox dangerBox"><b>Error:</b> Compare for how many Thans must be greater than 0.</div>`;
+    return;
+  }
+
+  const selectedIndexes = Array.from(document.querySelectorAll(".recipeCompareSelect")).map(select => select.value).filter(value => value !== "");
+  const uniqueIndexes = Array.from(new Set(selectedIndexes));
+  if(uniqueIndexes.length < 2){
+    result.innerHTML = `<div class="warningBox dangerBox"><b>Error:</b> Select minimum 2 recipes for comparison.</div>`;
+    return;
+  }
+  if(uniqueIndexes.length > 4){
+    result.innerHTML = `<div class="warningBox dangerBox"><b>Error:</b> Maximum 4 recipes can be compared.</div>`;
+    return;
+  }
+  if(uniqueIndexes.length !== selectedIndexes.length){
+    result.innerHTML = `<div class="warningBox dangerBox"><b>Error:</b> Select different recipes. Same recipe cannot be compared with itself.</div>`;
+    return;
+  }
+
+  let compared = [];
+  try{
+    compared = sortRecipes(uniqueIndexes.map(index => recipes[Number(index)])).map(recipe => getComparedRecipeData(recipe, compareThans));
+  }catch(error){
+    result.innerHTML = `<div class="warningBox dangerBox"><b>Error:</b> ${error.message}</div>`;
+    return;
+  }
+
+  const missing = new Set();
+  compared.forEach(item => item.missingPrices.forEach(name => missing.add(name)));
+  if(missing.size){
+    result.innerHTML = `<div class="warningBox dangerBox"><b>Missing price error:</b> ${Array.from(missing).sort().join(", ")} not found in Price Master. Add prices first, then compare.</div>`;
+    return;
+  }
+
+  const costs = compared.map(item => item.totalCost);
+  const quantities = compared.map(item => item.totalDyeQty);
+  const minCost = Math.min(...costs);
+  const maxCost = Math.max(...costs);
+  const minQty = Math.min(...quantities);
+  const maxQty = Math.max(...quantities);
+  const lowestCost = compared.find(item => item.totalCost === minCost);
+  const highestCost = compared.find(item => item.totalCost === maxCost);
+  const highestQty = compared.find(item => item.totalDyeQty === maxQty);
+
+  const rows = [
+    ["Recipe No", item => item.recipeNo],
+    ["Color Name", item => item.colorName],
+    ["Original Batch Thans", item => item.originalThans + " thans"],
+    ["Compared Batch Thans", item => item.compareThans + " thans"],
+    ["Polyester Dye Names and Qty", item => renderCompareDyeList(item.polyester)],
+    ["Cotton Dye Names and Qty", item => renderCompareDyeList(item.cotton)],
+    ["Total Polyester Qty", item => formatGrams(Math.round(item.totalPolyesterQty))],
+    ["Total Cotton Qty", item => formatGrams(Math.round(item.totalCottonQty))],
+    ["Total Dye Qty", item => formatGrams(Math.round(item.totalDyeQty)), item => getCompareRowClass(item.totalDyeQty, minQty, maxQty)],
+    ["Polyester Cost", item => formatMoney(item.polyesterCost)],
+    ["Cotton Cost", item => formatMoney(item.cottonCost)],
+    ["Total Cost", item => formatMoney(item.totalCost), item => getCompareRowClass(item.totalCost, minCost, maxCost)]
+  ];
+
+  const allDyes = Array.from(new Set(compared.flatMap(item => Object.keys(item.dyeMap)))).sort();
+  const dyeDiffRows = allDyes.map(name => {
+    const values = compared.map(item => item.dyeMap[name] || 0);
+    const max = Math.max(...values);
+    const min = Math.min(...values);
+    return `
+      <tr>
+        <td><b>${name}</b></td>
+        ${compared.map((item, index) => {
+          const qty = values[index];
+          const label = max === min ? "Same" : qty === max ? "More/Extra" : qty === min ? "Less" : "Middle";
+          return `<td>${formatGrams(Math.round(qty))}<br><span class="muted">${label}</span></td>`;
+        }).join("")}
+      </tr>
+    `;
+  }).join("");
+
+  result.innerHTML = `
+    <h2>Recipe Compare Result</h2>
+    <p><b>Compared Batch:</b> ${compareThans} thans</p>
+    <div class="tableWrap">
+      <table class="compareResultTable">
+        <thead>
+          <tr><th>Item</th>${compared.map(item => `<th>${item.recipeNo} - ${item.colorName}</th>`).join("")}</tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <th>${row[0]}</th>
+              ${compared.map(item => `<td class="${row[2] ? row[2](item) : ""}">${row[1](item)}</td>`).join("")}
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Difference Summary</h3>
+    <table>
+      <tbody>
+        <tr><th>More total dye quantity</th><td>${highestQty.recipeNo} - ${highestQty.colorName} (${formatGrams(Math.round(highestQty.totalDyeQty))})</td></tr>
+        <tr><th>More expensive recipe</th><td>${highestCost.recipeNo} - ${highestCost.colorName} (${formatMoney(highestCost.totalCost)})</td></tr>
+        <tr><th>Lowest cost recipe</th><td>${lowestCost.recipeNo} - ${lowestCost.colorName} (${formatMoney(lowestCost.totalCost)})</td></tr>
+        <tr><th>Difference in cost</th><td>${formatMoney(maxCost - minCost)}</td></tr>
+        <tr><th>Difference in total dye quantity</th><td>${formatGrams(Math.round(maxQty - minQty))}</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Dye-wise Difference</h3>
+    <div class="tableWrap">
+      <table>
+        <thead>
+          <tr><th>Dye Name</th>${compared.map(item => `<th>${item.recipeNo} - ${item.colorName}</th>`).join("")}</tr>
+        </thead>
+        <tbody>${dyeDiffRows}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function printRecipeCompare(){
+  const result = document.getElementById("recipeCompareResult");
+  if(!result || !result.innerHTML.trim() || result.textContent.includes("Select recipes above")){
+    calculateRecipeCompare();
+  }
+
+  const refreshed = document.getElementById("recipeCompareResult");
+  if(!refreshed || refreshed.querySelector(".dangerBox")) return;
+
+  const win = window.open("", "_blank");
+  if(!win) return;
+  win.document.write(`
+    <html>
+      <head>
+        <title>Recipe Compare</title>
+        <style>
+          body{font-family:Arial;margin:18px;color:#111}
+          h1,h2,h3{margin:8px 0}
+          table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+          th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top}
+          th{background:#dbeafe}
+          .compareLowest{background:#dcfce7!important;color:#166534;font-weight:bold}
+          .compareHighest{background:#fee2e2!important;color:#991b1b;font-weight:bold}
+          .muted{color:#64748b;font-size:11px}
+          .compareDyeList{margin:0;padding-left:16px}
+          button{margin-bottom:12px;padding:8px 12px}
+          @media print{button{display:none}}
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print()">Print / Save PDF</button>
+        <h1>Recipe Compare</h1>
+        ${refreshed.innerHTML}
+      </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 function formatMoney(value){
@@ -4280,6 +4565,7 @@ function renderAll(){
   renderRecipes();
   renderRecipeSelect();
   renderMultiCostingSelect();
+  renderRecipeCompareSelectors();
   renderPrograms();
   renderAuditLogs();
   renderRecipeVersions();
