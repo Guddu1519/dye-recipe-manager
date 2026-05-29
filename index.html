@@ -1387,6 +1387,10 @@ async function saveRecipeRecord(recipe){
     }
 
     if(error){
+      if(isCloudTimeoutError(error)){
+        let savedAfterTimeout = await verifyRecipeUpdateAfterTimeout(recipe, payload);
+        if(savedAfterTimeout) return true;
+      }
       alert("Recipe update failed: " + error.message);
       return false;
     }
@@ -1406,6 +1410,38 @@ async function saveRecipeRecord(recipe){
   }
 
   return true;
+}
+
+function isCloudTimeoutError(error){
+  return String(error?.message || "").toLowerCase().includes("timed out");
+}
+
+function recipeRowMatchesPayload(row, payload){
+  if(!row || !payload) return false;
+  return String(row.recipe_no || "") === String(payload.recipe_no || "") &&
+    String(row.color_name || "") === String(payload.color_name || "") &&
+    (!Object.prototype.hasOwnProperty.call(row, "recipe_master_name") || String(row.recipe_master_name || "") === String(payload.recipe_master_name || "")) &&
+    String(row.than_count || "") === String(payload.than_count || "") &&
+    String(row.hex_code || "N/A") === String(payload.hex_code || "N/A") &&
+    JSON.stringify(row.dyes || []) === JSON.stringify(payload.dyes || []);
+}
+
+async function verifyRecipeUpdateAfterTimeout(recipe, payload){
+  if(!recipe?.id || !supabaseClient) return false;
+  let { data, error } = await withTimeout(
+    supabaseClient
+      .from("recipes")
+      .select("*")
+      .eq("id", recipe.id)
+      .single(),
+    15000,
+    "Recipe verification timed out after 15 seconds."
+  );
+  if(error){
+    console.warn("Recipe timeout verification failed", error);
+    return false;
+  }
+  return recipeRowMatchesPayload(data, payload);
 }
 
 function setRecipeSaveBusy(isBusy, actionType){
