@@ -415,7 +415,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div id="dyeLines"></div>
     <button class="btn" onclick="addDyeLine()">Add Dye</button>
     <button class="btn green" onclick="saveRecipe()">Save Recipe</button>
-    <button class="btn" onclick="document.getElementById('recipeImportFile').click()">Import Recipe</button>
+    <button class="btn" onclick="openRecipeImport()">Import Recipe</button>
     <input type="file" id="recipeImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importRecipeExcel(event)">
   </div>
 
@@ -1931,6 +1931,22 @@ function parseRecipeImportRows(rows){
   });
 
   return {recipesToImport: Array.from(grouped.values()), errors};
+}
+
+function openRecipeImport(){
+  if(!requireAdmin()) return;
+  if(typeof XLSX === "undefined"){
+    alert("Excel reader is still loading. Please refresh and try again.");
+    return;
+  }
+  let input = document.getElementById("recipeImportFile");
+  if(!input){
+    alert("Recipe import input not found. Please refresh the page.");
+    return;
+  }
+  input.disabled = false;
+  input.value = "";
+  input.click();
 }
 
 async function importRecipeExcel(event){
