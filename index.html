@@ -4141,7 +4141,7 @@ function renderDashboard(){
       let value = programs
         .filter(program => isDateInMonth(getProgramDateValue(program), key))
         .reduce((sum, program) => sum + getProgramThanDyedCount(program), 0);
-      return {label:key, value, display:value};
+      return {label:key, value, display:value + " Thans"};
     });
     programChart.innerHTML = renderBarRows(monthItems);
   }
