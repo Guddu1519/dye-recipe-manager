@@ -1324,11 +1324,14 @@ async function saveRecipeRecord(recipe){
       return true;
     }
 
-    const { error } = await supabaseClient.from("recipes").insert(payload);
+    const { data: insertedRows, error } = await supabaseClient.from("recipes").insert(payload).select("id");
 
     if(error){
       alert("Recipe insert failed: " + error.message);
       return false;
+    }
+    if(insertedRows && insertedRows[0]){
+      recipe.id = insertedRows[0].id;
     }
   }
 
@@ -1938,19 +1941,32 @@ async function importRecipeExcel(event){
       }
       if(!confirm(preview)) return;
 
+      let savedCount = 0;
       for(let recipe of recipesToImport){
         let existing = recipes.find(item => String(item.recipeNo) === String(recipe.recipeNo));
         let oldValue = existing ? {...existing} : null;
         if(existing) recipe.id = existing.id;
         let saved = await saveRecipeRecord(recipe);
-        if(!saved) return;
+        if(!saved){
+          alert("Recipe import stopped while saving Recipe No " + recipe.recipeNo + ".");
+          return;
+        }
         if(oldValue) await saveRecipeVersion(oldValue, "before import update");
         await saveRecipeVersion(recipe, oldValue ? "import update" : "import create");
         await logAudit(oldValue ? "import update" : "import create", "Recipe Master", recipe.recipeNo + " - " + recipe.colorName, oldValue, recipe);
+        if(existing){
+          Object.assign(existing, recipe);
+        } else {
+          recipes.push(recipe);
+        }
+        savedCount++;
       }
 
-      await loadDataFromJson();
-      alert("Recipe imported successfully");
+      sortRecipesInPlace();
+      renderAll();
+      let refreshed = await loadDataFromJson();
+      if(!refreshed) renderAll();
+      alert("Recipe imported successfully. Saved " + savedCount + " recipe(s).");
     }catch(err){
       alert("Recipe import failed: " + (err.message || err));
     }finally{
