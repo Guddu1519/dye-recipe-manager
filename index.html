@@ -805,6 +805,7 @@ let stockAlertState = {};
 
 let dataLoaded = false;
 
+const LOCAL_AUDIT_KEY = "mtm_audit_logs";
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 const LOW_STOCK_THRESHOLD_GRAMS = 5000;
 const ADMIN_EMAILS = new Set(["JAINGARVIT31@GMAIL.COM"]);
@@ -1367,15 +1368,44 @@ async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
     created_at: new Date().toISOString()
   };
 
+  saveLocalAuditLog(payload);
   const { error } = await supabaseClient.from("audit_logs").insert(payload);
   if(error){
     console.warn("Audit log skipped. Run the updated Supabase SQL for audit_logs.", error);
   }
 }
 
+function loadLocalAuditLogs(){
+  try{
+    return JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
+  }catch{
+    return [];
+  }
+}
+
+function saveLocalAuditLog(log){
+  try{
+    let logs = loadLocalAuditLogs();
+    logs.unshift({...log, local_id: log.local_id || Date.now() + "-" + Math.random().toString(16).slice(2)});
+    localStorage.setItem(LOCAL_AUDIT_KEY, JSON.stringify(logs.slice(0, 500)));
+  }catch(err){
+    console.warn("Local audit log skipped", err);
+  }
+}
+
+function mergeAuditLogs(cloudLogs, localLogs){
+  let seen = new Set();
+  return [...(cloudLogs || []), ...(localLogs || [])].filter(log => {
+    let key = [log.created_at, log.user_email, log.section_name, log.action_type, log.item_name].join("|");
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a,b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+}
+
 async function loadAuditLogsFromSupabase(){
   if(!supabaseClient || !isLoggedIn() || !isAdmin()){
-    auditLogs = [];
+    auditLogs = loadLocalAuditLogs();
     return;
   }
 
@@ -1387,11 +1417,11 @@ async function loadAuditLogsFromSupabase(){
 
   if(error){
     console.warn("Audit log load skipped", error);
-    auditLogs = [];
+    auditLogs = loadLocalAuditLogs();
     return;
   }
 
-  auditLogs = data || [];
+  auditLogs = mergeAuditLogs(data || [], loadLocalAuditLogs());
 }
 
 function confirmPriceUpdate(name, oldPrice, newPrice){
@@ -3783,8 +3813,9 @@ function renderAuditLogs(){
       log.section_name,
       log.action_type,
       log.item_name,
-      safeJson(log.old_value),
-      safeJson(log.new_value)
+      formatAuditValue(log.old_value),
+      formatAuditValue(log.new_value),
+      getAuditSentence(log)
     ].join(" ").toUpperCase();
     return text.includes(q);
   }).map(log => `
@@ -3792,14 +3823,54 @@ function renderAuditLogs(){
       <td>${log.created_at ? new Date(log.created_at).toLocaleString() : ""}</td>
       <td>${log.user_email || ""}</td>
       <td>${log.section_name || ""}</td>
-      <td>${log.action_type || ""}</td>
+      <td>${getAuditSentence(log)}</td>
       <td>${log.item_name || ""}</td>
-      <td class="muted">${safeJson(log.old_value)}</td>
-      <td class="muted">${safeJson(log.new_value)}</td>
+      <td class="muted">${formatAuditValue(log.old_value)}</td>
+      <td class="muted">${formatAuditValue(log.new_value)}</td>
     </tr>
   `).join("");
 
   table.innerHTML = rows || `<tr><td colspan="7">No history found.</td></tr>`;
+}
+
+function formatAuditValue(value){
+  if(!value) return "";
+  if(typeof value === "string") return value;
+  if(value.recipeNo || value.colorName || value.recipeThans || value.dyes){
+    let dyeText = (value.dyes || []).map(d => (d.name || "") + " " + (d.qty || "") + "g").join(", ");
+    return [
+      value.recipeNo ? "Recipe No: " + value.recipeNo : "",
+      value.colorName ? "Color: " + value.colorName : "",
+      value.recipeThans ? "Thans: " + value.recipeThans : "",
+      dyeText ? "Dyes: " + dyeText : ""
+    ].filter(Boolean).join(" | ");
+  }
+  if(value.name || value.rate || value.colorType){
+    return [
+      value.name ? "Name: " + value.name : "",
+      value.colorType ? "Type: " + value.colorType : "",
+      value.rate ? "Rate: " + value.rate : ""
+    ].filter(Boolean).join(" | ");
+  }
+  try{
+    return JSON.stringify(value);
+  }catch{
+    return "";
+  }
+}
+
+function getAuditSentence(log){
+  let action = String(log.action_type || "").toLowerCase();
+  let item = log.item_name || "";
+  let user = log.user_email || "admin";
+  if((log.section_name || "") === "Recipe Master"){
+    if(action.includes("import") && action.includes("create")) return "Recipe imported by " + user;
+    if(action.includes("import") && action.includes("update")) return "Recipe updated from import by " + user;
+    if(action === "create") return "Recipe added manually by " + user;
+    if(action === "update") return "Recipe edited by " + user;
+    if(action === "delete") return "Recipe deleted by " + user;
+  }
+  return (log.action_type || "Action") + (item ? " - " + item : "");
 }
 
 function downloadExcel(filename, rows, sheetName){
