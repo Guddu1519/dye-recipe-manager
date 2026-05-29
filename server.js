@@ -18,6 +18,7 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const assistantUsage = new Map();
 const ASSISTANT_LIMIT_PER_HOUR = Number(process.env.AI_ASSISTANT_LIMIT_PER_HOUR || 20);
+const ASSISTANT_FETCH_TIMEOUT_MS = Number(process.env.AI_ASSISTANT_FETCH_TIMEOUT_MS || 45000);
 
 app.use(express.static(__dirname));
 app.get("/", (req, res) => {
@@ -127,17 +128,35 @@ async function verifySupabaseUser(token){
 async function supabaseRead(table, select){
   if(!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase server environment variables are missing.");
   const url = `${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(select)}`;
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: {
       apikey: SUPABASE_SERVICE_ROLE_KEY,
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
     }
-  });
+  }, ASSISTANT_FETCH_TIMEOUT_MS, `Supabase read timed out for ${table}.`);
   if(!response.ok){
     const text = await response.text();
     throw new Error(`Could not read ${table}: ${text}`);
   }
   return response.json();
+}
+
+async function fetchWithTimeout(url, options, ms, timeoutMessage){
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try{
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+  }catch(error){
+    if(error.name === "AbortError"){
+      throw new Error(timeoutMessage || "Request timed out.");
+    }
+    throw error;
+  }finally{
+    clearTimeout(timer);
+  }
 }
 
 function isSchemaReadError(error){
@@ -229,7 +248,7 @@ async function handleAiAssistant(req, res){
     if(question.length > 500) return res.status(400).json({error:"Question is too long. Keep it below 500 characters."});
 
     const dataContext = await loadAssistantContext();
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -253,7 +272,7 @@ async function handleAiAssistant(req, res){
           }
         ]
       })
-    });
+    }, ASSISTANT_FETCH_TIMEOUT_MS, "OpenAI request timed out. Please try a shorter question or try again.");
 
     const result = await response.json();
     if(!response.ok){

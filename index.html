@@ -1422,6 +1422,7 @@ async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
 }
 
 function loadLocalAuditLogs(){
+  let aiTimeout = null;
   try{
     return JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
   }catch{
@@ -3732,17 +3733,22 @@ async function sendAiAssistantMessage(){
   try{
     let sessionResult = supabaseClient ? await supabaseClient.auth.getSession() : null;
     let token = sessionResult?.data?.session?.access_token || "";
+    const controller = new AbortController();
+    aiTimeout = setTimeout(() => controller.abort(), 60000);
     let response = await fetch("/api/ai-assistant", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": token ? "Bearer " + token : ""
       },
+      signal: controller.signal,
       body: JSON.stringify({
         question,
         history: getAiChatHistory()
       })
     });
+    clearTimeout(aiTimeout);
+    aiTimeout = null;
     let result = await response.json();
     if(!response.ok) throw new Error(result.error || "AI Assistant failed.");
     loading.textContent = result.answer || "No answer received.";
@@ -3750,8 +3756,9 @@ async function sendAiAssistantMessage(){
       loading.textContent += "\n\nRemaining AI questions this hour: " + result.remaining;
     }
   }catch(error){
-    loading.textContent = "AI Assistant error: " + (error.message || error);
+    loading.textContent = "AI Assistant error: " + (error.name === "AbortError" ? "Request timed out. Please try again with a shorter question." : (error.message || error));
   }finally{
+    if(aiTimeout) clearTimeout(aiTimeout);
     if(button){
       button.disabled = false;
       button.textContent = "Send";
