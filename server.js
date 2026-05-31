@@ -16,6 +16,8 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
 const AI_PROVIDER = (process.env.AI_PROVIDER || "ollama").toLowerCase();
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
@@ -313,7 +315,67 @@ async function askOpenAI(prompt){
   return extractResponseText(result) || "";
 }
 
+function extractGeminiText(responseJson){
+  const parts = [];
+  (responseJson.candidates || []).forEach(candidate => {
+    ((candidate.content || {}).parts || []).forEach(part => {
+      if(part.text) parts.push(part.text);
+    });
+  });
+  return parts.join("\n").trim();
+}
+
+async function askGemini(prompt){
+  if(!GEMINI_API_KEY){
+    throw new Error("GEMINI_API_KEY is missing on the server.");
+  }
+
+  const model = encodeURIComponent(GEMINI_MODEL);
+  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [
+          {
+            text: buildAssistantInstructions()
+          }
+        ]
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 900
+      }
+    })
+  }, ASSISTANT_FETCH_TIMEOUT_MS, "Gemini request timed out. Please try a shorter question or try again.");
+
+  const result = await response.json();
+  if(!response.ok){
+    const message = result.error?.message || "Gemini request failed.";
+    if(/quota|billing|limit/i.test(message)){
+      throw new Error("Gemini quota/free limit is reached. Please try again later or enable billing.");
+    }
+    throw new Error(message);
+  }
+  return extractGeminiText(result) || "";
+}
+
 async function askAiProvider(prompt){
+  if(AI_PROVIDER === "gemini"){
+    return {answer: await askGemini(prompt), provider: "gemini"};
+  }
   if(AI_PROVIDER === "openai"){
     return {answer: await askOpenAI(prompt), provider: "openai"};
   }
