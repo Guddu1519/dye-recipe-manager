@@ -222,8 +222,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .workflowStep span{display:block;color:#2563eb;font-size:12px;text-transform:uppercase;margin-bottom:4px}
     .smartAssistantButton{display:none;position:fixed;right:22px;bottom:22px;width:64px;height:64px;border-radius:999px;border:0;background:linear-gradient(135deg,#2563eb,#0f172a);color:white;font-size:20px;font-weight:800;box-shadow:0 18px 46px #0f172a55;z-index:9998}
     body.appReady .smartAssistantButton{display:block}
+    body.aiDisabled .smartAssistantButton{display:none!important}
     .smartAssistantWindow{display:none;position:fixed;right:22px;bottom:96px;width:390px;max-width:calc(100vw - 28px);height:560px;max-height:calc(100vh - 120px);background:white;border:1px solid #dbeafe;border-radius:16px;box-shadow:0 24px 70px #0f172a55;z-index:9999;overflow:hidden}
     body.appReady .smartAssistantWindow.open{display:flex;flex-direction:column}
+    body.aiDisabled .smartAssistantWindow{display:none!important}
     .smartAssistantHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#0f172a;color:white;padding:12px 14px;font-weight:bold}
     .smartAssistantHeader button{background:#1e293b;color:white;border:0;border-radius:8px;padding:7px 10px;cursor:pointer}
     .footerLine{margin-left:0;background:transparent;border:0}
@@ -852,6 +854,7 @@ let priceChangeLogs = [];
 let stockPurchases = [];
 let stockLedger = [];
 let programStockUsage = [];
+let aiEnabled = true;
 let editColorIndex = null;
 let editRecipeIndex = null;
 let editProgramIndex = null;
@@ -902,33 +905,23 @@ function getDefaultColorType(name){
 }
 
 function loadLocalColorTypes(){
-  try{
-    localColorTypes = JSON.parse(localStorage.getItem("dyeColorTypes") || "{}");
-  }catch{
-    localColorTypes = {};
-  }
+  localColorTypes = {};
 }
 
 function saveLocalColorType(name, type){
-  if(!name || !type) return;
-  localColorTypes[normalizeName(name)] = type;
-  localStorage.setItem("dyeColorTypes", JSON.stringify(localColorTypes));
+  return;
 }
 
 function getColorType(name, dbType=""){
-  return dbType || localColorTypes[normalizeName(name)] || getDefaultColorType(name);
+  return dbType || getDefaultColorType(name);
 }
 
 function loadLocalProcessHouses(){
-  try{
-    return JSON.parse(localStorage.getItem("processHousesLocal") || "[]");
-  }catch{
-    return [];
-  }
+  return [];
 }
 
 function saveLocalProcessHouses(){
-  localStorage.setItem("processHousesLocal", JSON.stringify(processHouses));
+  return;
 }
 
 function loadStockNotificationState(){
@@ -944,6 +937,17 @@ function loadStockNotificationState(){
 function saveStockNotificationState(){
   localStorage.setItem("stockNotifications", JSON.stringify(stockNotifications));
   localStorage.setItem("stockAlertState", JSON.stringify(stockAlertState));
+}
+
+function clearLegacyLocalDataCaches(){
+  try{
+    localStorage.removeItem("dyeColorTypes");
+    localStorage.removeItem("processHousesLocal");
+    localStorage.removeItem(PROGRAM_EDIT_OVERRIDES_KEY);
+    localStorage.removeItem(LOCAL_AUDIT_KEY);
+  }catch(error){
+    console.warn("Legacy local cache clear skipped", error);
+  }
 }
 
 function normalizeName(name){
@@ -1029,6 +1033,45 @@ function requireAdmin(){
   }
   alert("Viewers can only search, view recipes, and calculate costing.");
   return false;
+}
+
+function applyAiVisibility(){
+  document.body.classList.toggle("aiDisabled", !aiEnabled);
+  if(!aiEnabled){
+    toggleSmartAssistant(false);
+  }
+}
+
+function settingValueIsTrue(value){
+  return ["true", "1", "yes", "on", "enabled"].includes(String(value || "").trim().toLowerCase());
+}
+
+async function loadAppSettings(){
+  aiEnabled = true;
+  if(!supabaseClient || !isLoggedIn()){
+    applyAiVisibility();
+    return;
+  }
+
+  try{
+    let { data, error } = await supabaseClient
+      .from("app_settings")
+      .select("value")
+      .eq("key", "ai_enabled")
+      .maybeSingle();
+
+    if(error){
+      console.warn("App settings load skipped. Run app_settings SQL to control AI visibility.", error);
+      aiEnabled = true;
+    }else if(data){
+      aiEnabled = settingValueIsTrue(data.value);
+    }
+  }catch(error){
+    console.warn("App settings load failed. AI remains visible by default.", error);
+    aiEnabled = true;
+  }
+
+  applyAiVisibility();
 }
 
 async function loadUserRole(){
@@ -1203,11 +1246,13 @@ async function logoutUser(auto=false){
 
 async function showDashboard(){
   await loadUserRole();
+  clearLegacyLocalDataCaches();
   loadLocalColorTypes();
   loadStockNotificationState();
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("appShell").style.display = "block";
   document.body.classList.add("appReady");
+  await loadAppSettings();
 
   if(document.querySelectorAll(".dyeRow").length === 0){
     ensureDefaultDyeLines();
@@ -1498,22 +1543,11 @@ async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
 }
 
 function loadLocalAuditLogs(){
-  let aiTimeout = null;
-  try{
-    return JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
-  }catch{
-    return [];
-  }
+  return [];
 }
 
 function saveLocalAuditLog(log){
-  try{
-    let logs = loadLocalAuditLogs();
-    logs.unshift({...log, local_id: log.local_id || Date.now() + "-" + Math.random().toString(16).slice(2)});
-    localStorage.setItem(LOCAL_AUDIT_KEY, JSON.stringify(logs.slice(0, 500)));
-  }catch(err){
-    console.warn("Local audit log skipped", err);
-  }
+  return;
 }
 
 function mergeAuditLogs(cloudLogs, localLogs){
@@ -1528,7 +1562,7 @@ function mergeAuditLogs(cloudLogs, localLogs){
 
 async function loadAuditLogsFromSupabase(){
   if(!supabaseClient || !isLoggedIn() || !isAdmin()){
-    auditLogs = loadLocalAuditLogs();
+    auditLogs = [];
     return;
   }
 
@@ -1544,11 +1578,11 @@ async function loadAuditLogsFromSupabase(){
 
   if(error){
     console.warn("Audit log load skipped", error);
-    auditLogs = loadLocalAuditLogs();
+    auditLogs = [];
     return;
   }
 
-  auditLogs = mergeAuditLogs(data || [], loadLocalAuditLogs());
+  auditLogs = data || [];
 }
 
 function confirmPriceUpdate(name, oldPrice, newPrice){
@@ -1692,12 +1726,11 @@ async function loadProcessHousesFromSupabase(){
   if(error){
     console.warn("Process house load skipped", error);
     processHouseLocalOnly = true;
-    processHouses = loadLocalProcessHouses();
+    processHouses = [];
     return;
   }
   processHouseLocalOnly = false;
-  let localHouses = loadLocalProcessHouses();
-  processHouses = data && data.length ? data : localHouses;
+  processHouses = data || [];
 }
 
 function showTab(id,btn){
@@ -3057,22 +3090,11 @@ function parseProgramNumbers(){
 }
 
 function loadProgramEditOverrides(){
-  try{
-    return JSON.parse(localStorage.getItem(PROGRAM_EDIT_OVERRIDES_KEY) || "{}");
-  }catch(err){
-    return {};
-  }
+  return {};
 }
 
 function saveProgramEditOverride(program, recipeNumbers){
-  let key = String(program?.id || program?.programNo || "");
-  let programNoKey = String(program?.programNo || "");
-  if(!key && !programNoKey) return;
-  let overrides = loadProgramEditOverrides();
-  let value = Array.from(new Set((recipeNumbers || []).map(no => String(no || "").trim()).filter(Boolean)));
-  if(key) overrides[key] = value;
-  if(programNoKey) overrides["programNo:" + programNoKey] = value;
-  localStorage.setItem(PROGRAM_EDIT_OVERRIDES_KEY, JSON.stringify(overrides));
+  return;
 }
 
 function getProgramEditOverride(program){
@@ -3361,10 +3383,7 @@ async function createProgram(){
     selectedRecipeNumbers: snapshot.map(r => r.recipeNo)
   });
   clearProgramForm();
-  await loadProgramsFromSupabase();
-  await loadAuditLogsFromSupabase();
-  renderPrograms();
-  renderAuditLogs();
+  await loadDataFromJson();
   showSuccessToast("Program successfully created" + (stockDeducted ? " and stock deducted" : ""));
   }finally{
     setProgramProceedBusy(false);
@@ -3385,6 +3404,7 @@ async function loadProgramsFromSupabase(){
 
   if(error){
     console.warn("Program load skipped", error);
+    programs = [];
     return;
   }
 
@@ -3404,10 +3424,6 @@ async function loadProgramsFromSupabase(){
       selectedRecipeNumbers,
       recipeSnapshot
     };
-    let overrideNumbers = getProgramEditOverride(program);
-    if(overrideNumbers){
-      program.selectedRecipeNumbers = overrideNumbers;
-    }
     program.requiredThans = getProgramRequiredThans(program);
     program.recipeSnapshot = resolveProgramRecipes(program);
     return program;
@@ -3736,10 +3752,7 @@ async function updateProgramRecipes(index, details){
   saveProgramEditOverride(updatedProgram, selectedRecipeNumbers);
   programs[index] = {...updatedProgram, stockDeducted:true};
   clearProgramForm();
-  await loadProgramsFromSupabase();
-  await loadAuditLogsFromSupabase();
-  renderPrograms();
-  renderAuditLogs();
+  await loadDataFromJson();
   showSuccessToast("Program updated and stock recalculated");
 }
 
@@ -4041,10 +4054,7 @@ async function deleteProgram(index){
   }
 
   await logAudit("delete", "Program", program.programNo + " - " + program.programName, program, null);
-  await loadProgramsFromSupabase();
-  await loadAuditLogsFromSupabase();
-  renderPrograms();
-  renderAuditLogs();
+  await loadDataFromJson();
 }
 
 function gramsFromQty(qty, unit){
@@ -4176,6 +4186,9 @@ function clearStockNotifications(){
 }
 
 function toggleSmartAssistant(forceOpen){
+  if(!aiEnabled){
+    forceOpen = false;
+  }
   if(!isLoggedIn()){
     forceOpen = false;
   }
@@ -4215,6 +4228,7 @@ function clearAiAssistantChat(){
 
 async function sendAiAssistantMessage(){
   if(!requireLogin()) return;
+  if(!aiEnabled) return;
   let input = document.getElementById("aiQuestionInput");
   let button = document.getElementById("aiSendBtn");
   let question = (input?.value || "").trim();
@@ -4468,6 +4482,9 @@ async function loadStockFromSupabase(){
   if(purchaseResult.error || ledgerResult.error || usageResult.error){
     console.warn("Stock load skipped. Run updated Supabase SQL.", purchaseResult.error || ledgerResult.error || usageResult.error);
     stockLocalOnly = true;
+    stockPurchases = [];
+    stockLedger = [];
+    programStockUsage = [];
     return;
   }
 
@@ -5026,14 +5043,7 @@ async function saveProcessHouse(){
   }
 
   let existing = processHouses.find(h => normalizeName(h.name) === normalizeName(payload.name));
-  let localRecord = existing || {id: "local-" + Date.now()};
-  Object.assign(localRecord, payload);
-  if(!existing) processHouses.push(localRecord);
-  processHouses.sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
-  saveLocalProcessHouses();
-  renderProcessHouses();
-  ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
-  showProcessHouseStatus("Saved on website. Trying cloud save...", false);
+  showProcessHouseStatus("Saving to cloud...", false);
 
   let error;
   let savedRows = null;
@@ -5059,13 +5069,13 @@ async function saveProcessHouse(){
   }
   if(error){
     processHouseLocalOnly = true;
-    showProcessHouseStatus("Saved on website only. Cloud save failed: " + error.message, true);
+    showProcessHouseStatus("Cloud save failed: " + error.message, true);
     return;
   }
   processHouseLocalOnly = false;
+  ["houseName","housePhone","houseGst","houseRate","houseAddress"].forEach(id => document.getElementById(id).value = "");
   if(savedRows && savedRows[0]){
-    Object.assign(localRecord, savedRows[0]);
-    saveLocalProcessHouses();
+    await loadProcessHousesFromSupabase();
     renderProcessHouses();
   }
   await logAudit(existing ? "update" : "create", "Process House", payload.name, existing || null, payload);
@@ -5296,6 +5306,8 @@ async function loadDataFromJson(){
     if(colorError){
       alert("Color load error: " + explainSupabaseError(colorError, ""));
       console.error(colorError);
+      colors = [];
+      renderAll();
       return false;
     }
 console.log("SUPABASE COLORS:", colorData);
@@ -5312,6 +5324,9 @@ console.log("SUPABASE COLORS:", colorData);
     if(recipeError){
       alert("Recipe load error: " + explainSupabaseError(recipeError, ""));
       console.error(recipeError);
+      recipes = [];
+      programs = [];
+      renderAll();
       return false;
     }
 console.log("SUPABASE RECIPES:", recipeData);
@@ -5340,6 +5355,13 @@ console.log("SUPABASE RECIPES:", recipeData);
   }catch(error){
     alert("Cloud refresh failed: " + explainSupabaseError(error, ""));
     console.error(error);
+    colors = [];
+    recipes = [];
+    programs = [];
+    stockPurchases = [];
+    stockLedger = [];
+    programStockUsage = [];
+    renderAll();
     return false;
   }
 }
