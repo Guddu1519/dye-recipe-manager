@@ -7,7 +7,17 @@ const app = express();
 app.use(express.json());
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, message: "API working" });
+  res.json({
+    ok: true,
+    message: "API working",
+    ai: {
+      version: "gemini-preferred-2026-05-31",
+      provider: AI_PROVIDER || (GEMINI_API_KEY ? "gemini" : (OPENAI_API_KEY ? "openai" : "ollama")),
+      geminiConfigured: Boolean(GEMINI_API_KEY),
+      openaiConfigured: Boolean(OPENAI_API_KEY),
+      ollamaModel: OLLAMA_MODEL
+    }
+  });
 });
 
 const DATA_FILE = path.join(__dirname, "data.json");
@@ -17,7 +27,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const AI_PROVIDER = (process.env.AI_PROVIDER || "").trim().toLowerCase();
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
@@ -282,7 +292,7 @@ async function askOllama(prompt){
 
 async function askOpenAI(prompt){
   if(!OPENAI_API_KEY){
-    throw new Error("OPENAI_API_KEY is missing on the server.");
+    throw new Error("AI is set to OpenAI, but OPENAI_API_KEY is missing. For Gemini, set GEMINI_API_KEY in Render and deploy latest commit.");
   }
 
   const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
@@ -330,46 +340,63 @@ async function askGemini(prompt){
     throw new Error("GEMINI_API_KEY is missing on the server.");
   }
 
-  const model = encodeURIComponent(GEMINI_MODEL);
-  const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [
-          {
-            text: buildAssistantInstructions()
-          }
-        ]
+  const requestedModels = [
+    GEMINI_MODEL,
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite"
+  ].filter((model, index, all) => model && all.indexOf(model) === index);
+  let lastError = null;
+
+  for(const requestedModel of requestedModels){
+    const model = encodeURIComponent(requestedModel);
+    const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
       },
-      contents: [
-        {
-          role: "user",
+      body: JSON.stringify({
+        systemInstruction: {
           parts: [
             {
-              text: prompt
+              text: buildAssistantInstructions()
             }
           ]
+        },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: prompt
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 900
         }
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 900
-      }
-    })
-  }, ASSISTANT_FETCH_TIMEOUT_MS, "Gemini request timed out. Please try a shorter question or try again.");
+      })
+    }, ASSISTANT_FETCH_TIMEOUT_MS, "Gemini request timed out. Please try a shorter question or try again.");
 
-  const result = await response.json();
-  if(!response.ok){
+    const result = await response.json();
+    if(response.ok){
+      return extractGeminiText(result) || "";
+    }
+
     const message = result.error?.message || "Gemini request failed.";
+    lastError = new Error(message);
     if(/quota|billing|limit/i.test(message)){
       throw new Error("Gemini quota/free limit is reached. Please try again later or enable billing.");
     }
-    throw new Error(message);
+    if(!/not found|not supported|404/i.test(message)){
+      throw lastError;
+    }
+    console.warn(`Gemini model unavailable (${requestedModel}): ${message}`);
   }
-  return extractGeminiText(result) || "";
+
+  throw lastError || new Error("No supported Gemini model found.");
 }
 
 async function askAiProvider(prompt){
@@ -379,6 +406,9 @@ async function askAiProvider(prompt){
     return {answer: await askGemini(prompt), provider: "gemini"};
   }
   if(provider === "openai"){
+    if(!OPENAI_API_KEY && !GEMINI_API_KEY){
+      throw new Error("Gemini key is not loaded on Render. Add environment variable GEMINI_API_KEY, save, then Manual Deploy latest commit.");
+    }
     return {answer: await askOpenAI(prompt), provider: "openai"};
   }
 
