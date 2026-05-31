@@ -158,14 +158,16 @@ async function ensureAuthTables() {
   `);
 }
 
-app.get("/api/health", async (req, res) => {
+async function healthHandler(req, res) {
   const neon = Boolean(pool);
   res.json({
     ok: true,
     message: "API working",
     database: neon ? "neon" : "not configured"
   });
-});
+}
+
+app.get("/api/health", healthHandler);
 
 app.get("/api/setup/check", async (req, res) => {
   if (!requireDatabase(res)) return;
@@ -185,7 +187,7 @@ app.get("/api/setup/check", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+async function loginHandler(req, res) {
   if (!requireDatabase(res)) return;
   const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
@@ -223,11 +225,15 @@ app.post("/api/auth/login", async (req, res) => {
     console.error("Neon login failed", error);
     jsonError(res, 500, error.message);
   }
-});
+}
 
-app.post("/api/auth/logout", (req, res) => {
+app.post("/api/auth/login", loginHandler);
+
+function logoutHandler(req, res) {
   res.json({ ok: true });
-});
+}
+
+app.post("/api/auth/logout", logoutHandler);
 
 app.post("/api/db/:table/select", async (req, res) => {
   if (!requireDatabase(res)) return;
@@ -336,6 +342,24 @@ app.use("/api", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
+async function setupCheckHandler(req, res) {
+  if (!requireDatabase(res)) return;
+  try {
+    await pool.query("select 1");
+    const tables = await pool.query(
+      "select table_name from information_schema.tables where table_schema='public' order by table_name"
+    );
+    res.json({
+      ok: true,
+      database: "neon",
+      tables: tables.rows.map(row => row.table_name)
+    });
+  } catch (error) {
+    console.error("Neon setup check failed", error);
+    jsonError(res, 500, error.message);
+  }
+}
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log("Server running on port " + PORT);
@@ -343,3 +367,7 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.healthHandler = healthHandler;
+module.exports.loginHandler = loginHandler;
+module.exports.logoutHandler = logoutHandler;
+module.exports.setupCheckHandler = setupCheckHandler;
