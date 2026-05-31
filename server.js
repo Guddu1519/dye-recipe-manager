@@ -27,13 +27,13 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const AI_PROVIDER = (process.env.AI_PROVIDER || "").trim().toLowerCase();
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
 const assistantUsage = new Map();
 const ASSISTANT_LIMIT_PER_HOUR = Number(process.env.AI_ASSISTANT_LIMIT_PER_HOUR || 20);
-const ASSISTANT_FETCH_TIMEOUT_MS = Number(process.env.AI_ASSISTANT_FETCH_TIMEOUT_MS || 20000);
+const ASSISTANT_FETCH_TIMEOUT_MS = Number(process.env.AI_ASSISTANT_FETCH_TIMEOUT_MS || 12000);
 
 app.use(express.static(__dirname));
 app.get("/", (req, res) => {
@@ -225,12 +225,12 @@ async function loadAssistantContext(){
       ledger: ledger.length,
       programUsage: usage.length
     },
-    colors: compactRows(colors, 150),
-    recipes: compactRows(recipes, 120),
-    programs: compactRows(programs, 120),
-    stockPurchases: compactRows(purchases, 120),
-    stockLedger: compactRows(ledger, 180),
-    programStockUsage: compactRows(usage, 180)
+    colors: compactRows(colors, 80),
+    recipes: compactRows(recipes, 80),
+    programs: compactRows(programs, 80),
+    stockPurchases: compactRows(purchases, 80),
+    stockLedger: compactRows(ledger, 100),
+    programStockUsage: compactRows(usage, 100)
   };
 }
 
@@ -342,8 +342,8 @@ async function askGemini(prompt){
 
   const requestedModels = [
     GEMINI_MODEL,
-    "gemini-2.5-flash",
     "gemini-2.0-flash",
+    "gemini-2.5-flash",
     "gemini-2.5-flash-lite"
   ].filter((model, index, all) => model && all.indexOf(model) === index);
   let lastError = null;

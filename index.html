@@ -4235,7 +4235,7 @@ async function sendAiAssistantMessage(){
     let sessionResult = supabaseClient ? await supabaseClient.auth.getSession() : null;
     let token = sessionResult?.data?.session?.access_token || "";
     const controller = new AbortController();
-    aiTimeout = setTimeout(() => controller.abort(), 25000);
+    aiTimeout = setTimeout(() => controller.abort(), 15000);
     let response = await fetch("/api/ai-assistant", {
       method: "POST",
       headers: {
