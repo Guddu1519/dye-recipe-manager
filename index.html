@@ -1104,6 +1104,28 @@ function setupLoginEnterKey(){
   });
 }
 
+function setupGlobalSaveShortcut(){
+  window.addEventListener("keydown", function(event){
+    if(event.key !== "F10") return;
+    if(!isLoggedIn() || !isAdmin()) return;
+    event.preventDefault();
+
+    let activeSection = document.querySelector("section.active");
+    let activeId = activeSection ? activeSection.id : "";
+    if(activeId === "price"){
+      saveColor();
+    }else if(activeId === "recipe"){
+      saveRecipe();
+    }else if(activeId === "program"){
+      createProgram();
+    }else if(activeId === "stock"){
+      saveStockPurchase();
+    }else if(activeId === "processHouse"){
+      saveProcessHouse();
+    }
+  });
+}
+
 async function loginUser(){
   if(!supabaseClient){
     showLoginError("Supabase is not connected. Please check your internet connection.");
@@ -5374,6 +5396,7 @@ if(window.supabase){
 }
 window.addEventListener("load", function(){
 setupLoginEnterKey();
+setupGlobalSaveShortcut();
 initAuth();
 });
 </script>
