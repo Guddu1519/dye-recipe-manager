@@ -4250,7 +4250,13 @@ async function sendAiAssistantMessage(){
     });
     clearTimeout(aiTimeout);
     aiTimeout = null;
-    let result = await response.json();
+    let responseText = await response.text();
+    let result = {};
+    try{
+      result = responseText ? JSON.parse(responseText) : {};
+    }catch(parseError){
+      throw new Error("AI server returned HTML instead of JSON. Render may still be deploying. Wait 1 minute, refresh, and try again.");
+    }
     if(!response.ok) throw new Error(result.error || "AI Assistant failed.");
     loading.textContent = result.answer || "No answer received.";
   }catch(error){

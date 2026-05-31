@@ -584,6 +584,11 @@ async function handleAiAssistant(req, res){
 
 app.post("/api/ai-assistant", handleAiAssistant);
 app.post("/api/chat-assistant", handleAiAssistant);
+app.use("/api", (req, res) => {
+  res.status(404).json({
+    error: "API route not found. Please deploy the latest server commit on Render."
+  });
+});
 
 const PORT = process.env.PORT || 3000;
 
