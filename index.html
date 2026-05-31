@@ -2020,6 +2020,9 @@ function setActiveSuggestion(input, index){
   let safeIndex = ((index % items.length) + items.length) % items.length;
   input.dataset.suggestionIndex = String(safeIndex);
   items[safeIndex].classList.add("active");
+  if(items[safeIndex].dataset.name){
+    input.value = items[safeIndex].dataset.name;
+  }
   items[safeIndex].scrollIntoView({block:"nearest"});
 }
 
