@@ -3036,6 +3036,39 @@ function makeProgramStoredRecipe(recipe, requiredThans=""){
   };
 }
 
+async function findSavedProgramRow(programNo, createdAt){
+  if(!supabaseClient || !programNo) return null;
+  let { data, error } = await withTimeout(
+    supabaseClient
+      .from("programs")
+      .select("*")
+      .eq("program_no", programNo)
+      .order("created_at", {ascending:false})
+      .limit(5),
+    CLOUD_LOAD_TIMEOUT_MS,
+    "Program verification timed out after 30 seconds."
+  );
+  if(error){
+    console.warn("Program save verification failed", error);
+    return null;
+  }
+  let rows = data || [];
+  return rows.find(row => String(row.created_at || "") === String(createdAt || "")) || rows[0] || null;
+}
+
+async function reloadProgramPageData(){
+  await Promise.all([
+    loadProgramsFromSupabase(),
+    loadStockFromSupabase(),
+    loadAuditLogsFromSupabase()
+  ]);
+  renderPrograms();
+  renderDashboard();
+  renderStock();
+  renderAuditLogs();
+  applyRolePermissions();
+}
+
 function resolveProgramRecipes(program){
   let snapshot = normalizeProgramRecipeSnapshot(program?.recipeSnapshot || program?.recipe_snapshot || []);
   let selectedNumbers = getProgramEditOverride(program) || parseProgramList(program?.selectedRecipeNumbers || program?.selected_recipe_numbers || program?.recipeNumbers || program?.recipe_numbers);
@@ -3289,20 +3322,42 @@ async function createProgram(){
   }
 
   if(error){
-    alert("Program save failed: " + error.message);
-    return;
+    let savedAfterTimeout = String(error.message || "").toLowerCase().includes("timed out")
+      ? await findSavedProgramRow(programNo, createdAt)
+      : null;
+    if(savedAfterTimeout){
+      insertedRows = [savedAfterTimeout];
+      error = null;
+      console.warn("Program save timed out, but saved row was found.", savedAfterTimeout);
+    }else{
+      alert("Program save failed: " + error.message);
+      return;
+    }
   }
 
   let insertedProgram = insertedRows && insertedRows[0] ? insertedRows[0] : null;
-  stockDeducted = await deductStockForProgram({
+  let savedProgram = {
     id: insertedProgram?.id,
     programNo,
     programName,
+    status: programStatus,
     programDate,
+    createdAt,
+    selectedRecipeNumbers: snapshot.map(r => r.recipeNo),
     recipeSnapshot: snapshot,
     requiredThans,
     stockDeducted: false
+  };
+  programs.push({
+    ...savedProgram
   });
+  programs = programs.sort((a,b) => Number(a.programNo) - Number(b.programNo));
+  clearProgramForm();
+  renderPrograms();
+  renderDashboard();
+  showSuccessToast("Program created successfully");
+
+  stockDeducted = await deductStockForProgram(savedProgram);
   await logAudit("create", "Program", programNo + " - " + programName, null, {
     programNo,
     programName,
@@ -3311,9 +3366,7 @@ async function createProgram(){
     requiredThans,
     selectedRecipeNumbers: snapshot.map(r => r.recipeNo)
   });
-  clearProgramForm();
-  await loadDataFromJson();
-  showSuccessToast("Program created successfully");
+  await reloadProgramPageData();
   }catch(error){
     console.error("Program save/update failed", error);
     alert((editProgramIndex !== null ? "Program update failed: " : "Program creation failed: ") + (error.message || error));
