@@ -373,7 +373,7 @@ async function askGemini(prompt){
 }
 
 async function askAiProvider(prompt){
-  const provider = AI_PROVIDER || (GEMINI_API_KEY ? "gemini" : (OPENAI_API_KEY ? "openai" : "ollama"));
+  const provider = GEMINI_API_KEY ? "gemini" : (AI_PROVIDER || (OPENAI_API_KEY ? "openai" : "ollama"));
 
   if(provider === "gemini" || provider === "google"){
     return {answer: await askGemini(prompt), provider: "gemini"};
