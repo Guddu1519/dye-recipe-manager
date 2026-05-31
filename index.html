@@ -1106,36 +1106,42 @@ function setupLoginEnterKey(){
   });
 }
 
-function setupGlobalSaveShortcut(){
-  window.addEventListener("keydown", function(event){
-    if(event.key !== "F10" && event.code !== "F10") return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-    if(!isLoggedIn() || !isAdmin()) return;
+let lastF10SaveAt = 0;
 
-    let activeSection = document.querySelector("section.active");
-    let activeId = activeSection ? activeSection.id : "";
-    let clickSaveButton = (selector, fallback) => {
-      let button = document.querySelector(selector);
-      if(button && !button.disabled){
-        button.click();
-      }else if(typeof fallback === "function"){
-        fallback();
-      }
-    };
-    if(activeId === "price"){
-      clickSaveButton("#colorSaveBtn", saveColor);
-    }else if(activeId === "recipe"){
-      clickSaveButton("#recipeSaveBtn", saveRecipe);
-    }else if(activeId === "program"){
-      clickSaveButton("#programProceedBtn", createProgram);
-    }else if(activeId === "stock"){
-      clickSaveButton("#stock button[onclick='saveStockPurchase()']", saveStockPurchase);
-    }else if(activeId === "customers"){
-      clickSaveButton("#customers button[onclick='saveProcessHouse()']", saveProcessHouse);
-    }
-  }, true);
+function isF10Event(event){
+  return event.key === "F10" || event.code === "F10" || event.keyCode === 121 || event.which === 121;
+}
+
+function runF10SaveShortcut(event){
+  if(!isF10Event(event)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if(event.stopImmediatePropagation) event.stopImmediatePropagation();
+
+  let now = Date.now();
+  if(now - lastF10SaveAt < 600) return;
+  lastF10SaveAt = now;
+
+  let activeSection = document.querySelector("section.active") || document.activeElement?.closest("section");
+  let activeId = activeSection ? activeSection.id : "";
+  if(activeId === "price"){
+    saveColor();
+  }else if(activeId === "recipe"){
+    saveRecipe();
+  }else if(activeId === "program"){
+    createProgram();
+  }else if(activeId === "stock"){
+    saveStockPurchase();
+  }else if(activeId === "customers"){
+    saveProcessHouse();
+  }
+}
+
+function setupGlobalSaveShortcut(){
+  document.addEventListener("keydown", runF10SaveShortcut, true);
+  window.addEventListener("keydown", runF10SaveShortcut, true);
+  document.addEventListener("keyup", runF10SaveShortcut, true);
+  window.addEventListener("keyup", runF10SaveShortcut, true);
 }
 
 async function loginUser(){
