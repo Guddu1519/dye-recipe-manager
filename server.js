@@ -18,12 +18,12 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
-const AI_PROVIDER = (process.env.AI_PROVIDER || "ollama").toLowerCase();
+const AI_PROVIDER = (process.env.AI_PROVIDER || "").trim().toLowerCase();
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
 const assistantUsage = new Map();
 const ASSISTANT_LIMIT_PER_HOUR = Number(process.env.AI_ASSISTANT_LIMIT_PER_HOUR || 20);
-const ASSISTANT_FETCH_TIMEOUT_MS = Number(process.env.AI_ASSISTANT_FETCH_TIMEOUT_MS || 45000);
+const ASSISTANT_FETCH_TIMEOUT_MS = Number(process.env.AI_ASSISTANT_FETCH_TIMEOUT_MS || 20000);
 
 app.use(express.static(__dirname));
 app.get("/", (req, res) => {
@@ -215,12 +215,12 @@ async function loadAssistantContext(){
       ledger: ledger.length,
       programUsage: usage.length
     },
-    colors: compactRows(colors, 250),
-    recipes: compactRows(recipes, 250),
-    programs: compactRows(programs, 250),
-    stockPurchases: compactRows(purchases, 250),
-    stockLedger: compactRows(ledger, 500),
-    programStockUsage: compactRows(usage, 500)
+    colors: compactRows(colors, 150),
+    recipes: compactRows(recipes, 120),
+    programs: compactRows(programs, 120),
+    stockPurchases: compactRows(purchases, 120),
+    stockLedger: compactRows(ledger, 180),
+    programStockUsage: compactRows(usage, 180)
   };
 }
 
@@ -373,10 +373,12 @@ async function askGemini(prompt){
 }
 
 async function askAiProvider(prompt){
-  if(AI_PROVIDER === "gemini"){
+  const provider = AI_PROVIDER || (GEMINI_API_KEY ? "gemini" : (OPENAI_API_KEY ? "openai" : "ollama"));
+
+  if(provider === "gemini" || provider === "google"){
     return {answer: await askGemini(prompt), provider: "gemini"};
   }
-  if(AI_PROVIDER === "openai"){
+  if(provider === "openai"){
     return {answer: await askOpenAI(prompt), provider: "openai"};
   }
 
@@ -384,7 +386,7 @@ async function askAiProvider(prompt){
     return {answer: await askOllama(prompt), provider: "ollama"};
   }catch(ollamaError){
     console.warn("Ollama AI failed", ollamaError.message);
-    if(AI_PROVIDER === "ollama" || !OPENAI_API_KEY){
+    if(provider === "ollama" || !OPENAI_API_KEY){
       throw new Error("Free local AI is not running. Install Ollama, run `ollama pull " + OLLAMA_MODEL + "`, then start Ollama and try again.");
     }
     return {answer: await askOpenAI(prompt), provider: "openai"};

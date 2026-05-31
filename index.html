@@ -3661,7 +3661,7 @@ async function updateProgramRecipes(index, details){
   };
 
   let { error } = await withTimeout(
-    supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
+    supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id"),
     CLOUD_SAVE_TIMEOUT_MS,
     "Program update timed out after 45 seconds."
   );
@@ -3670,7 +3670,7 @@ async function updateProgramRecipes(index, details){
     delete updatePayload.required_thans;
     delete updatePayload.stock_deducted;
     ({ error } = await withTimeout(
-      supabaseClient.from("programs").update(updatePayload).eq("id", program.id),
+      supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id"),
       CLOUD_SAVE_TIMEOUT_MS,
       "Program update timed out after 45 seconds."
     ));
@@ -4235,7 +4235,7 @@ async function sendAiAssistantMessage(){
     let sessionResult = supabaseClient ? await supabaseClient.auth.getSession() : null;
     let token = sessionResult?.data?.session?.access_token || "";
     const controller = new AbortController();
-    aiTimeout = setTimeout(() => controller.abort(), 60000);
+    aiTimeout = setTimeout(() => controller.abort(), 25000);
     let response = await fetch("/api/ai-assistant", {
       method: "POST",
       headers: {
@@ -4257,7 +4257,7 @@ async function sendAiAssistantMessage(){
       loading.textContent += "\n\nRemaining AI questions this hour: " + result.remaining;
     }
   }catch(error){
-    loading.textContent = "AI Assistant error: " + (error.name === "AbortError" ? "Request timed out. Please try again with a shorter question." : (error.message || error));
+    loading.textContent = "AI Assistant error: " + (error.name === "AbortError" ? "Taking too long. Please ask a shorter question and try again." : (error.message || error));
   }finally{
     if(aiTimeout) clearTimeout(aiTimeout);
     if(button){
