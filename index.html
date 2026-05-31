@@ -1659,6 +1659,10 @@ async function loadProcessHousesFromSupabase(){
 }
 
 function showTab(id,btn){
+  let currentSection = document.querySelector("section.active");
+  if(currentSection && currentSection.id === "price" && id !== "price"){
+    clearColorForm();
+  }
   document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
   document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
@@ -1667,6 +1671,7 @@ function showTab(id,btn){
   document.body.classList.remove("sidebarHoverOpen");
   updateMobileMenuButton();
   renderAll();
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function isMobileSidebarMode(){
@@ -1791,9 +1796,9 @@ async function saveColor(){
     if(!saved) return;
 
     await logAudit(actionType, "Price Master", name, oldValue, obj);
+    showSuccessToast(actionType === "update" ? "Price updated" : "Price saved");
     clearColorForm();
     await loadDataFromJson();
-    showSuccessToast(actionType === "update" ? "Price updated" : "Price saved");
   }finally{
     colorSaveInProgress = false;
     setColorSaveBusy(false);
@@ -1861,6 +1866,8 @@ function editColor(i){
   document.getElementById("colorType").value = colors[i].colorType || getDefaultColorType(colors[i].name);
   editColorIndex = i;
   setColorSaveBusy(false);
+  document.getElementById("price")?.scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(()=>document.getElementById("colorName")?.focus(), 250);
 }
 
 async function deleteColor(i){
