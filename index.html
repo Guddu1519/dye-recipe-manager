@@ -434,12 +434,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </div>
     <input id="hexCode" placeholder="Hex Code e.g. #6A4F22">
     <input id="recipeThans" type="number" placeholder="Batch Thans (20/22/24)">
+    <div class="exportBar">
+      <button class="btn" onclick="addDyeLine()">Add Dye</button>
+      <button id="recipeSaveBtn" class="btn green" onclick="saveRecipe()">Save Recipe</button>
+      <button class="btn" onclick="openRecipeImport()">Import Recipe</button>
+    </div>
+    <input type="file" id="recipeImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importRecipeExcel(event)">
     <h3>Dyes</h3>
     <div id="dyeLines"></div>
-    <button class="btn" onclick="addDyeLine()">Add Dye</button>
-    <button id="recipeSaveBtn" class="btn green" onclick="saveRecipe()">Save Recipe</button>
-    <button class="btn" onclick="openRecipeImport()">Import Recipe</button>
-    <input type="file" id="recipeImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importRecipeExcel(event)">
   </div>
 
   <div class="card">
@@ -1680,10 +1682,53 @@ async function loadProcessHousesFromSupabase(){
   processHouses = data || [];
 }
 
+function resetScreenState(id){
+  const setValue = (inputId, value="") => {
+    let el = document.getElementById(inputId);
+    if(el) el.value = value;
+  };
+
+  if(id === "price"){
+    setValue("priceSearch");
+    clearColorForm();
+  }else if(id === "recipe"){
+    setValue("recipeSearch");
+  }else if(id === "costing"){
+    setValue("recipeSelect");
+    setValue("thanCount");
+    setValue("meterCount");
+    setValue("chemicalCost");
+    setValue("processCharge");
+    setValue("labourCost");
+    setValue("profitPercent");
+    let costResult = document.getElementById("costResult");
+    let multiCostResult = document.getElementById("multiCostResult");
+    if(costResult) costResult.innerHTML = "";
+    if(multiCostResult) multiCostResult.innerHTML = "";
+    document.querySelectorAll(".multiCostRecipeCheck").forEach(cb => cb.checked = false);
+    let selectAll = document.getElementById("multiCostSelectAll");
+    if(selectAll) selectAll.checked = false;
+  }else if(id === "recipeCompare"){
+    setValue("compareThans", "20");
+    setValue("compareCount", "2");
+    let result = document.getElementById("recipeCompareResult");
+    if(result) result.innerHTML = `<p class="muted">Select recipes above and click Compare Recipes.</p>`;
+  }else if(id === "program"){
+    setValue("programRecipeSearch");
+  }else if(id === "stock"){
+    setValue("stockSearch");
+    setValue("stockFilter", "all");
+  }else if(id === "history"){
+    setValue("historySearch");
+  }else if(id === "versions"){
+    setValue("versionSearch");
+  }
+}
+
 function showTab(id,btn){
   let currentSection = document.querySelector("section.active");
-  if(currentSection && currentSection.id === "price" && id !== "price"){
-    clearColorForm();
+  if(currentSection && currentSection.id !== id){
+    resetScreenState(currentSection.id);
   }
   document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
