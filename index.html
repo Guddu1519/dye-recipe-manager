@@ -1352,6 +1352,48 @@ async function saveColorRecord(color){
   return true;
 }
 
+function renameDyeArray(dyes, oldName, newName){
+  let changed = false;
+  let renamed = (dyes || []).map(dye => {
+    if(normalizeName(dye.name) !== normalizeName(oldName)) return dye;
+    changed = true;
+    return {...dye, name: newName};
+  });
+  return {changed, dyes: renamed};
+}
+
+async function cascadeColorNameRename(oldName, newName){
+  if(!supabaseClient || !oldName || !newName || normalizeName(oldName) === normalizeName(newName)) return;
+
+  let recipeUpdates = recipes.map(recipe => {
+    let renamed = renameDyeArray(recipe.dyes || [], oldName, newName);
+    return renamed.changed ? supabaseClient.from("recipes").update({dyes: renamed.dyes}).eq("id", recipe.id) : null;
+  }).filter(Boolean);
+
+  let programUpdates = programs.map(program => {
+    let changed = false;
+    let snapshot = (program.recipeSnapshot || []).map(recipe => {
+      let renamed = renameDyeArray(recipe.dyes || [], oldName, newName);
+      if(renamed.changed) changed = true;
+      return renamed.changed ? {...recipe, dyes: renamed.dyes} : recipe;
+    });
+    return changed && program.id ? supabaseClient.from("programs").update({recipe_snapshot: snapshot}).eq("id", program.id) : null;
+  }).filter(Boolean);
+
+  let stockUpdates = [
+    supabaseClient.from("chemical_stock_purchases").update({chemical_name: newName}).eq("chemical_name", oldName),
+    supabaseClient.from("chemical_stock_ledger").update({chemical_name: newName}).eq("chemical_name", oldName),
+    supabaseClient.from("program_stock_usage").update({chemical_name: newName}).eq("chemical_name", oldName),
+    supabaseClient.from("price_change_logs").update({chemical_name: newName}).eq("chemical_name", oldName)
+  ];
+
+  let results = await Promise.all([...recipeUpdates, ...programUpdates, ...stockUpdates]);
+  let failed = results.find(result => result && result.error);
+  if(failed){
+    throw new Error("Color renamed in Price Master, but related data update failed: " + failed.error.message);
+  }
+}
+
 async function deleteColorRecord(color){
   if(!requireAdmin()) return false;
 
@@ -1878,6 +1920,9 @@ async function saveColor(){
     const saved = await saveColorRecord(obj);
     if(!saved) return;
 
+    if(actionType === "update" && oldValue && normalizeName(oldValue.name) !== normalizeName(name)){
+      await cascadeColorNameRename(oldValue.name, name);
+    }
     await logAudit(actionType, "Price Master", name, oldValue, obj);
     showSuccessToast(actionType === "update" ? "Price updated" : "Price saved");
     clearColorForm();
