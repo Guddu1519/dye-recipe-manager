@@ -1108,24 +1108,34 @@ function setupLoginEnterKey(){
 
 function setupGlobalSaveShortcut(){
   window.addEventListener("keydown", function(event){
-    if(event.key !== "F10") return;
-    if(!isLoggedIn() || !isAdmin()) return;
+    if(event.key !== "F10" && event.code !== "F10") return;
     event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    if(!isLoggedIn() || !isAdmin()) return;
 
     let activeSection = document.querySelector("section.active");
     let activeId = activeSection ? activeSection.id : "";
+    let clickSaveButton = (selector, fallback) => {
+      let button = document.querySelector(selector);
+      if(button && !button.disabled){
+        button.click();
+      }else if(typeof fallback === "function"){
+        fallback();
+      }
+    };
     if(activeId === "price"){
-      saveColor();
+      clickSaveButton("#colorSaveBtn", saveColor);
     }else if(activeId === "recipe"){
-      saveRecipe();
+      clickSaveButton("#recipeSaveBtn", saveRecipe);
     }else if(activeId === "program"){
-      createProgram();
+      clickSaveButton("#programProceedBtn", createProgram);
     }else if(activeId === "stock"){
-      saveStockPurchase();
-    }else if(activeId === "processHouse"){
-      saveProcessHouse();
+      clickSaveButton("#stock button[onclick='saveStockPurchase()']", saveStockPurchase);
+    }else if(activeId === "customers"){
+      clickSaveButton("#customers button[onclick='saveProcessHouse()']", saveProcessHouse);
     }
-  });
+  }, true);
 }
 
 async function loginUser(){
