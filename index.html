@@ -387,7 +387,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <option value="COTTON">Cotton</option>
       <option value="POLYSTER">Polyster</option>
     </select>
-    <button class="btn green" onclick="saveColor()">Save Color</button>
+    <button id="colorSaveBtn" class="btn green" onclick="saveColor()">Save</button>
   </div>
 
   <div class="card">
@@ -823,6 +823,7 @@ let editColorIndex = null;
 let editRecipeIndex = null;
 let editProgramIndex = null;
 let programSaveInProgress = false;
+let colorSaveInProgress = false;
 let currentUser = null;
 let currentRole = "viewer";
 let refreshTimer = null;
@@ -1250,27 +1251,30 @@ async function saveColorRecord(color){
     return false;
   }
 
-  async function runColorWrite(payload, fallbackPayload, id){
+  async function runColorWrite(colorTypePayload, typePayload, id){
     let query = id
-      ? supabaseClient.from("colors").update(payload).eq("id", id)
-      : supabaseClient.from("colors").insert(payload);
+      ? supabaseClient.from("colors").update(colorTypePayload).eq("id", id)
+      : supabaseClient.from("colors").insert(colorTypePayload);
     let { error } = await query;
     if(error && String(error.message || "").includes("color_type")){
       let fallbackQuery = id
-        ? supabaseClient.from("colors").update(fallbackPayload).eq("id", id)
-        : supabaseClient.from("colors").insert(fallbackPayload);
+        ? supabaseClient.from("colors").update(typePayload).eq("id", id)
+        : supabaseClient.from("colors").insert(typePayload);
       return await fallbackQuery;
     }
     return { error };
   }
 
-  let resolvedType = color.colorType || getColorType(color.name);
-  saveLocalColorType(color.name, resolvedType);
-  let fullPayload = {name: color.name, rate: color.rate, color_type: resolvedType};
-  let fallbackPayload = {name: color.name, rate: color.rate};
+  let resolvedType = String(color.colorType || "").trim().toUpperCase();
+  if(!resolvedType){
+    alert("Color type is required.");
+    return false;
+  }
+  let colorTypePayload = {name: color.name, rate: color.rate, color_type: resolvedType};
+  let typePayload = {name: color.name, rate: color.rate, type: resolvedType};
 
   if(color.id){
-    const { error } = await runColorWrite(fullPayload, fallbackPayload, color.id);
+    const { error } = await runColorWrite(colorTypePayload, typePayload, color.id);
 
     if(error){
       alert("Color update failed: " + error.message);
@@ -1286,7 +1290,7 @@ async function saveColorRecord(color){
     }
 
     if(existing && existing.length){
-      const { error } = await runColorWrite(fullPayload, fallbackPayload, existing[0].id);
+      const { error } = await runColorWrite(colorTypePayload, typePayload, existing[0].id);
 
       if(error){
         alert("Color update failed: " + error.message);
@@ -1297,7 +1301,7 @@ async function saveColorRecord(color){
       return true;
     }
 
-    const { error } = await runColorWrite(fullPayload, fallbackPayload, null);
+    const { error } = await runColorWrite(colorTypePayload, typePayload, null);
 
     if(error){
       alert("Color insert failed: " + error.message);
@@ -1727,12 +1731,32 @@ function goToTab(id){
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+function setColorSaveBusy(isBusy){
+  let button = document.getElementById("colorSaveBtn");
+  if(!button) return;
+  button.disabled = isBusy;
+  if(isBusy){
+    button.textContent = editColorIndex !== null ? "Updating..." : "Saving...";
+  }else{
+    button.textContent = editColorIndex !== null ? "Update" : "Save";
+  }
+}
+
+function clearColorForm(){
+  document.getElementById("colorName").value = "";
+  document.getElementById("colorRate").value = "";
+  document.getElementById("colorType").value = "";
+  editColorIndex = null;
+  setColorSaveBusy(false);
+}
+
 async function saveColor(){
   if(!requireAdmin()) return;
+  if(colorSaveInProgress) return;
 
   let name = document.getElementById("colorName").value.trim().toUpperCase();
   let rate = Number(document.getElementById("colorRate").value);
-  let colorType = document.getElementById("colorType").value || getDefaultColorType(name);
+  let colorType = document.getElementById("colorType").value;
 
   if(!name || rate <= 0 || !colorType){
     alert("Color name, type and rate required");
@@ -1753,7 +1777,6 @@ async function saveColor(){
       alert("Color already exists");
       return;
     }
-    editColorIndex = null;
   } else {
     if(colors.some(c=>c.name === name)){
       alert("Color already exists");
@@ -1761,14 +1784,20 @@ async function saveColor(){
     }
   }
 
-  const saved = await saveColorRecord(obj);
-  if(!saved) return;
+  colorSaveInProgress = true;
+  setColorSaveBusy(true);
+  try{
+    const saved = await saveColorRecord(obj);
+    if(!saved) return;
 
-  await logAudit(actionType, "Price Master", name, oldValue, obj);
-  document.getElementById("colorName").value = "";
-  document.getElementById("colorRate").value = "";
-  document.getElementById("colorType").value = "";
-  await loadDataFromJson();
+    await logAudit(actionType, "Price Master", name, oldValue, obj);
+    clearColorForm();
+    await loadDataFromJson();
+    showSuccessToast(actionType === "update" ? "Price updated" : "Price saved");
+  }finally{
+    colorSaveInProgress = false;
+    setColorSaveBusy(false);
+  }
 }
 
 function renderColors(){
@@ -1831,6 +1860,7 @@ function editColor(i){
   document.getElementById("colorRate").value = colors[i].rate;
   document.getElementById("colorType").value = colors[i].colorType || getDefaultColorType(colors[i].name);
   editColorIndex = i;
+  setColorSaveBusy(false);
 }
 
 async function deleteColor(i){
@@ -1865,7 +1895,7 @@ function addDyeLine(name="", qty="", force=false){
         value="${name}"
         oninput="showDyeSuggestions(this)"
         onkeydown="handleDyeSuggestionKey(event, this)"
-        onblur="hideSuggestionsLater(this)"
+        onblur="handleDyeInputBlur(this)"
         autocomplete="off"
       >
       <div class="suggestionBox"></div>
@@ -1900,12 +1930,35 @@ function setActiveSuggestion(input, index){
   let safeIndex = ((index % items.length) + items.length) % items.length;
   input.dataset.suggestionIndex = String(safeIndex);
   items[safeIndex].classList.add("active");
+  items[safeIndex].scrollIntoView({block:"nearest"});
+}
+
+function isDuplicateDyeInput(input, name){
+  let clean = normalizeName(name);
+  if(!clean) return false;
+  return Array.from(document.querySelectorAll(".dyeName")).some(other => {
+    return other !== input && normalizeName(other.value) === clean;
+  });
+}
+
+function handleDuplicateDyeSelection(input, name){
+  if(!isDuplicateDyeInput(input, name)) return false;
+  alert("You already have this color in the recipe.");
+  input.value = "";
+  input.focus();
+  return true;
 }
 
 function chooseDyeSuggestion(input, item){
   if(!item) return;
   let box = input.parentElement.querySelector(".suggestionBox");
-  input.value = item.dataset.name || item.textContent.trim();
+  let selectedName = item.dataset.name || item.textContent.trim();
+  if(handleDuplicateDyeSelection(input, selectedName)){
+    input.dataset.suggestionIndex = "-1";
+    if(box) box.style.display = "none";
+    return;
+  }
+  input.value = selectedName;
   input.dataset.suggestionIndex = "-1";
   if(box) box.style.display = "none";
 }
@@ -1964,7 +2017,8 @@ function showDyeSuggestions(input){
     item.dataset.name = c.name;
     item.innerHTML = `${c.name} <span>₹${c.rate}/kg</span>`;
 
-    item.onclick = function(){
+    item.onmousedown = function(event){
+      event.preventDefault();
       chooseDyeSuggestion(input, item);
     };
 
@@ -1972,6 +2026,14 @@ function showDyeSuggestions(input){
   });
 
   box.style.display = "block";
+}
+
+function handleDyeInputBlur(input){
+  let name = input.value.trim().toUpperCase();
+  if(name && colors.some(c => normalizeName(c.name) === normalizeName(name))){
+    handleDuplicateDyeSelection(input, name);
+  }
+  hideSuggestionsLater(input);
 }
 
 function hideSuggestionsLater(input){
@@ -2094,6 +2156,13 @@ async function saveRecipe(){
 
   if(dyes.length > 20){
     alert("Maximum 20 dyes allowed");
+    return;
+  }
+
+  let dyeNames = dyes.map(d => normalizeName(d.name));
+  let duplicateDye = dyes.find((d, index) => dyeNames.indexOf(normalizeName(d.name)) !== index);
+  if(duplicateDye){
+    alert("You already have this color in the recipe.");
     return;
   }
 
@@ -5220,7 +5289,7 @@ console.log("SUPABASE COLORS:", colorData);
       id: c.id,
       name: c.name,
       rate: c.rate,
-      colorType: getColorType(c.name, c.color_type)
+      colorType: getColorType(c.name, c.color_type || c.type)
     })).sort((a,b) => normalizeName(a.name).localeCompare(normalizeName(b.name)));
 
     const { data: recipeData, error: recipeError } =
