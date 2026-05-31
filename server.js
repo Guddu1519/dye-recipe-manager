@@ -12,7 +12,7 @@ app.get("/api/health", (req, res) => {
     message: "API working",
     ai: {
       version: "gemini-preferred-2026-05-31",
-      provider: AI_PROVIDER || (GEMINI_API_KEY ? "gemini" : (OPENAI_API_KEY ? "openai" : "ollama")),
+      provider: GEMINI_API_KEY ? "gemini" : (AI_PROVIDER || (OPENAI_API_KEY ? "openai" : "ollama")),
       geminiConfigured: Boolean(GEMINI_API_KEY),
       openaiConfigured: Boolean(OPENAI_API_KEY),
       ollamaModel: OLLAMA_MODEL
@@ -283,6 +283,48 @@ function buildAssistantStockRows(dataContext){
   }
 
   return Object.values(map);
+}
+
+function isAssistantStockQuestion(question){
+  return /\b(stock|stocks|chemical|chemicals|kg|gram|grams|left|available|balance|remaining|low stock|below 5|reorder|purchase|used)\b/i.test(String(question || ""));
+}
+
+async function loadAssistantContextForQuestion(question){
+  if(!isAssistantStockQuestion(question)){
+    return loadAssistantContext();
+  }
+
+  const [colors, purchases, ledger, usage] = await Promise.all([
+    supabaseReadFallback("colors", ["id,name,rate,color_type", "id,name,rate", "*"]),
+    supabaseReadFallback("chemical_stock_purchases", ["id,chemical_name,purchased_qty_grams,unit,purchase_date,supplier,rate_per_kg,notes,created_at", "*"]),
+    supabaseReadFallback("chemical_stock_ledger", ["id,chemical_name,entry_type,qty_delta_grams,program_id,program_no,note,created_at", "*"]),
+    supabaseReadFallback("program_stock_usage", ["id,program_id,program_no,program_name,program_date,chemical_name,quantity_used_grams,before_stock_grams,after_stock_grams,created_at", "*"])
+  ]);
+
+  const stockContext = {
+    generatedAt: new Date().toISOString(),
+    contextType: "stock-focused",
+    counts: {
+      colors: colors.length,
+      purchases: purchases.length,
+      ledger: ledger.length,
+      programUsage: usage.length
+    },
+    colors: compactRows(colors, 120),
+    stockPurchases: compactRows(purchases, 120),
+    stockLedger: compactRows(ledger, 250),
+    programStockUsage: compactRows(usage, 150)
+  };
+  const stockRows = buildAssistantStockRows(stockContext).sort((a, b) => a.name.localeCompare(b.name));
+  stockContext.stockSummary = {
+    totalItems: stockRows.length,
+    totalPurchasedGrams: stockRows.reduce((sum, row) => sum + (Number(row.purchased) || 0), 0),
+    totalUsedGrams: stockRows.reduce((sum, row) => sum + (Number(row.used) || 0), 0),
+    totalAvailableGrams: stockRows.reduce((sum, row) => sum + (Number(row.balance) || 0), 0),
+    lowStockItems: stockRows.filter(row => (Number(row.balance) || 0) < 5000)
+  };
+  stockContext.currentStock = stockRows;
+  return stockContext;
 }
 
 function findAssistantItemName(question, dataContext){
@@ -559,16 +601,7 @@ async function handleAiAssistant(req, res){
       return res.status(429).json({error:"AI Assistant hourly limit reached. Please try again later."});
     }
 
-    const dataContext = await loadAssistantContext();
-    const directAnswer = tryDirectAssistantAnswer(question, dataContext);
-    if(directAnswer){
-      return res.json({
-        answer: directAnswer,
-        provider: "direct",
-        remaining: limit.remaining
-      });
-    }
-
+    const dataContext = await loadAssistantContextForQuestion(question);
     const aiResult = await askAiProvider(buildAssistantPrompt(user, history, dataContext, question));
 
     res.json({
