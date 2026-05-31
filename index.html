@@ -548,7 +548,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="programRecipeSearch" placeholder="Search Recipe No, Color Name, Recipe Master Name" oninput="renderPrograms()">
     <table>
       <thead>
-        <tr><th>Select</th><th>Recipe Master / Recipe No</th><th>Color Name</th><th>Batch Thans</th></tr>
+        <tr><th>Select</th><th>Recipe No</th><th>Recipe Master</th><th>Color Name</th><th>Batch Thans</th></tr>
       </thead>
       <tbody id="programRecipeTable"></tbody>
     </table>
@@ -822,6 +822,7 @@ let programStockUsage = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let editProgramIndex = null;
+let programSaveInProgress = false;
 let currentUser = null;
 let currentRole = "viewer";
 let refreshTimer = null;
@@ -3153,7 +3154,11 @@ function setProgramProceedBusy(isBusy){
   const button = document.getElementById("programProceedBtn");
   if(!button) return;
   button.disabled = isBusy;
-  button.textContent = isBusy ? "Proceeding..." : (editProgramIndex !== null ? "Update Program" : "Proceed");
+  if(isBusy){
+    button.textContent = editProgramIndex !== null ? "Updating program..." : "Creating program...";
+  }else{
+    button.textContent = editProgramIndex !== null ? "Update Program" : "Proceed";
+  }
 }
 
 function setProgramBaseMode(){
@@ -3177,6 +3182,7 @@ function clearProgramForm(){
 
 async function createProgram(){
   if(!requireAdmin()) return;
+  if(programSaveInProgress) return;
   if(!supabaseClient){
     alert("Supabase is not connected. Program was not saved.");
     return;
@@ -3217,6 +3223,7 @@ async function createProgram(){
     return;
   }
   setProgramProceedBusy(true);
+  programSaveInProgress = true;
   let programNo = null;
   let stockDeducted = false;
   try{
@@ -3291,8 +3298,12 @@ async function createProgram(){
   });
   clearProgramForm();
   await loadDataFromJson();
-  showSuccessToast("Program successfully created" + (stockDeducted ? " and stock deducted" : ""));
+  showSuccessToast("Program created successfully");
+  }catch(error){
+    console.error("Program save/update failed", error);
+    alert((editProgramIndex !== null ? "Program update failed: " : "Program creation failed: ") + (error.message || error));
   }finally{
+    programSaveInProgress = false;
     setProgramProceedBusy(false);
   }
 }
@@ -3364,7 +3375,8 @@ function renderPrograms(){
     .map(r => `
       <tr>
         <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${editingRecipeNos.has(String(r.recipeNo || "")) ? "checked" : ""} ${isAdmin() ? "" : "disabled"}></td>
-        <td>${r.recipeMasterName ? r.recipeMasterName + " - " : ""}${r.recipeNo || ""}</td>
+        <td>${r.recipeNo || ""}</td>
+        <td>${r.recipeMasterName || ""}</td>
         <td>${r.colorName || ""}</td>
         <td>${r.recipeThans || ""}</td>
       </tr>
@@ -3670,7 +3682,7 @@ async function updateProgramRecipes(index, details){
   programs[index] = {...updatedProgram, stockDeducted:true};
   clearProgramForm();
   await loadDataFromJson();
-  showSuccessToast("Program updated and stock recalculated");
+  showSuccessToast("Program updated successfully");
 }
 
 function getProgramStockDelta(oldRecipes, oldRequiredThans, newRecipes, newRequiredThans){
@@ -5186,29 +5198,141 @@ console.log("SUPABASE RECIPES:", recipeData);
 </script>
 
 <datalist id="dyeSuggestions"></datalist>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
 <script>
-const SUPABASE_URL = "https://dgxrkymrestwrcwgntdu.supabase.co";
-const SUPABASE_KEY = "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil";
+function createNeonCompatClient(){
+  let token = "";
 
-let supabaseClient = null;
-if(window.supabase){
-  supabaseClient = supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_KEY,
-    {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false
+  async function apiFetch(url, options={}){
+    let response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? {Authorization: "Bearer " + token} : {}),
+        ...(options.headers || {})
       }
+    });
+    let result = await response.json().catch(() => ({}));
+    if(!response.ok){
+      return {data:null, error:{message:result.error || "Server request failed"}};
     }
-  );
-  console.log("Supabase Connected");
-} else {
-  console.warn("Supabase library not loaded.");
+    return {data:result.data ?? result.user ?? result, error:null, session:result.session};
+  }
+
+  class NeonQueryBuilder{
+    constructor(table){
+      this.table = table;
+      this.action = "select";
+      this.filters = [];
+      this.orderBy = null;
+      this.limitCount = 0;
+      this.payload = null;
+      this.singleMode = false;
+      this.maybeSingleMode = false;
+    }
+    select(){
+      if(this.action === "insert" || this.action === "update") return this;
+      this.action = "select";
+      return this;
+    }
+    insert(row){
+      this.action = "insert";
+      this.payload = row;
+      return this;
+    }
+    update(row){
+      this.action = "update";
+      this.payload = row;
+      return this;
+    }
+    delete(){
+      this.action = "delete";
+      return this;
+    }
+    eq(column, value){
+      this.filters.push({column, value});
+      return this;
+    }
+    order(column, options={}){
+      this.orderBy = {column, ascending: options.ascending !== false};
+      return this;
+    }
+    limit(value){
+      this.limitCount = Number(value) || 0;
+      return this;
+    }
+    single(){
+      this.singleMode = true;
+      return this;
+    }
+    maybeSingle(){
+      this.maybeSingleMode = true;
+      return this;
+    }
+    async execute(){
+      let body = {
+        filters: this.filters,
+        order: this.orderBy,
+        limit: this.limitCount
+      };
+      let endpoint = "/api/db/" + encodeURIComponent(this.table) + "/" + this.action;
+      if(this.action === "insert"){
+        body.rows = Array.isArray(this.payload) ? this.payload : [this.payload];
+      }
+      if(this.action === "update"){
+        body.row = this.payload || {};
+      }
+      let result = await apiFetch(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body)
+      });
+      if(result.error) return result;
+      let data = result.data || [];
+      if(this.singleMode){
+        data = data[0] || null;
+      }else if(this.maybeSingleMode){
+        data = data.length ? data[0] : null;
+      }
+      return {data, error:null};
+    }
+    then(resolve, reject){
+      return this.execute().then(resolve, reject);
+    }
+  }
+
+  return {
+    auth: {
+      async signInWithPassword(credentials){
+        let result = await apiFetch("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify(credentials || {})
+        });
+        if(result.error) return {data:null, error:result.error};
+        token = result.session?.access_token || "";
+        return {
+          data: {
+            user: result.data,
+            session: result.session
+          },
+          error: null
+        };
+      },
+      async signOut(){
+        await apiFetch("/api/auth/logout", {method:"POST"});
+        token = "";
+        return {error:null};
+      },
+      onAuthStateChange(){
+        return {data:{subscription:{unsubscribe(){}}}};
+      }
+    },
+    from(table){
+      return new NeonQueryBuilder(table);
+    }
+  };
 }
+
+let supabaseClient = createNeonCompatClient();
+console.log("Neon backend connected");
 window.addEventListener("load", function(){
 setupLoginEnterKey();
 initAuth();
