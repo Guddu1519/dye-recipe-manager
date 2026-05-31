@@ -4253,9 +4253,6 @@ async function sendAiAssistantMessage(){
     let result = await response.json();
     if(!response.ok) throw new Error(result.error || "AI Assistant failed.");
     loading.textContent = result.answer || "No answer received.";
-    if(result.remaining !== undefined){
-      loading.textContent += "\n\nRemaining AI questions this hour: " + result.remaining;
-    }
   }catch(error){
     loading.textContent = "AI Assistant error: " + (error.name === "AbortError" ? "Taking too long. Please ask a shorter question and try again." : (error.message || error));
   }finally{

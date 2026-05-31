@@ -205,6 +205,18 @@ function compactRows(rows, limit){
   return Array.isArray(rows) ? rows.slice(0, limit) : [];
 }
 
+function normalizeAssistantName(value){
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
+function formatAssistantGrams(value){
+  const grams = Math.round(Number(value) || 0);
+  if(Math.abs(grams) >= 1000){
+    return `${grams.toLocaleString("en-IN")} g (${(grams / 1000).toFixed(2)} kg)`;
+  }
+  return `${grams.toLocaleString("en-IN")} g`;
+}
+
 async function loadAssistantContext(){
   const [colors, recipes, programs, purchases, ledger, usage] = await Promise.all([
     supabaseReadFallback("colors", ["id,name,rate,color_type", "id,name,rate", "*"], true),
@@ -232,6 +244,109 @@ async function loadAssistantContext(){
     stockLedger: compactRows(ledger, 100),
     programStockUsage: compactRows(usage, 100)
   };
+}
+
+function getAssistantRowName(row){
+  return row?.name || row?.chemical_name || row?.chemicalName || "";
+}
+
+function getAssistantDyeName(row){
+  return row?.name || row?.dyeName || row?.dye_name || row?.chemical_name || row?.chemicalName || row?.colorName || row?.color_name || "";
+}
+
+function buildAssistantStockRows(dataContext){
+  const map = {};
+  (dataContext.stockLedger || []).forEach(entry => {
+    const name = String(getAssistantRowName(entry)).toUpperCase().trim();
+    if(!name) return;
+    if(!map[name]) map[name] = {name, purchased:0, used:0, balance:0};
+    const delta = Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0);
+    const type = entry.entryType || entry.entry_type || "";
+    if(type === "program_delete_restore"){
+      map[name].used = Math.max(0, map[name].used - Math.abs(delta));
+    }else{
+      if(delta > 0) map[name].purchased += delta;
+      if(delta < 0 || type === "program_usage") map[name].used += Math.abs(delta);
+    }
+    map[name].balance += delta;
+  });
+
+  if(!Object.keys(map).length){
+    (dataContext.stockPurchases || []).forEach(entry => {
+      const name = String(getAssistantRowName(entry)).toUpperCase().trim();
+      if(!name) return;
+      if(!map[name]) map[name] = {name, purchased:0, used:0, balance:0};
+      const qty = Number(entry.purchased_qty_grams ?? entry.purchasedQtyGrams ?? 0);
+      map[name].purchased += qty;
+      map[name].balance += qty;
+    });
+  }
+
+  return Object.values(map);
+}
+
+function findAssistantItemName(question, dataContext){
+  const questionKey = normalizeAssistantName(question);
+  if(!questionKey) return "";
+  const names = [
+    ...(dataContext.colors || []).map(getAssistantRowName),
+    ...buildAssistantStockRows(dataContext).map(row => row.name),
+    ...(dataContext.programStockUsage || []).map(getAssistantRowName)
+  ].filter(Boolean);
+  const uniqueNames = [...new Set(names.map(name => String(name).toUpperCase().trim()))];
+  return uniqueNames
+    .sort((a, b) => normalizeAssistantName(b).length - normalizeAssistantName(a).length)
+    .find(name => {
+      const key = normalizeAssistantName(name);
+      return key && (questionKey.includes(key) || key.includes(questionKey));
+    }) || "";
+}
+
+function tryDirectAssistantAnswer(question, dataContext){
+  const simpleQuestion = String(question || "").trim();
+  if(/^(hi|hello|hey|namaste|hii)$/i.test(simpleQuestion)){
+    return "Hello! I am your AI Production Assistant. Ask me about recipes, programs, stock, prices, costing, reports, or production planning.";
+  }
+
+  const itemName = findAssistantItemName(simpleQuestion, dataContext);
+  if(!itemName) return "";
+
+  const stock = buildAssistantStockRows(dataContext).find(row => normalizeAssistantName(row.name) === normalizeAssistantName(itemName));
+  const price = (dataContext.colors || []).find(row => normalizeAssistantName(getAssistantRowName(row)) === normalizeAssistantName(itemName));
+  const recipeMatches = (dataContext.recipes || []).filter(recipe => {
+    const dyes = Array.isArray(recipe.dyes) ? recipe.dyes : [];
+    return dyes.some(dye => normalizeAssistantName(getAssistantDyeName(dye)) === normalizeAssistantName(itemName));
+  });
+  const usageQty = (dataContext.programStockUsage || []).reduce((sum, row) => {
+    if(normalizeAssistantName(getAssistantRowName(row)) !== normalizeAssistantName(itemName)) return sum;
+    return sum + (Number(row.quantity_used_grams ?? row.quantityUsedGrams ?? 0) || 0);
+  }, 0);
+
+  const lines = [`${itemName}`];
+  if(price){
+    lines.push(`Price Master Rate: Rs. ${Number(price.rate || 0).toLocaleString("en-IN")} per kg`);
+    if(price.color_type || price.colorType) lines.push(`Type: ${price.color_type || price.colorType}`);
+  }else{
+    lines.push("Price Master Rate: Not found");
+  }
+  if(stock){
+    lines.push(`Purchased: ${formatAssistantGrams(stock.purchased)}`);
+    lines.push(`Used: ${formatAssistantGrams(stock.used)}`);
+    lines.push(`Available Stock: ${formatAssistantGrams(stock.balance)}`);
+  }else{
+    lines.push("Stock: Not found in stock ledger");
+  }
+  if(usageQty){
+    lines.push(`Program Usage History Total: ${formatAssistantGrams(usageQty)}`);
+  }
+  if(recipeMatches.length){
+    const recipeList = recipeMatches.slice(0, 12).map(recipe => `${recipe.recipe_no || recipe.recipeNo || ""} - ${recipe.color_name || recipe.colorName || ""}`.trim()).join(", ");
+    lines.push(`Recipes using this dye: ${recipeList}`);
+  }else{
+    lines.push("Recipes using this dye: Not found in loaded recipes");
+  }
+
+  return lines.join("\n");
 }
 
 function extractResponseText(responseJson){
@@ -425,11 +540,6 @@ async function askAiProvider(prompt){
 
 async function handleAiAssistant(req, res){
   try{
-    const limit = checkAssistantLimit(req);
-    if(!limit.allowed){
-      return res.status(429).json({error:"AI Assistant hourly limit reached. Please try again later."});
-    }
-
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     const user = await verifySupabaseUser(token);
     const question = String(req.body.question || "").trim();
@@ -437,7 +547,28 @@ async function handleAiAssistant(req, res){
     if(!question) return res.status(400).json({error:"Question is required."});
     if(question.length > 500) return res.status(400).json({error:"Question is too long. Keep it below 500 characters."});
 
+    if(/^(hi|hello|hey|namaste|hii)$/i.test(question)){
+      return res.json({
+        answer: tryDirectAssistantAnswer(question, null),
+        provider: "direct"
+      });
+    }
+
+    const limit = checkAssistantLimit(req);
+    if(!limit.allowed){
+      return res.status(429).json({error:"AI Assistant hourly limit reached. Please try again later."});
+    }
+
     const dataContext = await loadAssistantContext();
+    const directAnswer = tryDirectAssistantAnswer(question, dataContext);
+    if(directAnswer){
+      return res.json({
+        answer: directAnswer,
+        provider: "direct",
+        remaining: limit.remaining
+      });
+    }
+
     const aiResult = await askAiProvider(buildAssistantPrompt(user, history, dataContext, question));
 
     res.json({
