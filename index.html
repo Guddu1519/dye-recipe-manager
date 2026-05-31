@@ -548,7 +548,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="programRecipeSearch" placeholder="Search Recipe No, Color Name, Recipe Master Name" oninput="renderPrograms()">
     <table>
       <thead>
-        <tr><th>Select</th><th>Recipe Master / Recipe No</th><th>Color Name</th><th>Batch Thans</th></tr>
+        <tr><th>Select</th><th>Recipe No</th><th>Recipe Master</th><th>Color Name</th><th>Batch Thans</th></tr>
       </thead>
       <tbody id="programRecipeTable"></tbody>
     </table>
@@ -822,6 +822,7 @@ let programStockUsage = [];
 let editColorIndex = null;
 let editRecipeIndex = null;
 let editProgramIndex = null;
+let programSaveInProgress = false;
 let currentUser = null;
 let currentRole = "viewer";
 let refreshTimer = null;
@@ -839,6 +840,7 @@ const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 const LOW_STOCK_THRESHOLD_GRAMS = 5000;
 const CLOUD_SAVE_TIMEOUT_MS = 45000;
 const CLOUD_LOAD_TIMEOUT_MS = 30000;
+const PROGRAM_SAVE_TIMEOUT_MS = 120000;
 const FIXED_RECIPE_MASTER_NAMES = ["SARVAN JI", "NARPAT JI", "OWN"];
 const CUSTOM_RECIPE_MASTER_VALUE = "__CUSTOM__";
 const PROGRAM_EDIT_OVERRIDES_KEY = "mtm_program_recipe_overrides";
@@ -3153,7 +3155,11 @@ function setProgramProceedBusy(isBusy){
   const button = document.getElementById("programProceedBtn");
   if(!button) return;
   button.disabled = isBusy;
-  button.textContent = isBusy ? "Proceeding..." : (editProgramIndex !== null ? "Update Program" : "Proceed");
+  if(isBusy){
+    button.textContent = editProgramIndex !== null ? "Updating program..." : "Creating program...";
+  }else{
+    button.textContent = editProgramIndex !== null ? "Update Program" : "Proceed";
+  }
 }
 
 function setProgramBaseMode(){
@@ -3168,6 +3174,17 @@ function getSelectedProgramRecipes(selectedNos){
     .filter(Boolean));
 }
 
+function validateProgramRecipe(recipe){
+  if(!recipe) return "Recipe not found";
+  if(!String(recipe.recipeNo || "").trim()) return "Recipe No missing";
+  if(!String(recipe.colorName || "").trim()) return "Color Name missing";
+  if(!getRecipeSavedThans(recipe) || getRecipeSavedThans(recipe) <= 0) return "Batch thans missing";
+  if(!Array.isArray(recipe.dyes) || !recipe.dyes.length) return "Dye rows missing";
+  let invalidDye = recipe.dyes.find(d => !String(d.name || "").trim() || !(Number(d.qty) > 0));
+  if(invalidDye) return "Dye name or quantity missing";
+  return "";
+}
+
 function clearProgramForm(){
   document.getElementById("programName").value = "";
   document.getElementById("programRequiredThans").value = "";
@@ -3177,6 +3194,7 @@ function clearProgramForm(){
 
 async function createProgram(){
   if(!requireAdmin()) return;
+  if(programSaveInProgress) return;
   if(!supabaseClient){
     alert("Supabase is not connected. Program was not saved.");
     return;
@@ -3211,12 +3229,16 @@ async function createProgram(){
     alert("Required thans must be greater than 0");
     return;
   }
-  let missingBatchRecipe = selectedRecipes.find(r => !getRecipeSavedThans(r) || getRecipeSavedThans(r) <= 0);
-  if(missingBatchRecipe){
-    alert("Batch thans missing for this recipe: " + (missingBatchRecipe.recipeNo || ""));
+  let invalidRecipe = selectedRecipes.map(recipe => ({
+    recipe,
+    reason: validateProgramRecipe(recipe)
+  })).find(item => item.reason);
+  if(invalidRecipe){
+    alert("Recipe " + (invalidRecipe.recipe?.recipeNo || "") + " invalid: " + invalidRecipe.reason);
     return;
   }
   setProgramProceedBusy(true);
+  programSaveInProgress = true;
   let programNo = null;
   let stockDeducted = false;
   try{
@@ -3252,8 +3274,8 @@ async function createProgram(){
   };
   let { data: insertedRows, error } = await withTimeout(
     supabaseClient.from("programs").insert(programPayload).select("id"),
-    CLOUD_SAVE_TIMEOUT_MS,
-    "Program save timed out after 45 seconds. Please try again with fewer recipes or check your Supabase connection."
+    PROGRAM_SAVE_TIMEOUT_MS,
+    "Program save timed out after 120 seconds. Please check your Supabase connection."
   );
   if(error && (String(error.message || "").includes("status") || String(error.message || "").includes("required_thans") || String(error.message || "").includes("stock_deducted"))){
     delete programPayload.status;
@@ -3261,8 +3283,8 @@ async function createProgram(){
     delete programPayload.stock_deducted;
     ({ data: insertedRows, error } = await withTimeout(
       supabaseClient.from("programs").insert(programPayload).select("id"),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Program save timed out after 45 seconds. Please try again with fewer recipes or check your Supabase connection."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Program save timed out after 120 seconds. Please check your Supabase connection."
     ));
   }
 
@@ -3291,8 +3313,12 @@ async function createProgram(){
   });
   clearProgramForm();
   await loadDataFromJson();
-  showSuccessToast("Program successfully created" + (stockDeducted ? " and stock deducted" : ""));
+  showSuccessToast("Program created successfully");
+  }catch(error){
+    console.error("Program save/update failed", error);
+    alert((editProgramIndex !== null ? "Program update failed: " : "Program creation failed: ") + (error.message || error));
   }finally{
+    programSaveInProgress = false;
     setProgramProceedBusy(false);
   }
 }
@@ -3364,7 +3390,8 @@ function renderPrograms(){
     .map(r => `
       <tr>
         <td><input class="programRecipeCheck" type="checkbox" value="${r.recipeNo || ""}" ${editingRecipeNos.has(String(r.recipeNo || "")) ? "checked" : ""} ${isAdmin() ? "" : "disabled"}></td>
-        <td>${r.recipeMasterName ? r.recipeMasterName + " - " : ""}${r.recipeNo || ""}</td>
+        <td>${r.recipeNo || ""}</td>
+        <td>${r.recipeMasterName || ""}</td>
         <td>${r.colorName || ""}</td>
         <td>${r.recipeThans || ""}</td>
       </tr>
@@ -3559,8 +3586,9 @@ function editProgram(index){
 }
 
 async function updateProgramRecipes(index, details){
+  try{
   let program = programs[index];
-  if(!program || !program.id) return;
+  if(!program || !program.id) throw new Error("Program record missing. Refresh cloud data and try again.");
 
   let oldValue = {...program, recipeSnapshot: resolveProgramRecipes(program)};
   let selectedRecipes = details.selectedRecipes || [];
@@ -3595,8 +3623,8 @@ async function updateProgramRecipes(index, details){
 
   let { error } = await withTimeout(
     supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id"),
-    CLOUD_SAVE_TIMEOUT_MS,
-    "Program update timed out after 45 seconds."
+    PROGRAM_SAVE_TIMEOUT_MS,
+    "Program update timed out after 120 seconds."
   );
   if(error && (String(error.message || "").includes("status") || String(error.message || "").includes("required_thans") || String(error.message || "").includes("stock_deducted"))){
     delete updatePayload.status;
@@ -3604,22 +3632,21 @@ async function updateProgramRecipes(index, details){
     delete updatePayload.stock_deducted;
     ({ error } = await withTimeout(
       supabaseClient.from("programs").update(updatePayload).eq("id", program.id).select("id"),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Program update timed out after 45 seconds."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Program update timed out after 120 seconds."
     ));
   }
 
   if(error){
-    alert("Program update failed: " + error.message);
     await loadDataFromJson();
-    return;
+    throw new Error(error.message);
   }
 
   if(program.programNo){
     await withTimeout(
       supabaseClient.from("programs").update(updatePayload).eq("program_no", program.programNo),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Duplicate program row update timed out after 45 seconds."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Duplicate program row update timed out after 120 seconds."
     );
   }
 
@@ -3670,7 +3697,14 @@ async function updateProgramRecipes(index, details){
   programs[index] = {...updatedProgram, stockDeducted:true};
   clearProgramForm();
   await loadDataFromJson();
-  showSuccessToast("Program updated and stock recalculated");
+  showSuccessToast("Program updated successfully");
+  }catch(error){
+    console.error("Program update failed", error);
+    alert("Program update failed: " + (error.message || error));
+  }finally{
+    programSaveInProgress = false;
+    setProgramProceedBusy(false);
+  }
 }
 
 function getProgramStockDelta(oldRecipes, oldRequiredThans, newRecipes, newRequiredThans){
@@ -3729,8 +3763,8 @@ async function replaceProgramStockUsage(program, newUsage){
 
   let { error } = await withTimeout(
     supabaseClient.from("program_stock_usage").insert(usageRows),
-    CLOUD_SAVE_TIMEOUT_MS,
-    "Program stock usage save timed out after 45 seconds."
+    PROGRAM_SAVE_TIMEOUT_MS,
+    "Program stock usage save timed out after 120 seconds."
   );
   if(error){
     alert("Program stock usage save failed: " + error.message + ". Run the updated Supabase SQL for stock tables.");
@@ -3760,8 +3794,8 @@ async function applyProgramStockDelta(program, stockDelta){
   if(ledgerRows.length){
     let { error: ledgerError } = await withTimeout(
       supabaseClient.from("chemical_stock_ledger").insert(ledgerRows),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Program stock change save timed out after 45 seconds."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Program stock change save timed out after 120 seconds."
     );
     if(ledgerError){
       alert("Program stock change failed: " + ledgerError.message + ". Run the updated Supabase SQL for stock tables.");
@@ -3787,8 +3821,8 @@ async function applyProgramStockDelta(program, stockDelta){
     let programQueryValue = program.programNo || program.id;
     let { error: programError } = await withTimeout(
       supabaseClient.from("programs").update({stock_deducted:true}).eq(programQueryColumn, programQueryValue),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Program stock flag update timed out after 45 seconds."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Program stock flag update timed out after 120 seconds."
     );
     if(programError) console.warn("Program stock flag update failed", programError);
   }
@@ -4173,8 +4207,8 @@ async function deductStockForProgram(program){
     if(program.id){
       let { error } = await withTimeout(
         supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id),
-        CLOUD_SAVE_TIMEOUT_MS,
-        "Program stock flag update timed out after 45 seconds."
+        PROGRAM_SAVE_TIMEOUT_MS,
+        "Program stock flag update timed out after 120 seconds."
       );
       if(error) console.warn("Program stock flag update failed", error);
     }
@@ -4226,8 +4260,8 @@ async function deductStockForProgram(program){
 
   let { error: ledgerError } = await withTimeout(
     supabaseClient.from("chemical_stock_ledger").insert(ledgerRows),
-    CLOUD_SAVE_TIMEOUT_MS,
-    "Stock ledger save timed out after 45 seconds."
+    PROGRAM_SAVE_TIMEOUT_MS,
+    "Stock ledger save timed out after 120 seconds."
   );
   if(ledgerError){
     alert("Stock deduction failed: " + ledgerError.message + ". Run the updated Supabase SQL for stock tables.");
@@ -4236,8 +4270,8 @@ async function deductStockForProgram(program){
 
   let { error: usageError } = await withTimeout(
     supabaseClient.from("program_stock_usage").insert(usageRows),
-    CLOUD_SAVE_TIMEOUT_MS,
-    "Program stock usage save timed out after 45 seconds."
+    PROGRAM_SAVE_TIMEOUT_MS,
+    "Program stock usage save timed out after 120 seconds."
   );
   if(usageError){
     await withTimeout(
@@ -4250,8 +4284,8 @@ async function deductStockForProgram(program){
         note: "Auto rollback after failed program stock usage save",
         created_at: new Date().toISOString()
       }))),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Stock rollback save timed out after 45 seconds."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Stock rollback save timed out after 120 seconds."
     );
     alert("Program stock usage save failed: " + usageError.message + ". Run the updated Supabase SQL for stock tables.");
     return false;
@@ -4260,8 +4294,8 @@ async function deductStockForProgram(program){
   if(program.id){
     let { error: programError } = await withTimeout(
       supabaseClient.from("programs").update({stock_deducted:true}).eq("id", program.id),
-      CLOUD_SAVE_TIMEOUT_MS,
-      "Program stock flag update timed out after 45 seconds."
+      PROGRAM_SAVE_TIMEOUT_MS,
+      "Program stock flag update timed out after 120 seconds."
     );
     if(programError) console.warn("Program stock flag update failed", programError);
   }
