@@ -235,82 +235,90 @@ function logoutHandler(req, res) {
 
 app.post("/api/auth/logout", logoutHandler);
 
-async function dbHandler(req, res) {
+app.post("/api/db/:table/select", async (req, res) => {
   if (!requireDatabase(res)) return;
-  const action = req.params?.action || req.query?.action;
-  const tableName = req.params?.table || req.query?.table;
-  if (!["select", "insert", "update", "delete"].includes(action)) {
-    return jsonError(res, 404, "Database action not found.");
+  const user = requireUser(req, res);
+  if (!user) return;
+
+  try {
+    const table = safeTable(req.params.table);
+    const where = buildWhere(req.body.filters || []);
+    const order = sanitizeOrder(req.body.order);
+    const limit = Number(req.body.limit || 0);
+    const limitSql = limit > 0 ? ` limit ${Math.min(limit, 5000)}` : "";
+    const result = await pool.query(`select * from ${table}${where.sql}${order}${limitSql}`, where.values);
+    res.json({ data: normalizeRowsForClient(result.rows) });
+  } catch (error) {
+    console.error("Neon select failed", error);
+    jsonError(res, 500, error.message);
   }
+});
 
-  if (action === "select") {
-    const user = requireUser(req, res);
-    if (!user) return;
-
-    try {
-      const table = safeTable(tableName);
-      const where = buildWhere(req.body.filters || []);
-      const order = sanitizeOrder(req.body.order);
-      const limit = Number(req.body.limit || 0);
-      const limitSql = limit > 0 ? ` limit ${Math.min(limit, 5000)}` : "";
-      const result = await pool.query(`select * from ${table}${where.sql}${order}${limitSql}`, where.values);
-      return res.json({ data: normalizeRowsForClient(result.rows) });
-    } catch (error) {
-      console.error("Neon select failed", error);
-      return jsonError(res, 500, error.message);
-    }
-  }
-
+app.post("/api/db/:table/insert", async (req, res) => {
+  if (!requireDatabase(res)) return;
   const user = requireAdmin(req, res);
   if (!user) return;
 
   try {
-    const table = safeTable(tableName);
+    const table = safeTable(req.params.table);
+    const rows = Array.isArray(req.body.rows) ? req.body.rows : [req.body.row || {}];
+    if (!rows.length) return res.json({ data: [] });
+    const inserted = [];
 
-    if (action === "insert") {
-      const rows = Array.isArray(req.body.rows) ? req.body.rows : [req.body.row || {}];
-      if (!rows.length) return res.json({ data: [] });
-      const inserted = [];
-
-      for (const row of rows) {
-        const clean = { ...row };
-        const columns = Object.keys(clean).filter(Boolean);
-        const values = columns.map(column => clean[column]);
-        const placeholders = columns.map((_, index) => `$${index + 1}`).join(",");
-        const sql = `insert into ${table} (${columns.join(",")}) values (${placeholders}) returning *`;
-        const result = await pool.query(sql, values);
-        inserted.push(result.rows[0]);
-      }
-
-      return res.json({ data: inserted });
+    for (const row of rows) {
+      const clean = { ...row };
+      const columns = Object.keys(clean).filter(Boolean);
+      const values = columns.map(column => clean[column]);
+      const placeholders = columns.map((_, index) => `$${index + 1}`).join(",");
+      const sql = `insert into ${table} (${columns.join(",")}) values (${placeholders}) returning *`;
+      const result = await pool.query(sql, values);
+      inserted.push(result.rows[0]);
     }
 
-    if (action === "update") {
-      const row = req.body.row || {};
-      const columns = Object.keys(row).filter(Boolean);
-      if (!columns.length) return res.json({ data: [] });
-      const values = columns.map(column => row[column]);
-      const setSql = columns.map((column, index) => `${column} = $${index + 1}`).join(",");
-      const where = buildWhere(req.body.filters || [], values.length + 1);
-      const result = await pool.query(`update ${table} set ${setSql}${where.sql} returning *`, [...values, ...where.values]);
-      return res.json({ data: result.rows });
-    }
-
-    if (action === "delete") {
-      const where = buildWhere(req.body.filters || []);
-      if (!where.sql) return jsonError(res, 400, "Delete filter required.");
-      const result = await pool.query(`delete from ${table}${where.sql} returning *`, where.values);
-      return res.json({ data: result.rows });
-    }
-
-    return jsonError(res, 404, "Database action not found.");
+    res.json({ data: inserted });
   } catch (error) {
-    console.error("Neon " + action + " failed", error);
-    return jsonError(res, 500, error.message);
+    console.error("Neon insert failed", error);
+    jsonError(res, 500, error.message);
   }
-}
+});
 
-app.post("/api/db/:table/:action", dbHandler);
+app.post("/api/db/:table/update", async (req, res) => {
+  if (!requireDatabase(res)) return;
+  const user = requireAdmin(req, res);
+  if (!user) return;
+
+  try {
+    const table = safeTable(req.params.table);
+    const row = req.body.row || {};
+    const columns = Object.keys(row).filter(Boolean);
+    if (!columns.length) return res.json({ data: [] });
+    const values = columns.map(column => row[column]);
+    const setSql = columns.map((column, index) => `${column} = $${index + 1}`).join(",");
+    const where = buildWhere(req.body.filters || [], values.length + 1);
+    const result = await pool.query(`update ${table} set ${setSql}${where.sql} returning *`, [...values, ...where.values]);
+    res.json({ data: result.rows });
+  } catch (error) {
+    console.error("Neon update failed", error);
+    jsonError(res, 500, error.message);
+  }
+});
+
+app.post("/api/db/:table/delete", async (req, res) => {
+  if (!requireDatabase(res)) return;
+  const user = requireAdmin(req, res);
+  if (!user) return;
+
+  try {
+    const table = safeTable(req.params.table);
+    const where = buildWhere(req.body.filters || []);
+    if (!where.sql) return jsonError(res, 400, "Delete filter required.");
+    const result = await pool.query(`delete from ${table}${where.sql} returning *`, where.values);
+    res.json({ data: result.rows });
+  } catch (error) {
+    console.error("Neon delete failed", error);
+    jsonError(res, 500, error.message);
+  }
+});
 
 app.use(express.static(__dirname));
 app.get("/", (req, res) => {
@@ -363,4 +371,3 @@ module.exports.healthHandler = healthHandler;
 module.exports.loginHandler = loginHandler;
 module.exports.logoutHandler = logoutHandler;
 module.exports.setupCheckHandler = setupCheckHandler;
-module.exports.dbHandler = dbHandler;
