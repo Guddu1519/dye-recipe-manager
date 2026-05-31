@@ -16,6 +16,9 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const AI_PROVIDER = (process.env.AI_PROVIDER || "ollama").toLowerCase();
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
 const assistantUsage = new Map();
 const ASSISTANT_LIMIT_PER_HOUR = Number(process.env.AI_ASSISTANT_LIMIT_PER_HOUR || 20);
 const ASSISTANT_FETCH_TIMEOUT_MS = Number(process.env.AI_ASSISTANT_FETCH_TIMEOUT_MS || 45000);
@@ -230,14 +233,107 @@ function extractResponseText(responseJson){
   return parts.join("\n").trim();
 }
 
+function buildAssistantInstructions(){
+  return [
+    "You are the read-only AI Production Assistant for MONICA TEXTILE MILLS dye recipe manager.",
+    "Answer only from the provided Supabase data snapshot. Do not invent data.",
+    "Never suggest editing, inserting, deleting, or updating database rows.",
+    "For totals, show units clearly: grams, kg, Rs., thans.",
+    "If a table helps, return a compact markdown table.",
+    "If data is missing, say exactly what is missing."
+  ].join("\n");
+}
+
+function buildAssistantPrompt(user, history, dataContext, question){
+  return [
+    buildAssistantInstructions(),
+    "",
+    "User: " + (user.email || "logged-in user"),
+    "Recent chat: " + JSON.stringify(history),
+    "Supabase data snapshot: " + JSON.stringify(dataContext),
+    "Question: " + question
+  ].join("\n");
+}
+
+async function askOllama(prompt){
+  const response = await fetchWithTimeout(`${OLLAMA_URL.replace(/\/$/, "")}/api/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OLLAMA_MODEL,
+      prompt,
+      stream: false,
+      options: {
+        temperature: 0.2
+      }
+    })
+  }, ASSISTANT_FETCH_TIMEOUT_MS, "Free local AI timed out. Make sure Ollama is running.");
+
+  const result = await response.json();
+  if(!response.ok){
+    throw new Error(result.error || "Free local AI failed.");
+  }
+  return result.response || "";
+}
+
+async function askOpenAI(prompt){
+  if(!OPENAI_API_KEY){
+    throw new Error("OPENAI_API_KEY is missing on the server.");
+  }
+
+  const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      max_output_tokens: 900,
+      instructions: buildAssistantInstructions(),
+      input: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ]
+    })
+  }, ASSISTANT_FETCH_TIMEOUT_MS, "OpenAI request timed out. Please try a shorter question or try again.");
+
+  const result = await response.json();
+  if(!response.ok){
+    const message = result.error?.message || "OpenAI request failed.";
+    if(/quota|billing|plan/i.test(message)){
+      throw new Error("OpenAI quota/billing is not active. Free local AI can still work if Ollama is running.");
+    }
+    throw new Error(message);
+  }
+  return extractResponseText(result) || "";
+}
+
+async function askAiProvider(prompt){
+  if(AI_PROVIDER === "openai"){
+    return {answer: await askOpenAI(prompt), provider: "openai"};
+  }
+
+  try{
+    return {answer: await askOllama(prompt), provider: "ollama"};
+  }catch(ollamaError){
+    console.warn("Ollama AI failed", ollamaError.message);
+    if(AI_PROVIDER === "ollama" || !OPENAI_API_KEY){
+      throw new Error("Free local AI is not running. Install Ollama, run `ollama pull " + OLLAMA_MODEL + "`, then start Ollama and try again.");
+    }
+    return {answer: await askOpenAI(prompt), provider: "openai"};
+  }
+}
+
 async function handleAiAssistant(req, res){
   try{
     const limit = checkAssistantLimit(req);
     if(!limit.allowed){
       return res.status(429).json({error:"AI Assistant hourly limit reached. Please try again later."});
-    }
-    if(!OPENAI_API_KEY){
-      return res.status(500).json({error:"OPENAI_API_KEY is missing on the server."});
     }
 
     const token = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "");
@@ -248,39 +344,11 @@ async function handleAiAssistant(req, res){
     if(question.length > 500) return res.status(400).json({error:"Question is too long. Keep it below 500 characters."});
 
     const dataContext = await loadAssistantContext();
-    const response = await fetchWithTimeout("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        max_output_tokens: 900,
-        instructions: [
-          "You are the read-only AI Production Assistant for MONICA TEXTILE MILLS dye recipe manager.",
-          "Answer only from the provided Supabase data snapshot. Do not invent data.",
-          "Never suggest editing, inserting, deleting, or updating database rows.",
-          "For totals, show units clearly: grams, kg, Rs., thans.",
-          "If a table helps, return a compact markdown table.",
-          "If data is missing, say exactly what is missing."
-        ].join("\n"),
-        input: [
-          {
-            role: "user",
-            content: "User: " + (user.email || "logged-in user") + "\nRecent chat: " + JSON.stringify(history) + "\nSupabase data snapshot: " + JSON.stringify(dataContext) + "\nQuestion: " + question
-          }
-        ]
-      })
-    }, ASSISTANT_FETCH_TIMEOUT_MS, "OpenAI request timed out. Please try a shorter question or try again.");
-
-    const result = await response.json();
-    if(!response.ok){
-      return res.status(response.status).json({error: result.error?.message || "OpenAI request failed."});
-    }
+    const aiResult = await askAiProvider(buildAssistantPrompt(user, history, dataContext, question));
 
     res.json({
-      answer: extractResponseText(result) || "No answer generated.",
+      answer: aiResult.answer || "No answer generated.",
+      provider: aiResult.provider,
       remaining: limit.remaining
     });
   }catch(error){
