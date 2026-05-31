@@ -139,6 +139,25 @@ function normalizeRowsForClient(rows) {
   return rows || [];
 }
 
+async function ensureAuthTables() {
+  await pool.query(`
+    create table if not exists app_users (
+      id text primary key,
+      email text not null unique,
+      password_hash text not null,
+      role text not null default 'viewer' check (role in ('admin', 'viewer')),
+      created_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists profiles (
+      id text primary key,
+      email text not null default '',
+      role text not null default 'viewer' check (role in ('admin', 'viewer'))
+    )
+  `);
+}
+
 app.get("/api/health", async (req, res) => {
   const neon = Boolean(pool);
   res.json({
@@ -148,6 +167,24 @@ app.get("/api/health", async (req, res) => {
   });
 });
 
+app.get("/api/setup/check", async (req, res) => {
+  if (!requireDatabase(res)) return;
+  try {
+    await pool.query("select 1");
+    const tables = await pool.query(
+      "select table_name from information_schema.tables where table_schema='public' order by table_name"
+    );
+    res.json({
+      ok: true,
+      database: "neon",
+      tables: tables.rows.map(row => row.table_name)
+    });
+  } catch (error) {
+    console.error("Neon setup check failed", error);
+    jsonError(res, 500, error.message);
+  }
+});
+
 app.post("/api/auth/login", async (req, res) => {
   if (!requireDatabase(res)) return;
   const email = String(req.body.email || "").trim().toLowerCase();
@@ -155,6 +192,7 @@ app.post("/api/auth/login", async (req, res) => {
   if (!email || !password) return jsonError(res, 400, "Email and password required.");
 
   try {
+    await ensureAuthTables();
     let result = await pool.query("select id,email,password_hash,role from app_users where lower(email)=lower($1) limit 1", [email]);
     if (!result.rows.length && ADMIN_PASSWORD && email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       const id = crypto.randomUUID();
