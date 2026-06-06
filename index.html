@@ -473,6 +473,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <input id="profitPercent" type="number" placeholder="Profit %">
     </div>
     <button class="btn green" onclick="calculateCost()">Calculate Cost</button>
+    <button class="btn" onclick="printBatchCosting('single')">Print / Export PDF</button>
   </div>
 
   <div class="card" id="costResult"></div>
@@ -492,6 +493,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   </div>
 
   <div class="card" id="multiCostResult"></div>
+  <div class="card">
+    <button class="btn" onclick="printBatchCosting('multiple')">Print / Export PDF</button>
+  </div>
 </section>
 
 <section id="recipeCompare">
@@ -3069,6 +3073,58 @@ function printRecipeCompare(){
         <button onclick="window.print()">Print / Save PDF</button>
         <h1>Recipe Compare</h1>
         ${refreshed.innerHTML}
+      </body>
+    </html>
+  `);
+  win.document.close();
+}
+
+function printBatchCosting(type="single"){
+  const resultId = type === "multiple" ? "multiCostResult" : "costResult";
+  const title = type === "multiple" ? "Multiple Recipe Batch Costing" : "Single Recipe Batch Costing";
+  let result = document.getElementById(resultId);
+
+  if(type === "single" && (!result || !result.innerHTML.trim())){
+    calculateCost();
+    result = document.getElementById(resultId);
+  }
+
+  if(!result || !result.innerHTML.trim()){
+    alert("Please calculate costing first.");
+    return;
+  }
+
+  const win = window.open("", "_blank");
+  if(!win){
+    alert("Popup blocked. Please allow popups to export the Batch Costing PDF.");
+    return;
+  }
+  win.document.write(`
+    <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          body{font-family:Arial;margin:18px;color:#111}
+          h1,h2,h3{margin:8px 0}
+          .printHeader{text-align:center;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px}
+          .printHeader h1{font-size:22px;margin:0 0 4px;white-space:nowrap}
+          .printHeader p{margin:0;font-size:12px}
+          table{width:100%;border-collapse:collapse;margin:10px 0;font-size:12px}
+          th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top}
+          th{background:#dbeafe}
+          .warningBox{border:1px solid #f59e0b;background:#fffbeb;padding:8px;margin:8px 0}
+          button{margin-bottom:12px;padding:8px 12px}
+          @media print{button{display:none}.card{box-shadow:none;border:0}}
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print()">Print / Save PDF</button>
+        <div class="printHeader">
+          <h1>MONICA TEXTILE MILLS</h1>
+          <p>F-238, Mandia Road, Pali, Rajasthan - 306401, India</p>
+          <h2>${title}</h2>
+        </div>
+        ${result.innerHTML}
       </body>
     </html>
   `);
