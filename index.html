@@ -3065,12 +3065,18 @@ function printRecipeCompare(){
           .compareHighest{background:#fee2e2!important;color:#991b1b;font-weight:bold}
           .muted{color:#64748b;font-size:11px}
           .compareDyeList{margin:0;padding-left:16px}
-          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44}
-          @media print{button{display:none}}
+          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44;text-decoration:none;text-align:center;width:max-content}
+          .androidPrintAction{display:none}
+          .androidApp .androidPrintAction{display:block!important}
+          .androidApp .browserPrintAction{display:none!important}
+          @media print{button,.printAction{display:none!important}}
         </style>
       </head>
       <body>
         <script>
+          if(navigator.userAgent.indexOf("MTMAndroidApp") !== -1){
+            document.documentElement.classList.add("androidApp");
+          }
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
               AndroidPrinter.printPage();
@@ -3085,7 +3091,8 @@ function printRecipeCompare(){
         <\/script>
         <h1>Recipe Compare</h1>
         ${refreshed.innerHTML}
-        <button class="printAction" onclick="printOrSavePdf()">Print / Save PDF</button>
+        <a class="printAction androidPrintAction" href="mtmprint://print">Print / Save PDF</a>
+        <button class="printAction browserPrintAction" onclick="printOrSavePdf()">Print / Save PDF</button>
       </body>
     </html>
   `);
@@ -3126,12 +3133,18 @@ function printBatchCosting(type="single"){
           th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top}
           th{background:#dbeafe}
           .warningBox{border:1px solid #f59e0b;background:#fffbeb;padding:8px;margin:8px 0}
-          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44}
-          @media print{button{display:none}.card{box-shadow:none;border:0}}
+          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44;text-decoration:none;text-align:center;width:max-content}
+          .androidPrintAction{display:none}
+          .androidApp .androidPrintAction{display:block!important}
+          .androidApp .browserPrintAction{display:none!important}
+          @media print{button,.printAction{display:none!important}.card{box-shadow:none;border:0}}
         </style>
       </head>
       <body>
         <script>
+          if(navigator.userAgent.indexOf("MTMAndroidApp") !== -1){
+            document.documentElement.classList.add("androidApp");
+          }
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
               AndroidPrinter.printPage();
@@ -3150,7 +3163,8 @@ function printBatchCosting(type="single"){
           <h2>${title}</h2>
         </div>
         ${result.innerHTML}
-        <button class="printAction" onclick="printOrSavePdf()">Print / Save PDF</button>
+        <a class="printAction androidPrintAction" href="mtmprint://print">Print / Save PDF</a>
+        <button class="printAction browserPrintAction" onclick="printOrSavePdf()">Print / Save PDF</button>
       </body>
     </html>
   `);
@@ -3890,8 +3904,12 @@ async function exportProgramPdf(index, options={}){
           h2,h3{margin:5px 0 4px}
           .signatureGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:18px}
           .signatureBox{border-top:1px solid #111;text-align:center;padding-top:8px}
+          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44;text-decoration:none;text-align:center;width:max-content}
+          .androidPrintAction{display:none}
+          .androidApp .androidPrintAction{display:block!important}
+          .androidApp .browserPrintAction{display:none!important}
           @media print{
-            button{display:none}
+            button,.printAction{display:none!important}
             @page{margin:12mm}
             body{padding:0}
           }
@@ -3899,6 +3917,9 @@ async function exportProgramPdf(index, options={}){
       </head>
       <body>
         <script>
+          if(navigator.userAgent.indexOf("MTMAndroidApp") !== -1){
+            document.documentElement.classList.add("androidApp");
+          }
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
               AndroidPrinter.printPage();
@@ -3912,7 +3933,8 @@ async function exportProgramPdf(index, options={}){
           }
         <\/script>
         ${renderProgramHtml(program, requiredThans)}
-        <button style="display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44" onclick="printOrSavePdf()">Print / Save PDF</button>
+        <a class="printAction androidPrintAction" href="mtmprint://print">Print / Save PDF</a>
+        <button class="printAction browserPrintAction" onclick="printOrSavePdf()">Print / Save PDF</button>
       </body>
     </html>
   `);
