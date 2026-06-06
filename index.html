@@ -3070,7 +3070,16 @@ function printRecipeCompare(){
         </style>
       </head>
       <body>
-        <button onclick="window.print()">Print / Save PDF</button>
+        <button onclick="printOrSavePdf()">Print / Save PDF</button>
+        <script>
+          function printOrSavePdf(){
+            if(window.AndroidPrinter && AndroidPrinter.printPage){
+              AndroidPrinter.printPage();
+              return;
+            }
+            window.print();
+          }
+        <\/script>
         <h1>Recipe Compare</h1>
         ${refreshed.innerHTML}
       </body>
@@ -3118,7 +3127,16 @@ function printBatchCosting(type="single"){
         </style>
       </head>
       <body>
-        <button onclick="window.print()">Print / Save PDF</button>
+        <button onclick="printOrSavePdf()">Print / Save PDF</button>
+        <script>
+          function printOrSavePdf(){
+            if(window.AndroidPrinter && AndroidPrinter.printPage){
+              AndroidPrinter.printPage();
+              return;
+            }
+            window.print();
+          }
+        <\/script>
         <div class="printHeader">
           <h1>MONICA TEXTILE MILLS</h1>
           <p>F-238, Mandia Road, Pali, Rajasthan - 306401, India</p>
@@ -3872,7 +3890,16 @@ async function exportProgramPdf(index, options={}){
         </style>
       </head>
       <body>
-        <button onclick="window.print()">Print / Save PDF</button>
+        <button onclick="printOrSavePdf()">Print / Save PDF</button>
+        <script>
+          function printOrSavePdf(){
+            if(window.AndroidPrinter && AndroidPrinter.printPage){
+              AndroidPrinter.printPage();
+              return;
+            }
+            window.print();
+          }
+        <\/script>
         ${renderProgramHtml(program, requiredThans)}
       </body>
     </html>
