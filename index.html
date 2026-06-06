@@ -3077,6 +3077,10 @@ function printRecipeCompare(){
               AndroidPrinter.printPage();
               return;
             }
+            if(navigator.userAgent.indexOf("MTMAndroidApp") !== -1){
+              window.location.href = "mtmprint://print";
+              return;
+            }
             window.print();
           }
         <\/script>
@@ -3132,6 +3136,10 @@ function printBatchCosting(type="single"){
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
               AndroidPrinter.printPage();
+              return;
+            }
+            if(navigator.userAgent.indexOf("MTMAndroidApp") !== -1){
+              window.location.href = "mtmprint://print";
               return;
             }
             window.print();
@@ -3895,6 +3903,10 @@ async function exportProgramPdf(index, options={}){
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
               AndroidPrinter.printPage();
+              return;
+            }
+            if(navigator.userAgent.indexOf("MTMAndroidApp") !== -1){
+              window.location.href = "mtmprint://print";
               return;
             }
             window.print();
