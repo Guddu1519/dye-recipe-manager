@@ -2810,7 +2810,7 @@ function calculateMultiRecipeCost(){
 
   document.getElementById("multiCostResult").innerHTML = `
     <h2>Multiple Recipe Costing Summary</h2>
-    <p><b>Selected Recipes:</b> ${selectedRecipes.map(r => `${r.recipeNo} - ${r.colorName}`).join(", ")}</p>
+    <p><b>Selected Recipe Nos:</b> ${selectedRecipes.map(r => r.recipeNo).join(", ")}</p>
     ${warningHtml}
     <table>
       <tbody>
