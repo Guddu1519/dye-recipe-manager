@@ -3065,12 +3065,11 @@ function printRecipeCompare(){
           .compareHighest{background:#fee2e2!important;color:#991b1b;font-weight:bold}
           .muted{color:#64748b;font-size:11px}
           .compareDyeList{margin:0;padding-left:16px}
-          button{margin-bottom:12px;padding:8px 12px}
+          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44}
           @media print{button{display:none}}
         </style>
       </head>
       <body>
-        <button onclick="printOrSavePdf()">Print / Save PDF</button>
         <script>
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
@@ -3086,6 +3085,7 @@ function printRecipeCompare(){
         <\/script>
         <h1>Recipe Compare</h1>
         ${refreshed.innerHTML}
+        <button class="printAction" onclick="printOrSavePdf()">Print / Save PDF</button>
       </body>
     </html>
   `);
@@ -3126,12 +3126,11 @@ function printBatchCosting(type="single"){
           th,td{border:1px solid #999;padding:6px;text-align:left;vertical-align:top}
           th{background:#dbeafe}
           .warningBox{border:1px solid #f59e0b;background:#fffbeb;padding:8px;margin:8px 0}
-          button{margin-bottom:12px;padding:8px 12px}
+          .printAction{display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44}
           @media print{button{display:none}.card{box-shadow:none;border:0}}
         </style>
       </head>
       <body>
-        <button onclick="printOrSavePdf()">Print / Save PDF</button>
         <script>
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
@@ -3151,6 +3150,7 @@ function printBatchCosting(type="single"){
           <h2>${title}</h2>
         </div>
         ${result.innerHTML}
+        <button class="printAction" onclick="printOrSavePdf()">Print / Save PDF</button>
       </body>
     </html>
   `);
@@ -3898,7 +3898,6 @@ async function exportProgramPdf(index, options={}){
         </style>
       </head>
       <body>
-        <button onclick="printOrSavePdf()">Print / Save PDF</button>
         <script>
           function printOrSavePdf(){
             if(window.AndroidPrinter && AndroidPrinter.printPage){
@@ -3913,6 +3912,7 @@ async function exportProgramPdf(index, options={}){
           }
         <\/script>
         ${renderProgramHtml(program, requiredThans)}
+        <button style="display:block;margin:22px auto 12px;padding:12px 20px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:bold;font-size:15px;box-shadow:0 8px 20px #0f766e44" onclick="printOrSavePdf()">Print / Save PDF</button>
       </body>
     </html>
   `);
