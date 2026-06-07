@@ -212,10 +212,13 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     .workflowSteps{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:12px 0}
     .workflowStep{background:#f8fafc;border:1px solid #dbeafe;border-radius:12px;padding:10px;color:#334155;font-weight:700;font-size:13px}
     .workflowStep span{display:block;color:#2563eb;font-size:12px;text-transform:uppercase;margin-bottom:4px}
+    .downloadAppCard{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:15px;background:linear-gradient(135deg,#ecfeff,#ffffff)}
+    .downloadAppCard h3{margin:0 0 6px;color:#0f172a}
+    .downloadAppCard p{margin:0;color:#64748b}
     .footerLine{margin-left:0;background:transparent;border:0}
     @media(max-width:900px){.statGrid,.dashboardHero,.dashboardGrid,.contactGrid,.stockGrid,.reportGrid,.compareGrid{grid-template-columns:1fr}.dashboardLogoBox{justify-content:flex-start;text-align:left;min-width:0}.quickActions{grid-template-columns:1fr 1fr}.stockSummary{grid-template-columns:1fr}}
     @media(max-width:900px){header{left:0}.sidebarHotspot{display:block;width:22px;z-index:1100}.sidebarOpen .sidebarOverlay{display:block}nav,nav:hover{width:min(82vw,260px);transform:translateX(-105%);transition:.2s ease}.sidebarOpen nav{transform:translateX(0)}section{margin-left:0;padding-left:18px;padding-right:18px}.footerLine{margin-left:0}.erpChartGrid,.workflowSteps{grid-template-columns:1fr}}
-    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:row;align-items:center}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}section{padding-top:150px}.toastContainer{left:16px;right:16px;top:18px}.successToast{text-align:center}}
+    @media(max-width:700px){.row,.dyeRow,.statGrid,.signatureGrid,.quickActions{grid-template-columns:1fr}.downloadAppCard{display:block}.downloadAppCard .btn{margin-top:12px}table{font-size:13px;min-width:650px}.card{overflow-x:auto}.auth-card{padding:18px}.logout{margin-left:0}header{height:auto;min-height:72px;flex-direction:row;align-items:center}.brandLeft{align-items:center}.siteLogo{width:46px;height:46px}.companyHeader{text-align:left;margin-left:0}.appTitle p{margin:6px 0 0}nav button,.btn{width:100%;padding:14px}.dashboardHero{padding:16px}.dashboardHero h2{font-size:24px}.dashboardLogo{width:72px;height:72px}.contactActions .btn{width:100%}.bellWrap{width:100%;order:12}.bellBtn{width:100%}.notificationPanel{left:0;right:auto;width:100%}.stockHeaderRow{flex-direction:column}section{padding-top:150px}.toastContainer{left:16px;right:16px;top:18px}.successToast{text-align:center}}
     @media(max-width:700px){.mobileMenuBtn{width:42px;height:42px;flex-basis:42px}nav{width:min(82vw,260px);gap:3px;padding:10px 10px}nav:before{font-size:20px;padding:5px 8px 12px;margin-bottom:5px}nav button{padding:8px 10px!important;font-size:13px;line-height:1.05;border-radius:10px;min-height:0}nav button:before{width:22px!important;height:22px!important;flex-basis:22px!important}nav .logout{padding:9px 10px!important;margin-top:auto}nav .role-badge{padding:8px 8px!important;font-size:12px}}
   </style>
 </head>
@@ -301,6 +304,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <div class="stat"><span>This Month Production</span><b id="dashMonthlyProduction">0</b></div>
       <div class="stat"><span>Stock Value</span><b id="dashStockValue">Rs. 0</b></div>
     </div>
+
+  <div class="card downloadAppCard">
+    <div>
+      <h3>Download MTM Android App</h3>
+      <p>Install the MTM app on your Android phone for quick access to Dye Recipe Manager.</p>
+    </div>
+    <a class="btn green" href="downloads/MTM.apk" download>Download APK</a>
+  </div>
   </div>
 
   <div class="dashboardGrid">
