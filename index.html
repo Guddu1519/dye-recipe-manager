@@ -93,6 +93,21 @@ th{background:#dbeafe}
     .importProgressTrack{height:14px;background:#e2e8f0;border-radius:999px;overflow:hidden}
     .importProgressBar{height:100%;width:0;background:linear-gradient(90deg,#2563eb,#16a34a);border-radius:999px;transition:width .25s ease}
     .importProgressText{margin-top:8px;font-weight:bold;color:#1d4ed8}
+
+    .adminPinOverlay{position:fixed;inset:0;z-index:30000;background:rgba(15,23,42,.68);display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(5px);animation:modalFade .16s ease-out}
+    .adminPinCard{width:100%;max-width:420px;background:#fff;border-radius:18px;box-shadow:0 28px 80px rgba(15,23,42,.35);overflow:hidden;animation:modalPop .18s ease-out;border:1px solid #e2e8f0}
+    .adminPinHead{padding:18px 20px;background:linear-gradient(135deg,#0f172a,#1d4ed8);color:#fff}
+    .adminPinHead h3{margin:0;font-size:20px;letter-spacing:-.01em}
+    .adminPinHead p{margin:6px 0 0;color:#dbeafe;font-size:13px;line-height:1.35}
+    .adminPinBody{padding:18px 20px 20px}
+    .adminPinAction{font-weight:800;color:#0f172a;margin-bottom:12px}
+    .adminPinInput{font-size:22px!important;text-align:center;letter-spacing:.28em;font-weight:800;margin:0 0 10px!important;border:1px solid #cbd5e1!important;border-radius:12px!important;padding:13px!important}
+    .adminPinError{display:none;background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:10px;padding:10px 12px;margin:10px 0;font-weight:700;font-size:13px}
+    .adminPinError.show{display:block}
+    .adminPinActions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+    .adminPinCancel{background:#e5e7eb!important;color:#111827!important}
+    .adminPinDelete{background:#dc2626!important;color:#fff!important;min-width:132px}
+    @media(max-width:520px){.adminPinCard{max-width:100%}.adminPinActions{display:grid;grid-template-columns:1fr}.adminPinActions .btn{width:100%}}
     .priceModalOverlay{display:none;position:fixed;inset:0;background:#0f172a99;z-index:10000;align-items:center;justify-content:center;padding:18px}
     .priceModalOverlay.open{display:flex;animation:modalFade .18s ease-out}
     .priceModal{width:100%;max-width:460px;background:white;border-radius:14px;box-shadow:0 24px 70px #0005;overflow:hidden;animation:modalPop .2s ease-out}
@@ -1029,24 +1044,105 @@ function requireAdmin(){
 }
 async function confirmAdminDeletePin(actionText){
   if(!requireAdmin()) return false;
-
-  const pin = prompt("Enter Admin Delete PIN to " + (actionText || "delete this item") + ":");
-  if(pin === null) return false;
-
-  try{
-    const response = await fetch("/api/verify-delete-pin", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({pin})
-    });
-    const data = await response.json().catch(() => ({}));
-    if(response.ok && data.ok) return true;
-    alert(data.error || "Wrong Admin Delete PIN.");
-  }catch(error){
-    alert("Admin Delete PIN check failed. Please check internet and try again.");
-  }
-  return false;
+  return showAdminDeletePinModal(actionText || "delete this item");
 }
+
+function showAdminDeletePinModal(actionText){
+  return new Promise(resolve => {
+    const overlay = document.createElement("div");
+    overlay.className = "adminPinOverlay";
+    overlay.innerHTML = `
+      <div class="adminPinCard" role="dialog" aria-modal="true" aria-labelledby="adminPinTitle">
+        <div class="adminPinHead">
+          <h3 id="adminPinTitle">Admin PIN Required</h3>
+          <p>This extra check protects important delete actions.</p>
+        </div>
+        <div class="adminPinBody">
+          <div class="adminPinAction">Confirm: ${escapeHtml(actionText)}</div>
+          <input class="adminPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" maxlength="12">
+          <div class="adminPinError"></div>
+          <div class="adminPinActions">
+            <button type="button" class="btn adminPinCancel">Cancel</button>
+            <button type="button" class="btn adminPinDelete">Verify and Delete</button>
+          </div>
+        </div>
+      </div>`;
+
+    const card = overlay.querySelector(".adminPinCard");
+    const input = overlay.querySelector(".adminPinInput");
+    const errorBox = overlay.querySelector(".adminPinError");
+    const cancelBtn = overlay.querySelector(".adminPinCancel");
+    const deleteBtn = overlay.querySelector(".adminPinDelete");
+    let settled = false;
+
+    function close(result){
+      if(settled) return;
+      settled = true;
+      document.removeEventListener("keydown", handleKey);
+      overlay.remove();
+      resolve(result);
+    }
+
+    function showError(message){
+      errorBox.textContent = message || "Wrong Admin Delete PIN.";
+      errorBox.classList.add("show");
+      input.focus();
+      input.select();
+    }
+
+    async function verifyPin(){
+      const pin = input.value.trim();
+      if(!pin){
+        showError("Please enter Admin Delete PIN.");
+        return;
+      }
+
+      deleteBtn.disabled = true;
+      cancelBtn.disabled = true;
+      deleteBtn.textContent = "Checking...";
+      errorBox.classList.remove("show");
+
+      try{
+        const response = await fetch("/api/verify-delete-pin", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({pin})
+        });
+        const data = await response.json().catch(() => ({}));
+        if(response.ok && data.ok){
+          close(true);
+          return;
+        }
+        showError(data.error || "Wrong Admin Delete PIN.");
+      }catch(error){
+        showError("PIN check failed. Please check internet and try again.");
+      }finally{
+        deleteBtn.disabled = false;
+        cancelBtn.disabled = false;
+        deleteBtn.textContent = "Verify and Delete";
+      }
+    }
+
+    function handleKey(event){
+      if(event.key === "Escape") close(false);
+      if(event.key === "Enter"){
+        event.preventDefault();
+        verifyPin();
+      }
+    }
+
+    overlay.addEventListener("mousedown", event => {
+      if(event.target === overlay) close(false);
+    });
+    card.addEventListener("mousedown", event => event.stopPropagation());
+    cancelBtn.addEventListener("click", () => close(false));
+    deleteBtn.addEventListener("click", verifyPin);
+    document.addEventListener("keydown", handleKey);
+    document.body.appendChild(overlay);
+    setTimeout(() => input.focus(), 50);
+  });
+}
+
 async function loadUserRole(){
   let previousRole = currentRole;
   if(!currentUser) return;
