@@ -12,6 +12,20 @@ app.get("/api/health", (req, res) => {
     message: "API working"
   });
 });
+app.post("/api/verify-delete-pin", (req, res) => {
+  const configuredPin = process.env.ADMIN_DELETE_PIN || "2580";
+  const enteredPin = String(req.body?.pin || "").trim();
+
+  if (!enteredPin) {
+    return res.status(400).json({ ok: false, error: "Admin Delete PIN is required." });
+  }
+
+  if (enteredPin !== configuredPin) {
+    return res.status(403).json({ ok: false, error: "Wrong Admin Delete PIN." });
+  }
+
+  res.json({ ok: true });
+});
 
 app.use(express.static(__dirname));
 app.get("/", (req, res) => {

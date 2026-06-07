@@ -1027,7 +1027,26 @@ function requireAdmin(){
   alert("Viewers can only search, view recipes, and calculate costing.");
   return false;
 }
+async function confirmAdminDeletePin(actionText){
+  if(!requireAdmin()) return false;
 
+  const pin = prompt("Enter Admin Delete PIN to " + (actionText || "delete this item") + ":");
+  if(pin === null) return false;
+
+  try{
+    const response = await fetch("/api/verify-delete-pin", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({pin})
+    });
+    const data = await response.json().catch(() => ({}));
+    if(response.ok && data.ok) return true;
+    alert(data.error || "Wrong Admin Delete PIN.");
+  }catch(error){
+    alert("Admin Delete PIN check failed. Please check internet and try again.");
+  }
+  return false;
+}
 async function loadUserRole(){
   let previousRole = currentRole;
   if(!currentUser) return;
@@ -2026,6 +2045,7 @@ async function deleteColor(i){
   if(!requireAdmin()) return;
 
   if(confirm("Delete only this color: " + colors[i].name + "?")){
+    if(!(await confirmAdminDeletePin("delete color " + colors[i].name))) return;
     let oldValue = {...colors[i]};
     const saved = await deleteColorRecord(colors[i]);
     if(saved){
@@ -2647,6 +2667,7 @@ async function deleteRecipe(i){
   if(!requireAdmin()) return;
 
   if(confirm("Delete only this recipe: " + recipes[i].recipeNo + "?")){
+    if(!(await confirmAdminDeletePin("delete recipe " + recipes[i].recipeNo))) return;
     let oldValue = {...recipes[i]};
     await saveRecipeVersion(oldValue, "before delete");
     const saved = await deleteRecipeRecord(recipes[i]);
@@ -4376,6 +4397,7 @@ async function deleteProgram(index){
   let program = programs[index];
   if(!program || !program.id) return;
   if(!confirm("Delete Program " + program.programNo + "?")) return;
+  if(!(await confirmAdminDeletePin("delete program " + program.programNo))) return;
 
   let restored = await restoreProgramStock(program);
   if(!restored) return;
@@ -5324,6 +5346,7 @@ async function deleteProcessHouse(index){
   let house = processHouses[index];
   if(!house || !house.id) return;
   if(!confirm("Delete process house: " + house.name + "?")) return;
+  if(!(await confirmAdminDeletePin("delete process house " + house.name))) return;
   if(processHouseLocalOnly || String(house.id).startsWith("local-")){
     processHouses.splice(index, 1);
     saveLocalProcessHouses();
