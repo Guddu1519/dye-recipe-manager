@@ -4692,22 +4692,64 @@ function clearStockNotifications(){
 
 function getStockRows(){
   let map = {};
-  stockLedger.forEach(entry => {
-    let name = normalizeName(entry.chemicalName || entry.chemical_name);
-    if(!name) return;
+  let ledgerUsageKeys = new Set();
+
+  function ensureStockRow(name){
     if(!map[name]){
       map[name] = {name, purchased:0, used:0, balance:0};
     }
+    return map[name];
+  }
+
+  function usageKey(programNo, name, qty){
+    return [String(programNo || ""), normalizeName(name), Math.round(Math.abs(Number(qty) || 0))].join("|");
+  }
+
+  (stockLedger || []).forEach(entry => {
+    let name = normalizeName(entry.chemicalName || entry.chemical_name);
+    if(!name) return;
+    let row = ensureStockRow(name);
     let delta = Number(entry.qtyDeltaGrams ?? entry.qty_delta_grams ?? 0);
     let type = entry.entryType || entry.entry_type || "";
-    if(type === "program_delete_restore"){
-      map[name].used = Math.max(0, map[name].used - Math.abs(delta));
-    } else {
-      if(delta > 0) map[name].purchased += delta;
-      if(delta < 0 || type === "program_usage") map[name].used += Math.abs(delta);
+
+    if(type === "program_usage"){
+      ledgerUsageKeys.add(usageKey(entry.program_no, name, delta));
     }
-    map[name].balance += delta;
+
+    if(type === "program_delete_restore"){
+      row.used = Math.max(0, row.used - Math.abs(delta));
+    } else {
+      if(delta > 0 && type !== "adjustment") row.purchased += delta;
+      if(delta < 0 || type === "program_usage") row.used += Math.abs(delta);
+      if(delta > 0 && type === "adjustment") row.purchased += delta;
+    }
+    row.balance += delta;
   });
+
+  const activeProgramIds = new Set((programs || []).map(program => String(program.id || "")).filter(Boolean));
+  const activeProgramNos = new Set((programs || []).map(program => String(program.programNo || program.program_no || "")).filter(Boolean));
+
+  (programStockUsage || []).forEach(usage => {
+    let name = normalizeName(usage.chemical_name || usage.chemicalName);
+    let qty = Number(usage.quantity_used_grams || usage.quantityUsedGrams || 0);
+    let programId = String(usage.program_id || "");
+    let programNo = String(usage.program_no || "");
+    if(!name || qty <= 0) return;
+    if(activeProgramIds.size || activeProgramNos.size){
+      if(programId && activeProgramIds.has(programId)){
+        // active program found by id
+      } else if(programNo && activeProgramNos.has(programNo)){
+        // active program found by number
+      } else {
+        return;
+      }
+    }
+    if(ledgerUsageKeys.has(usageKey(programNo, name, qty))) return;
+    let row = ensureStockRow(name);
+    row.used += qty;
+    row.balance -= qty;
+  });
+
   return Object.values(map).sort((a,b) => a.name.localeCompare(b.name));
 }
 
@@ -4955,6 +4997,12 @@ async function saveStockAdjustment(){
   if(!requireAdmin()) return;
   let name = normalizeName(document.getElementById("adjustChemicalName").value);
   let grams = gramsFromQty(Number(document.getElementById("adjustQty").value), document.getElementById("adjustUnit").value);
+  let reason = document.getElementById("adjustReason").value;
+  if(reason === "Damage"){
+    grams = -Math.abs(grams);
+  } else if(reason === "Opening balance"){
+    grams = Math.abs(grams);
+  }
   if(!name || !grams){
     alert("Chemical name and adjustment quantity required");
     return;
@@ -4963,7 +5011,7 @@ async function saveStockAdjustment(){
     chemical_name: name,
     entry_type: "adjustment",
     qty_delta_grams: grams,
-    note: document.getElementById("adjustReason").value + " - " + document.getElementById("adjustNote").value.trim(),
+    note: reason + " - " + document.getElementById("adjustNote").value.trim(),
     created_at: new Date().toISOString()
   });
   if(error){
@@ -4973,7 +5021,7 @@ async function saveStockAdjustment(){
   await logAudit("stock adjustment", "Chemical Stock", name, null, {
     chemicalName: name,
     qtyDeltaGrams: grams,
-    reason: document.getElementById("adjustReason").value,
+    reason,
     note: document.getElementById("adjustNote").value.trim()
   });
   ["adjustChemicalName","adjustQty","adjustNote"].forEach(id => document.getElementById(id).value = "");
