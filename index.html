@@ -176,12 +176,21 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     nav button{width:100%;box-sizing:border-box;order:initial!important;display:flex;align-items:center;gap:9px;text-align:left;background:transparent;color:#cbd5e1;border-radius:10px;padding:clamp(6px,.9vh,9px) 12px;font-size:clamp(12px,1.55vh,14px);line-height:1.1;font-weight:700;white-space:nowrap}
     nav button:hover{background:#1e293b;color:white}
     nav button.active{background:#2563eb;color:white;box-shadow:0 10px 24px #2563eb40}
-    nav button:nth-of-type(1):before{content:"D";display:inline-grid;place-items:center;width:22px;height:22px;border-radius:8px;background:#1e40af;color:white;font-size:11px;flex:0 0 22px}
-    nav button:nth-of-type(2):before{content:"R";display:inline-grid;place-items:center;width:22px;height:22px;border-radius:8px;background:#334155;color:white;font-size:11px;flex:0 0 22px}
-    nav button:nth-of-type(3):before{content:"C";display:inline-grid;place-items:center;width:22px;height:22px;border-radius:8px;background:#334155;color:white;font-size:11px;flex:0 0 22px}
-    nav button:nth-of-type(4):before{content:"P";display:inline-grid;place-items:center;width:22px;height:22px;border-radius:8px;background:#334155;color:white;font-size:11px;flex:0 0 22px}
-    nav button:nth-of-type(5):before{content:"M";display:inline-grid;place-items:center;width:22px;height:22px;border-radius:8px;background:#334155;color:white;font-size:11px;flex:0 0 22px}
-    nav button:nth-of-type(7):before{content:"S";display:inline-grid;place-items:center;width:22px;height:22px;border-radius:8px;background:#334155;color:white;font-size:11px;flex:0 0 22px}
+    nav button:not(.logout):before{content:"";display:inline-block;width:24px;height:24px;border-radius:8px;background-color:#fff;background-position:center;background-repeat:no-repeat;background-size:18px auto;box-shadow:0 4px 10px #0002;flex:0 0 24px}
+    nav button.active:not(.logout):before{background-color:#fff;box-shadow:0 6px 14px #0003}
+    nav button:nth-of-type(1):before{background-image:url("logos/dashboard.png")}
+    nav button:nth-of-type(2):before{background-image:url("logos/recipe-master.png")}
+    nav button:nth-of-type(3):before{background-image:url("logos/batch-costing.png")}
+    nav button:nth-of-type(4):before{background-image:url("logos/recipe-compare.png")}
+    nav button:nth-of-type(5):before{background-image:url("logos/price-master.png")}
+    nav button:nth-of-type(6):before{background-image:url("logos/progam-management.png")}
+    nav button:nth-of-type(7):before{background-image:url("logos/process-house.png")}
+    nav button:nth-of-type(8):before{background-image:url("logos/stock-master.png")}
+    nav button:nth-of-type(9):before{background-image:url("logos/contact-us.png")}
+    nav button:nth-of-type(10):before{background-image:url("logos/settings-backup.png")}
+    nav button:nth-of-type(11):before{background-image:url("logos/reports.png")}
+    nav button:nth-of-type(12):before{background-image:url("logos/activity-logs.png")}
+    nav button:nth-of-type(13):before{background-image:url("logos/refresh-cloud-data.png" )}
     .role-badge,.logout{width:100%;margin-left:0;box-sizing:border-box;text-align:center;justify-content:center}
     nav .logout{margin-top:auto;padding:clamp(7px,1vh,10px) 12px}
     nav .role-badge{padding:clamp(7px,1vh,10px) 8px;font-size:clamp(11px,1.45vh,13px);white-space:nowrap}
