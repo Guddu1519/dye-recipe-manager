@@ -878,6 +878,7 @@ let stockAlertState = {};
 let dataLoaded = false;
 
 const LOCAL_AUDIT_KEY = "mtm_audit_logs";
+const LOCAL_PRICE_HISTORY_KEY = "mtm_price_change_logs";
 const SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 const LOW_STOCK_THRESHOLD_GRAMS = 5000;
 const CLOUD_SAVE_TIMEOUT_MS = 45000;
@@ -1781,8 +1782,43 @@ function confirmPriceUpdate(name, oldPrice, newPrice){
   });
 }
 
+function loadLocalPriceChangeLogs(){
+  try{
+    return JSON.parse(localStorage.getItem(LOCAL_PRICE_HISTORY_KEY) || "[]");
+  }catch{
+    return [];
+  }
+}
+
+function saveLocalPriceChangeLog(log){
+  try{
+    let logs = loadLocalPriceChangeLogs();
+    logs.unshift(log);
+    localStorage.setItem(LOCAL_PRICE_HISTORY_KEY, JSON.stringify(logs.slice(0, 500)));
+  }catch(error){
+    console.warn("Local price history save skipped", error);
+  }
+}
+
+function mergePriceChangeLogs(...groups){
+  let seen = new Set();
+  return groups.flat().filter(log => {
+    if(!log) return false;
+    let key = [
+      normalizeName(log.chemical_name || log.chemicalName || ""),
+      Number(log.old_price ?? log.oldPrice ?? 0).toFixed(4),
+      Number(log.new_price ?? log.newPrice ?? 0).toFixed(4),
+      log.updated_by || log.updatedBy || "",
+      log.created_at || log.createdAt || ""
+    ].join("|");
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a,b) => new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0));
+}
+
 async function logPriceChange(name, oldPrice, newPrice){
-  if(!supabaseClient || !currentUser || !isAdmin()) return;
+  if(!currentUser || !isAdmin()) return;
   let payload = {
     chemical_name: normalizeName(name),
     old_price: Number(oldPrice) || 0,
@@ -1790,26 +1826,36 @@ async function logPriceChange(name, oldPrice, newPrice){
     updated_by: currentUser.email || "",
     created_at: new Date().toISOString()
   };
+  saveLocalPriceChangeLog(payload);
+  priceChangeLogs = mergePriceChangeLogs([payload], priceChangeLogs || []);
+  renderPriceHistory();
+
+  if(!supabaseClient) return;
   const { error } = await supabaseClient.from("price_change_logs").insert(payload);
-  if(error) console.warn("Price change log skipped. Run updated Supabase SQL.", error);
+  if(error) console.warn("Price change log cloud save skipped. Run updated Supabase SQL.", error);
 }
 
 async function loadPriceChangeLogsFromSupabase(){
-  if(!supabaseClient || !isLoggedIn() || !isAdmin()){
+  if(!isLoggedIn() || !isAdmin()){
     priceChangeLogs = [];
+    return;
+  }
+  let localRows = loadLocalPriceChangeLogs();
+  if(!supabaseClient){
+    priceChangeLogs = localRows;
     return;
   }
   const { data, error } = await supabaseClient
     .from("price_change_logs")
     .select("*")
     .order("created_at", {ascending:false})
-    .limit(200);
+    .limit(500);
   if(error){
-    console.warn("Price history load skipped. Run updated Supabase SQL.", error);
-    priceChangeLogs = [];
+    console.warn("Price history cloud load skipped. Run updated Supabase SQL.", error);
+    priceChangeLogs = localRows;
     return;
   }
-  priceChangeLogs = data || [];
+  priceChangeLogs = mergePriceChangeLogs(data || [], localRows);
 }
 
 async function checkStockPriceUpdate(name, newPrice){
