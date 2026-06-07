@@ -2069,9 +2069,15 @@ async function saveColor(){
       return;
     }
   } else {
-    if(colors.some(c=>c.name === name)){
-      alert("Color already exists");
-      return;
+    let existingIndex = colors.findIndex(c => normalizeName(c.name) === normalizeName(name));
+    if(existingIndex !== -1){
+      let existingColor = colors[existingIndex];
+      let oldRate = Number(existingColor.rate || 0);
+      let shouldUpdate = await confirmPriceUpdate(name, oldRate, rate);
+      if(!shouldUpdate) return;
+      oldValue = {...existingColor};
+      obj.id = existingColor.id;
+      actionType = "update";
     }
   }
 
@@ -2135,9 +2141,15 @@ if(dl){
 }
 
 function getPriceHistoryRows(){
-  if(priceChangeLogs && priceChangeLogs.length) return priceChangeLogs;
+  let directRows = (priceChangeLogs || []).map(log => ({
+    chemical_name: log.chemical_name || "",
+    old_price: Number(log.old_price || 0),
+    new_price: Number(log.new_price || 0),
+    updated_by: log.updated_by || "",
+    created_at: log.created_at || ""
+  }));
 
-  return (auditLogs || [])
+  let auditRows = (auditLogs || [])
     .filter(log => (log.section_name || "") === "Price Master")
     .map(log => {
       let oldValue = log.old_value || {};
@@ -2155,6 +2167,22 @@ function getPriceHistoryRows(){
       };
     })
     .filter(Boolean);
+
+  let seen = new Set();
+  return [...directRows, ...auditRows]
+    .filter(log => {
+      let key = [
+        normalizeName(log.chemical_name),
+        Number(log.old_price || 0).toFixed(4),
+        Number(log.new_price || 0).toFixed(4),
+        log.updated_by || "",
+        log.created_at || ""
+      ].join("|");
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a,b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 }
 
 function renderPriceHistory(){
