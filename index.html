@@ -1686,6 +1686,10 @@ async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
   };
 
   saveLocalAuditLog(payload);
+  auditLogs = mergeAuditLogs([payload], auditLogs || []);
+  renderAuditLogs();
+
+
   const { error } = await withTimeout(
     supabaseClient.from("audit_logs").insert(payload),
     CLOUD_SAVE_TIMEOUT_MS,
@@ -1697,11 +1701,21 @@ async function logAudit(actionType, sectionName, itemName, oldValue, newValue){
 }
 
 function loadLocalAuditLogs(){
-  return [];
+  try{
+    return JSON.parse(localStorage.getItem(LOCAL_AUDIT_KEY) || "[]");
+  }catch{
+    return [];
+  }
 }
 
 function saveLocalAuditLog(log){
-  return;
+  try{
+    let logs = loadLocalAuditLogs();
+    logs.unshift(log);
+    localStorage.setItem(LOCAL_AUDIT_KEY, JSON.stringify(logs.slice(0, 500)));
+  }catch(error){
+    console.warn("Local audit log save skipped", error);
+  }
 }
 
 function mergeAuditLogs(cloudLogs, localLogs){
@@ -1732,11 +1746,11 @@ async function loadAuditLogsFromSupabase(){
 
   if(error){
     console.warn("Audit log load skipped", error);
-    auditLogs = [];
+    auditLogs = loadLocalAuditLogs();
     return;
   }
 
-  auditLogs = data || [];
+  auditLogs = mergeAuditLogs(data || [], loadLocalAuditLogs());
 }
 
 function confirmPriceUpdate(name, oldPrice, newPrice){
