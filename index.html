@@ -1048,6 +1048,14 @@ async function confirmAdminDeletePin(actionText){
 }
 
 function showAdminDeletePinModal(actionText){
+  const safeActionText = String(actionText || "delete this item").replace(/[&<>"'`]/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+    "`": "&#96;"
+  }[char]));
   return new Promise(resolve => {
     const overlay = document.createElement("div");
     overlay.className = "adminPinOverlay";
@@ -1058,7 +1066,7 @@ function showAdminDeletePinModal(actionText){
           <p>This extra check protects important delete actions.</p>
         </div>
         <div class="adminPinBody">
-          <div class="adminPinAction">Confirm: ${escapeHtml(actionText)}</div>
+          <div class="adminPinAction">Confirm: ${safeActionText}</div>
           <input class="adminPinInput" type="password" inputmode="numeric" autocomplete="off" placeholder="PIN" maxlength="12">
           <div class="adminPinError"></div>
           <div class="adminPinActions">
