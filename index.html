@@ -2070,6 +2070,11 @@ async function saveColor(){
     if(actionType === "update" && oldValue && normalizeName(oldValue.name) !== normalizeName(name)){
       await cascadeColorNameRename(oldValue.name, name);
     }
+    const oldRate = oldValue ? Number(oldValue.rate || 0) : 0;
+    if(actionType === "create" || oldRate !== Number(rate)){
+      await logPriceChange(name, oldRate, rate);
+    }
+
     await logAudit(actionType, "Price Master", name, oldValue, obj);
     showSuccessToast(actionType === "update" ? "Price updated" : "Price saved");
     clearColorForm();
@@ -2115,6 +2120,29 @@ if(dl){
   applyRolePermissions();
 }
 
+function getPriceHistoryRows(){
+  if(priceChangeLogs && priceChangeLogs.length) return priceChangeLogs;
+
+  return (auditLogs || [])
+    .filter(log => (log.section_name || "") === "Price Master")
+    .map(log => {
+      let oldValue = log.old_value || {};
+      let newValue = log.new_value || {};
+      let oldPrice = Number(oldValue.rate || 0);
+      let newPrice = Number(newValue.rate || 0);
+      if(!newPrice && log.action_type === "delete") return null;
+      if(oldPrice === newPrice && log.action_type !== "create") return null;
+      return {
+        chemical_name: newValue.name || oldValue.name || log.item_name || "",
+        old_price: oldPrice,
+        new_price: newPrice,
+        updated_by: log.user_email || "",
+        created_at: log.created_at || ""
+      };
+    })
+    .filter(Boolean);
+}
+
 function renderPriceHistory(){
   let table = document.getElementById("priceHistoryTable");
   if(!table) return;
@@ -2122,7 +2150,8 @@ function renderPriceHistory(){
     table.innerHTML = `<tr><td colspan="5">Only admin can view price change history.</td></tr>`;
     return;
   }
-  table.innerHTML = (priceChangeLogs || []).map(log => `
+  let rows = getPriceHistoryRows();
+  table.innerHTML = rows.map(log => `
     <tr>
       <td><span class="priceHistoryTag">${log.chemical_name || ""}</span></td>
       <td>Rs. ${Number(log.old_price || 0).toFixed(2)}/KG</td>
