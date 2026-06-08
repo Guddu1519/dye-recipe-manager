@@ -1283,6 +1283,25 @@ function isTrialCredentials(username, password){
   return String(username || "").trim().toUpperCase() === "TRIAL" && String(password || "").trim().toUpperCase() === "TRIAL";
 }
 
+function isSalesAdminCredentials(username, password){
+  return String(username || "").trim().toUpperCase() === "GARVIT" && String(password || "").trim() === "GARVIT1519";
+}
+
+function startSalesAdminLogin(){
+  trialLoginActive = false;
+  currentManagerMode = "sales";
+  currentUser = {
+    id: "sales-admin-garvit",
+    email: "GARVIT",
+    user_metadata: { role: "admin", module: "sales" },
+    app_metadata: { role: "admin", module: "sales" },
+    isSalesLocalAdmin: true
+  };
+  currentRole = "admin";
+  showSalesWorkspace("sales");
+  resetInactivityTimer();
+}
+
 function requireLogin(){
   if(isLoggedIn()) return true;
   alert("Please login first.");
@@ -1416,6 +1435,10 @@ function showAdminDeletePinModal(actionText){
 async function loadUserRole(){
   let previousRole = currentRole;
   if(!currentUser) return;
+  if(currentUser.isSalesLocalAdmin){
+    currentRole = "admin";
+    return;
+  }
   if(isTrialUser()){
     currentRole = "trial";
     return;
@@ -1724,6 +1747,11 @@ async function loginSalesUser(){
 
   if(isTrialCredentials(email, password)){
     await startTrialLogin("sales");
+    return;
+  }
+
+  if(isSalesAdminCredentials(email, password)){
+    startSalesAdminLogin();
     return;
   }
 
