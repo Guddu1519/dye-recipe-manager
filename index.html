@@ -443,7 +443,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
             <select id="salesPacking"><option value="">Packing</option></select>
             <select id="salesPatta"><option value="">Patta</option></select>
             <select id="salesStamping"><option value="">Stamping</option></select>
-            <input id="salesQuality" placeholder="Quality">
+            <select id="salesQuality">
+              <option value="">Quality</option>
+              <option value="HI TECH">HI TECH</option>
+              <option value="SARA INDIA">SARA INDIA</option>
+              <option value="DULHAN">DULHAN</option>
+              <option value="ACTIVA">ACTIVA</option>
+              <option value="SOFIYA">SOFIYA</option>
+            </select>
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
             <input id="salesQtyPerBale" type="number" placeholder="Qty Per Bale">
           </div>
@@ -474,6 +481,15 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Agents:</b> <span id="salesAgentCount">0</span></p>
           <p><b>Team Members:</b> <span id="salesStaffCount">0</span></p>
           <p class="muted">Create orders first, then push/change assigned team member from Order History.</p>
+        </div>
+      </div>
+      <div class="salesCard">
+        <h2>Pending Order Summary</h2>
+        <div class="salesGrid">
+          <div class="salesCard"><h3>Color No Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingColorTable"></table></div></div>
+          <div class="salesCard"><h3>Quality Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingQualityTable"></table></div></div>
+          <div class="salesCard"><h3>Agent Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingAgentTable"></table></div></div>
+          <div class="salesCard"><h3>Team Member Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingStaffTable"></table></div></div>
         </div>
       </div>
       <div class="salesCard">
@@ -3195,6 +3211,7 @@ function renderSalesManager(shouldLoadLocal=true){
   renderSalesStaffLedger();
   renderSalesMisc();
   renderSalesOrders();
+  renderSalesPendingSummary();
   renderSalesAgentPortal();
   renderSalesStaffOrders();
   let activeInBaleWork = document.activeElement && document.getElementById("salesBaleWorkArea")?.contains(document.activeElement);
@@ -3259,6 +3276,46 @@ function renderSalesMisc(){
   if(!table) return;
   table.innerHTML = `<tr><th>Type</th><th>Name</th><th>Action</th></tr>` +
     salesState.misc.map(m => `<tr><td>${salesEscape(m.type)}</td><td>${salesEscape(m.name)}</td><td><button class="salesSmallBtn gray" onclick="editSalesMisc('${m.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesMisc('${m.id}')">Delete</button></td></tr>`).join("");
+}
+
+function addSalesPendingSummary(map, key, qty, orderId){
+  key = String(key || "N/A").trim() || "N/A";
+  qty = Number(qty) || 0;
+  if(qty <= 0) return;
+  if(!map[key]) map[key] = {name:key, orderIds:new Set(), qty:0};
+  map[key].qty += qty;
+  if(orderId) map[key].orderIds.add(orderId);
+}
+
+function renderSalesSummaryTable(tableId, rows, nameLabel){
+  let table = document.getElementById(tableId);
+  if(!table) return;
+  let sorted = Object.values(rows).sort((a,b)=>b.qty - a.qty || String(a.name).localeCompare(String(b.name)));
+  table.innerHTML = `<tr><th>${salesEscape(nameLabel)}</th><th>Pending Orders</th><th>Total Pending Qty</th></tr>` +
+    (sorted.length ? sorted.map(row => `<tr><td>${salesEscape(row.name)}</td><td>${row.orderIds.size}</td><td><b>${row.qty}</b> pcs</td></tr>`).join("") : `<tr><td colspan="3" class="muted">No pending orders.</td></tr>`);
+}
+
+function renderSalesPendingSummary(){
+  let colorMap = {};
+  let qualityMap = {};
+  let agentMap = {};
+  let staffMap = {};
+  (salesState.orders || []).filter(order => order.status !== "Cancelled").forEach(order => {
+    let orderId = order.id || order.mtmOrderNo;
+    (order.colors || []).forEach(color => {
+      let pending = Number(color.pendingQty);
+      if(Number.isNaN(pending)) pending = Math.max(0, (Number(color.qty) || 0) - (Number(color.sentQty) || 0));
+      if(pending <= 0) return;
+      addSalesPendingSummary(colorMap, color.colorNo, pending, orderId);
+      addSalesPendingSummary(qualityMap, order.quality || "N/A", pending, orderId);
+      addSalesPendingSummary(agentMap, order.agentName || "N/A", pending, orderId);
+      addSalesPendingSummary(staffMap, order.assignedStaffName || "Not Assigned Yet", pending, orderId);
+    });
+  });
+  renderSalesSummaryTable("salesPendingColorTable", colorMap, "Color No");
+  renderSalesSummaryTable("salesPendingQualityTable", qualityMap, "Quality");
+  renderSalesSummaryTable("salesPendingAgentTable", agentMap, "Agent");
+  renderSalesSummaryTable("salesPendingStaffTable", staffMap, "Team Member");
 }
 
 function renderSalesOrders(){
