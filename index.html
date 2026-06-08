@@ -457,11 +457,16 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <div class="salesCard">
           <h2>Agent Ledger</h2>
           <input id="salesLedgerAgentName" placeholder="Agent Name">
+          <input id="salesLedgerAgentMobile" placeholder="Mobile Number">
           <input id="salesLedgerAgentEmail" type="email" placeholder="Agent Email">
           <div class="salesActions">
             <button class="salesSmallBtn green" onclick="addSalesAgent()">Add Agent</button>
+            <input id="agentCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesAgentCsv(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('agentCsvFile').click()">Import Agents</button>
+            <button class="salesSmallBtn gray" onclick="downloadSalesAgentSample()">Sample CSV</button>
+            <button class="salesSmallBtn gray" onclick="clearAgentCsv()">Clear CSV</button>
           </div>
-          <p class="muted">Use the same email as the agent login email so Agent Portal can show their parties/orders.</p>
+          <p class="muted">CSV format: agent_name,mobile_number,agent_login_email</p>
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Agents</h2>
@@ -2295,15 +2300,17 @@ function addSalesAgent(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can manage Agent Ledger.");
   let name = document.getElementById("salesLedgerAgentName").value.trim();
+  let mobile = document.getElementById("salesLedgerAgentMobile").value.trim();
   let email = document.getElementById("salesLedgerAgentEmail").value.trim().toLowerCase();
   if(!name) return alert("Agent Name is required.");
   if(!email || !email.includes("@")) return alert("Valid Agent Email is required.");
   let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(email) || normalizeName(a.name) === normalizeName(name));
   if(existing){
     existing.name = name;
+    existing.mobile = mobile;
     existing.email = email;
   }else{
-    salesState.agents.push({id:Date.now().toString(), name, email});
+    salesState.agents.push({id:Date.now().toString(), name, mobile, email});
   }
   salesState.parties.forEach(p => {
     if(normalizeName(p.agentEmail) === normalizeName(email) || normalizeName(p.agentName) === normalizeName(name)){
@@ -2313,6 +2320,7 @@ function addSalesAgent(){
   });
   saveSalesState();
   document.getElementById("salesLedgerAgentName").value = "";
+  document.getElementById("salesLedgerAgentMobile").value = "";
   document.getElementById("salesLedgerAgentEmail").value = "";
   renderSalesManager();
   showSuccessToast("Agent saved");
@@ -2682,10 +2690,10 @@ function renderSalesParties(){
 function renderSalesAgents(){
   let table = document.getElementById("salesAgentsTable");
   if(!table) return;
-  table.innerHTML = `<tr><th>Agent Name</th><th>Agent Email</th><th>Assigned Parties</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>Agent Name</th><th>Mobile Number</th><th>Agent Login Email</th><th>Assigned Parties</th><th>Action</th></tr>` +
     salesState.agents.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(agent => {
       let partyCount = salesState.parties.filter(p => normalizeName(p.agentEmail) === normalizeName(agent.email) || normalizeName(p.agentName) === normalizeName(agent.name)).length;
-      return `<tr><td>${salesEscape(agent.name)}</td><td>${salesEscape(agent.email)}</td><td>${partyCount}</td><td><button class="salesSmallBtn red" onclick="deleteSalesAgent('${agent.id}')">Delete</button></td></tr>`;
+      return `<tr><td>${salesEscape(agent.name)}</td><td>${salesEscape(agent.mobile)}</td><td>${salesEscape(agent.email)}</td><td>${partyCount}</td><td><button class="salesSmallBtn red" onclick="deleteSalesAgent('${agent.id}')">Delete</button></td></tr>`;
     }).join("");
 }
 
@@ -2817,6 +2825,44 @@ async function importSalesPartyCsv(event){
   saveSalesState(); renderSalesManager(); showSuccessToast("Party CSV imported");
 }
 
+async function importSalesAgentCsv(event){
+  if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can import agents.");
+  let file = event.target.files?.[0]; if(!file) return;
+  let rows = parseSalesCsv(await file.text());
+  let errors = [];
+  rows.forEach((row, index) => {
+    let name = row.agent_name || row.name || "";
+    let email = String(row.agent_login_email || row.agent_email || row.email || "").trim().toLowerCase();
+    if(!name || !email || !email.includes("@")){
+      errors.push(`Row ${index + 2}: agent_name and agent_login_email are required`);
+    }
+  });
+  if(errors.length) return alert("Agent import stopped:\n" + errors.join("\n"));
+  rows.forEach(row => {
+    let name = row.agent_name || row.name || "";
+    let mobile = row.mobile_number || row.mobile || row.phone || "";
+    let email = String(row.agent_login_email || row.agent_email || row.email || "").trim().toLowerCase();
+    let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(email) || normalizeName(a.name) === normalizeName(name));
+    if(existing){
+      existing.name = name;
+      existing.mobile = mobile;
+      existing.email = email;
+    }else{
+      salesState.agents.push({id:(Date.now() + Math.random()).toString(), name, mobile, email});
+    }
+    salesState.parties.forEach(p => {
+      if(normalizeName(p.agentEmail) === normalizeName(email) || normalizeName(p.agentName) === normalizeName(name)){
+        p.agentName = name;
+        p.agentEmail = email;
+      }
+    });
+  });
+  saveSalesState();
+  renderSalesManager();
+  showSuccessToast("Agents imported successfully");
+}
+
 async function importSalesMiscCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
@@ -2876,10 +2922,12 @@ async function importSalesOrderCsv(event){
 }
 
 function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,address,phone,agent_name,agent_email\nShree Textiles,24ABCDE1234F1Z5,Pali Rajasthan,9999999999,Agent 1,agent1@example.com\n"); }
+function downloadSalesAgentSample(){ downloadSalesCsv("agent-ledger-sample.csv", "agent_name,mobile_number,agent_login_email\nAgent 1,9462023854,agent1@example.com\n"); }
 function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
 function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
 function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,phone,station,tracking,confirmation,quality,rate,qty_per_bale,assign_staff\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,9999999999,Pali,LR123,Confirmed,Cotton,100,50,staff@example.com\n"); }
 function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
+function clearAgentCsv(){ let f = document.getElementById("agentCsvFile"); if(f) f.value = ""; showSuccessToast("Agent CSV cleared"); }
 function clearMiscCsv(){ let f = document.getElementById("miscCsvFile"); if(f) f.value = ""; showSuccessToast("Misc CSV cleared"); }
 
 async function logoutUser(auto=false){
