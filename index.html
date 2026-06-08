@@ -2234,6 +2234,23 @@ async function verifySalesCloudCount(key, expectedMin){
   return count >= expectedMin;
 }
 
+async function getLatestSalesCloudState(){
+  if(!canUseSalesCloud()) throw new Error("Login with Supabase Sales account first.");
+  let { data, error } = await supabaseClient
+    .from("sales_state")
+    .select("data")
+    .eq("id", "main")
+    .maybeSingle();
+  if(error) throw new Error("Sales cloud read failed: " + error.message);
+  let state = data?.data || {};
+  state.parties ||= [];
+  state.misc ||= [];
+  state.orders ||= [];
+  state.agents ||= [];
+  state.staffs ||= [];
+  return state;
+}
+
 function parseSalesCsv(text){
   let rows = String(text || "").replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter(Boolean).map(line => line.split(",").map(cell => cell.trim().replace(/^"|"$/g, "")));
   if(rows.length < 2) return [];
@@ -3147,35 +3164,45 @@ async function importSalesAgentCsv(event){
     }
   });
   if(errors.length) return alert("Agent import stopped:\n" + errors.join("\n"));
-  let importedCount = 0;
+  let importedAgents = [];
   rows.forEach(row => {
     let name = salesCsvPick(row, ["agent_name","agent","name"]);
     let mobile = salesCsvPick(row, ["mobile_number","mobile_no","mobile","phone_number","phone"]);
     let email = salesCsvPick(row, ["agent_login_email","agent_login_emal","agent_email","login_email","login_emal","email"]).toLowerCase();
-    let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(email) || normalizeName(a.name) === normalizeName(name));
+    importedAgents.push({id:(Date.now() + Math.random()).toString(), name, mobile, email});
+  });
+  if(importedAgents.length === 0) return alert("No agents imported. Please check CSV format.");
+
+  salesState = await getLatestSalesCloudState();
+  let beforeCount = salesState.agents.length;
+  let addedCount = 0;
+  let updatedCount = 0;
+  importedAgents.forEach(agent => {
+    let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(agent.email));
     if(existing){
-      existing.name = name;
-      existing.mobile = mobile;
-      existing.email = email;
+      existing.name = agent.name;
+      existing.mobile = agent.mobile;
+      existing.email = agent.email;
+      updatedCount++;
     }else{
-      salesState.agents.push({id:(Date.now() + Math.random()).toString(), name, mobile, email});
+      salesState.agents.push(agent);
+      addedCount++;
     }
     salesState.parties.forEach(p => {
-      if(normalizeName(p.agentEmail) === normalizeName(email) || normalizeName(p.agentName) === normalizeName(name)){
-        p.agentName = name;
-        p.agentEmail = email;
+      if(normalizeName(p.agentEmail) === normalizeName(agent.email) || normalizeName(p.agentName) === normalizeName(agent.name)){
+        p.agentName = agent.name;
+        p.agentEmail = agent.email;
       }
     });
-    importedCount++;
   });
-  if(importedCount === 0) return alert("No agents imported. Please check CSV format.");
   await saveSalesState();
-  let agentVerified = await verifySalesCloudCount("agents", salesState.agents.length);
+  let afterCount = salesState.agents.length;
+  let agentVerified = await verifySalesCloudCount("agents", afterCount);
   if(!agentVerified) alert("Agent import saved locally but cloud verification did not show the new rows. Press Refresh Sales Cloud and check Supabase sales_state.");
   renderSalesManager(false);
   showSalesTab("agents", false);
   renderSalesAgents();
-  showSuccessToast(`${importedCount} agent(s) imported successfully. Total agents: ${salesState.agents.length}`);
+  showSuccessToast(`Agents import done. Before: ${beforeCount}, Added: ${addedCount}, Updated: ${updatedCount}, Total: ${afterCount}`);
   }finally{
     salesImportInProgress = false;
   }
