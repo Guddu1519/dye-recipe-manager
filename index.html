@@ -306,7 +306,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="loginPage" class="auth-page">
   <div class="auth-card">
-    <h2 id="loginTitle">Dye Recipe Manager</h2>
+    <h2>Dyeing Manager Login</h2>
     <p>Login to view and manage your cloud recipes.</p>
     <div id="loginError" class="auth-error"></div>
     <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
@@ -314,6 +314,19 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <button class="btn green" style="width:100%" onclick="loginUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
     <div class="auth-meta">Your session stays active on this device until you logout.</div>
+  </div>
+</div>
+
+<div id="salesLoginPage" class="auth-page">
+  <div class="auth-card">
+    <h2>Sales Manager Login</h2>
+    <p>Login to open Sales Manager.</p>
+    <div id="salesLoginError" class="auth-error"></div>
+    <input id="salesLoginEmail" type="email" placeholder="Sales Email" autocomplete="email">
+    <input id="salesLoginPassword" type="password" placeholder="Sales Password" autocomplete="current-password">
+    <button class="btn green" style="width:100%" onclick="loginSalesUser()">Login</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
+    <div class="auth-meta">Sales Manager is separate from Dyeing Manager.</div>
   </div>
 </div>
 
@@ -1283,10 +1296,12 @@ function hideAllEntryScreens(){
   let manager = document.getElementById("managerSelectPage");
   let sales = document.getElementById("salesEmptyPage");
   let login = document.getElementById("loginPage");
+  let salesLogin = document.getElementById("salesLoginPage");
   let shell = document.getElementById("appShell");
   if(manager) manager.style.display = "none";
   if(sales) sales.style.display = "none";
   if(login) login.style.display = "none";
+  if(salesLogin) salesLogin.style.display = "none";
   if(shell) shell.style.display = "none";
 }
 
@@ -1309,8 +1324,6 @@ function showManagerSelect(){
 function openDyeingManager(){
   currentManagerMode = "dyeing";
   hideAllEntryScreens();
-  let title = document.getElementById("loginTitle");
-  if(title) title.textContent = "Dyeing Manager Login";
   let login = document.getElementById("loginPage");
   if(login) login.style.display = "flex";
   updateModeSwitchButton(true);
@@ -1320,12 +1333,10 @@ function openDyeingManager(){
 function openSalesManager(){
   currentManagerMode = "sales";
   hideAllEntryScreens();
-  let title = document.getElementById("loginTitle");
-  if(title) title.textContent = "Sales Manager Login";
-  let login = document.getElementById("loginPage");
+  let login = document.getElementById("salesLoginPage");
   if(login) login.style.display = "flex";
   updateModeSwitchButton(true);
-  setTimeout(() => document.getElementById("loginEmail")?.focus(), 80);
+  setTimeout(() => document.getElementById("salesLoginEmail")?.focus(), 80);
 }
 
 function showSalesWorkspace(){
@@ -1337,22 +1348,26 @@ function showSalesWorkspace(){
 }
 
 async function switchManagerMode(){
+  if(!confirm("Are you sure you want to go to the main switch screen? You will be logged out.")) return;
   switchingManagerMode = true;
   if(supabaseClient){
     await supabaseClient.auth.signOut();
   }
   currentUser = null;
   currentRole = "viewer";
-  if(currentManagerMode === "sales"){
-    openDyeingManager();
-  } else {
-    openSalesManager();
-  }
+  showManagerSelect();
   switchingManagerMode = false;
 }
 
 function showLoginError(message){
   let box = document.getElementById("loginError");
+  box.textContent = message;
+  box.style.display = "block";
+}
+
+function showSalesLoginError(message){
+  let box = document.getElementById("salesLoginError");
+  if(!box) return;
   box.textContent = message;
   box.style.display = "block";
 }
@@ -1380,6 +1395,16 @@ function setupLoginEnterKey(){
       if(event.key === "Enter"){
         event.preventDefault();
         loginUser();
+      }
+    });
+  });
+  ["salesLoginEmail","salesLoginPassword"].forEach(id => {
+    let input = document.getElementById(id);
+    if(!input) return;
+    input.addEventListener("keydown", function(event){
+      if(event.key === "Enter"){
+        event.preventDefault();
+        loginSalesUser();
       }
     });
   });
@@ -1454,6 +1479,37 @@ async function loginUser(){
   } else {
     await showDashboard();
   }
+  resetInactivityTimer();
+}
+
+async function loginSalesUser(){
+  if(!supabaseClient){
+    showSalesLoginError("Supabase is not connected. Please check your internet connection.");
+    return;
+  }
+
+  currentManagerMode = "sales";
+  let email = document.getElementById("salesLoginEmail").value.trim();
+  let password = document.getElementById("salesLoginPassword").value;
+
+  if(!email || !password){
+    showSalesLoginError("Sales email and password are required.");
+    return;
+  }
+
+  let { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error){
+    showSalesLoginError(error.message);
+    return;
+  }
+
+  currentUser = data.user;
+  await loadUserRole();
+  showSalesWorkspace();
   resetInactivityTimer();
 }
 
