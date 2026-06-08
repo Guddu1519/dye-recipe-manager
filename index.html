@@ -2021,6 +2021,7 @@ let salesProfile = null;
 let salesCloudLoaded = false;
 let salesProfiles = [];
 let salesRefreshTimer = null;
+let salesImportInProgress = false;
 let editingSalesPartyId = null;
 let editingSalesAgentId = null;
 let editingSalesMiscId = null;
@@ -2184,6 +2185,7 @@ function startSalesCloudRefresh(){
   if(!canUseSalesCloud()) return;
   salesRefreshTimer = setInterval(() => {
     if(document.hidden) return;
+    if(salesImportInProgress) return;
     if(!["sales","agent","staff"].includes(currentManagerMode)) return;
     refreshSalesCloudData({silent:true});
   }, 12000);
@@ -2210,6 +2212,18 @@ async function saveSalesState(){
     throw new Error("Sales cloud save failed: " + error.message);
   }
   localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+}
+
+async function verifySalesCloudCount(key, expectedMin){
+  if(!canUseSalesCloud()) return false;
+  let { data, error } = await supabaseClient
+    .from("sales_state")
+    .select("data")
+    .eq("id", "main")
+    .maybeSingle();
+  if(error) throw new Error("Sales cloud verify failed: " + error.message);
+  let count = Array.isArray(data?.data?.[key]) ? data.data[key].length : 0;
+  return count >= expectedMin;
 }
 
 function parseSalesCsv(text){
@@ -3062,6 +3076,8 @@ function renderSalesBaleWorkArea(){
 async function importSalesPartyCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
+  salesImportInProgress = true;
+  try{
   let rows = parseSalesCsv(await file.text());
   if(!rows.length) return alert("No party rows found in CSV.");
   let errors = [];
@@ -3094,13 +3110,22 @@ async function importSalesPartyCsv(event){
     importedCount++;
   });
   if(importedCount === 0) return alert("No parties imported. Please check CSV format.");
-  await saveSalesState(); await refreshSalesCloudData({silent:true}); renderSalesManager(); showSuccessToast(`${importedCount} party(s) imported successfully`);
+  await saveSalesState();
+  let partyVerified = await verifySalesCloudCount("parties", salesState.parties.length);
+  if(!partyVerified) alert("Party import saved locally but cloud verification did not show the new rows. Press Refresh Sales Cloud and check Supabase sales_state.");
+  renderSalesManager(false);
+  showSuccessToast(`${importedCount} party(s) imported successfully`);
+  }finally{
+    salesImportInProgress = false;
+  }
 }
 
 async function importSalesAgentCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can import agents.");
   let file = event.target.files?.[0]; if(!file) return;
+  salesImportInProgress = true;
+  try{
   let rows = parseSalesCsv(await file.text());
   if(!rows.length) return alert("No agent rows found in CSV. Use: agent_name,mobile_number,agent_login_email");
   let errors = [];
@@ -3135,9 +3160,13 @@ async function importSalesAgentCsv(event){
   });
   if(importedCount === 0) return alert("No agents imported. Please check CSV format.");
   await saveSalesState();
-  await refreshSalesCloudData({silent:true});
-  renderSalesManager();
+  let agentVerified = await verifySalesCloudCount("agents", salesState.agents.length);
+  if(!agentVerified) alert("Agent import saved locally but cloud verification did not show the new rows. Press Refresh Sales Cloud and check Supabase sales_state.");
+  renderSalesManager(false);
   showSuccessToast(`${importedCount} agent(s) imported successfully`);
+  }finally{
+    salesImportInProgress = false;
+  }
 }
 
 async function importSalesMiscCsv(event){
