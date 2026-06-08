@@ -2987,7 +2987,7 @@ function printSalesPackingSlips(orderId, baleNo=null){
       <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
     </section>`;
   };
-  let slipHtml = bales.map(bale => makeSlip(bale, "Office Copy") + makeSlip(bale, "Party Copy")).join("");
+  let slipHtml = bales.map(bale => `<div class="balePrintPage">${makeSlip(bale, "Office Copy")}${makeSlip(bale, "Party Copy")}</div>`).join("");
   let printWindow = window.open("", "_blank");
   if(!printWindow) return alert("Popup blocked. Please allow popups to print packing slip.");
   printWindow.document.write(`<!DOCTYPE html><html><head><title>Packing Slip</title>
@@ -2995,12 +2995,14 @@ function printSalesPackingSlips(orderId, baleNo=null){
       @page{size:A5 landscape;margin:6mm}
       *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:8px;color:#111;background:#fff}
       .printAction{display:block;margin:0 auto 12px;padding:12px 22px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:800;font-size:16px;box-shadow:0 10px 24px #0f766e33}
-      .sheet{display:grid;grid-template-columns:1fr;gap:6px}
-      .packingSlip{border:2px solid #111;padding:8px;height:calc((148mm - 12mm) / 2);min-height:0;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
+      .sheet{display:block}
+      .balePrintPage{display:grid;grid-template-columns:1fr 1fr;gap:6px;break-after:page;page-break-after:always}
+      .balePrintPage:last-child{break-after:auto;page-break-after:auto}
+      .packingSlip{border:2px solid #111;padding:8px;height:calc(148mm - 12mm);min-height:0;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
       .slipHead{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #111;margin-bottom:8px;padding-bottom:5px}
       h2{margin:0;font-size:17px}.slipMeta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 8px;font-size:11px}
       p{margin:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left}th{background:#dbeafe}
-      @media print{.printAction{display:none!important}body{padding:0}.packingSlip:nth-of-type(2n){page-break-after:always}}
+      @media print{.printAction{display:none!important}body{padding:0}}
       @media(max-width:700px){.sheet{grid-template-columns:1fr}.packingSlip{min-height:auto}}
     </style>
     <script>
