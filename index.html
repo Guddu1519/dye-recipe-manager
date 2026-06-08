@@ -3178,7 +3178,7 @@ async function importSalesAgentCsv(event){
   importedAgents.forEach(agent => {
     let existing = agent.email
       ? salesState.agents.find(a => normalizeName(a.email) === normalizeName(agent.email))
-      : salesState.agents.find(a => normalizeName(a.name) === normalizeName(agent.name) && normalizeName(a.mobile) === normalizeName(agent.mobile));
+      : null;
     if(existing){
       existing.name = agent.name;
       existing.mobile = agent.mobile;
@@ -3196,10 +3196,15 @@ async function importSalesAgentCsv(event){
     });
   });
   await saveSalesState();
+  let expectedTotal = beforeCount + addedCount;
+  let actualTotal = salesState.agents.length;
   renderSalesManager(false);
   showSalesTab("agents", false);
   renderSalesAgents();
-  showSuccessToast(`Agents import done. Before: ${beforeCount}, Added: ${addedCount}, Updated: ${updatedCount}, Total: ${salesState.agents.length}`);
+  if(actualTotal !== expectedTotal){
+    alert(`Agent import count mismatch. Before: ${beforeCount}, Added: ${addedCount}, Expected Total: ${expectedTotal}, Actual Total: ${actualTotal}.`);
+  }
+  showSuccessToast(`Agents import done. Before: ${beforeCount}, Added: ${addedCount}, Updated: ${updatedCount}, Total: ${actualTotal}`);
   }finally{
     salesImportInProgress = false;
   }
