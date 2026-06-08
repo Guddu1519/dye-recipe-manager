@@ -1099,6 +1099,7 @@ let currentUser = null;
 let currentRole = "viewer";
 let currentManagerMode = "dyeing";
 let switchingManagerMode = false;
+let trialLoginActive = false;
 let refreshTimer = null;
 let inactivityTimer = null;
 let localColorTypes = {};
@@ -1255,6 +1256,33 @@ function isLoggedIn(){
   return !!currentUser;
 }
 
+function isTrialUser(){
+  return !!trialLoginActive || currentUser?.id === "trial-master";
+}
+
+async function startTrialLogin(mode){
+  trialLoginActive = true;
+  currentManagerMode = mode || "dyeing";
+  currentUser = {
+    id: "trial-master",
+    email: "trial",
+    user_metadata: { role: "viewer" },
+    app_metadata: { role: "viewer" },
+    isTrial: true
+  };
+  currentRole = "trial";
+  if(currentManagerMode === "sales" || currentManagerMode === "staff"){
+    showSalesWorkspace(currentManagerMode);
+  }else{
+    await showDashboard();
+  }
+  resetInactivityTimer();
+}
+
+function isTrialCredentials(username, password){
+  return String(username || "").trim().toUpperCase() === "TRIAL" && String(password || "").trim().toUpperCase() === "TRIAL";
+}
+
 function requireLogin(){
   if(isLoggedIn()) return true;
   alert("Please login first.");
@@ -1262,6 +1290,7 @@ function requireLogin(){
 }
 
 function isAdmin(){
+  if(isTrialUser()) return false;
   return currentRole === "admin" ||
     (currentUser && (ADMIN_UIDS.has(currentUser.id) || ADMIN_EMAILS.has(normalizeName(currentUser.email))));
 }
@@ -1387,6 +1416,10 @@ function showAdminDeletePinModal(actionText){
 async function loadUserRole(){
   let previousRole = currentRole;
   if(!currentUser) return;
+  if(isTrialUser()){
+    currentRole = "trial";
+    return;
+  }
 
   if(ADMIN_UIDS.has(currentUser.id) || ADMIN_EMAILS.has(normalizeName(currentUser.email))){
     currentRole = "admin";
@@ -1534,6 +1567,7 @@ async function switchManagerMode(){
   }
   currentUser = null;
   currentRole = "viewer";
+  trialLoginActive = false;
   showManagerSelect();
   switchingManagerMode = false;
 }
@@ -1645,13 +1679,18 @@ function setupGlobalSaveShortcut(){
 }
 
 async function loginUser(){
+  let email = document.getElementById("loginEmail").value.trim();
+  let password = document.getElementById("loginPassword").value;
+
+  if(isTrialCredentials(email, password)){
+    await startTrialLogin("dyeing");
+    return;
+  }
+
   if(!supabaseClient){
     showLoginError("Supabase is not connected. Please check your internet connection.");
     return;
   }
-
-  let email = document.getElementById("loginEmail").value.trim();
-  let password = document.getElementById("loginPassword").value;
 
   if(!email || !password){
     showLoginError("Email and password are required.");
@@ -1679,14 +1718,19 @@ async function loginUser(){
 }
 
 async function loginSalesUser(){
+  currentManagerMode = "sales";
+  let email = document.getElementById("salesLoginEmail").value.trim();
+  let password = document.getElementById("salesLoginPassword").value;
+
+  if(isTrialCredentials(email, password)){
+    await startTrialLogin("sales");
+    return;
+  }
+
   if(!supabaseClient){
     showSalesLoginError("Supabase is not connected. Please check your internet connection.");
     return;
   }
-
-  currentManagerMode = "sales";
-  let email = document.getElementById("salesLoginEmail").value.trim();
-  let password = document.getElementById("salesLoginPassword").value;
 
   if(!email || !password){
     showSalesLoginError("Sales email and password are required.");
@@ -1710,14 +1754,19 @@ async function loginSalesUser(){
 }
 
 async function loginStaffUser(){
+  currentManagerMode = "staff";
+  let email = document.getElementById("staffLoginEmail").value.trim();
+  let password = document.getElementById("staffLoginPassword").value;
+
+  if(isTrialCredentials(email, password)){
+    await startTrialLogin("staff");
+    return;
+  }
+
   if(!supabaseClient){
     showStaffLoginError("Supabase is not connected. Please check your internet connection.");
     return;
   }
-
-  currentManagerMode = "staff";
-  let email = document.getElementById("staffLoginEmail").value.trim();
-  let password = document.getElementById("staffLoginPassword").value;
 
   if(!email || !password){
     showStaffLoginError("Staff email and password are required.");
@@ -1875,6 +1924,7 @@ function updateSalesOrderTotals(){
 }
 
 function addSalesParty(){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   let partyName = document.getElementById("partyMasterName").value.trim();
   let gstNo = document.getElementById("partyMasterGst").value.trim();
   let agentName = document.getElementById("partyMasterAgent").value.trim();
@@ -1895,6 +1945,7 @@ function addSalesParty(){
 }
 
 function deleteSalesParty(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!confirm("Delete this party?")) return;
   salesState.parties = salesState.parties.filter(p => p.id !== id);
   saveSalesState();
@@ -1902,6 +1953,7 @@ function deleteSalesParty(id){
 }
 
 function addSalesMisc(){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   let type = document.getElementById("miscMasterType").value;
   let name = document.getElementById("miscMasterName").value.trim();
   if(!type || !name) return alert("Type and name are required.");
@@ -1914,6 +1966,7 @@ function addSalesMisc(){
 }
 
 function deleteSalesMisc(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!confirm("Delete this misc value?")) return;
   salesState.misc = salesState.misc.filter(m => m.id !== id);
   saveSalesState();
@@ -1921,6 +1974,7 @@ function deleteSalesMisc(id){
 }
 
 function saveSalesOrder(){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(currentRole !== "admin") return alert("Only admin can create orders.");
   try{
     let colorsList = collectSalesColorRows();
@@ -1979,6 +2033,7 @@ function clearSalesOrderForm(){
 }
 
 function cancelSalesOrder(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order || !confirm("Cancel this assigned order?")) return;
   order.status = "Cancelled";
@@ -1987,6 +2042,7 @@ function cancelSalesOrder(id){
 }
 
 function deleteSalesOrder(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(currentRole !== "admin") return alert("Only admin can delete orders.");
   if(!confirm("Delete this sales order?")) return;
   salesState.orders = salesState.orders.filter(o => o.id !== id);
@@ -1996,12 +2052,14 @@ function deleteSalesOrder(id){
 }
 
 function getVisibleSalesOrders(){
+  if(isTrialUser()) return salesState.orders;
   if(currentRole === "admin") return salesState.orders;
   let email = getSalesUserEmail();
   return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
 }
 
 function acceptSalesOrder(id){
+  if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
   order.status = "Accepted";
@@ -2010,6 +2068,7 @@ function acceptSalesOrder(id){
 }
 
 function startSalesBaleCreation(id){
+  if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
   if(order.status === "Assigned") order.status = "Accepted";
@@ -2034,6 +2093,7 @@ function updateCurrentBaleTotal(){
 }
 
 function finishSalesBale(){
+  if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   try{
     let order = salesState.orders.find(o => o.id === salesSelectedOrderId);
     if(!order) return;
@@ -2083,6 +2143,19 @@ function renderSalesManager(){
   renderSalesBaleWorkArea();
   updateSalesOrderTotals();
   if(document.querySelectorAll("#salesColorRows .salesColorRow").length === 0) addSalesColorRow();
+  applySalesTrialReadonly();
+}
+
+function applySalesTrialReadonly(){
+  if(!isTrialUser()) return;
+  document.querySelectorAll("#salesEmptyPage input, #salesEmptyPage select, #salesEmptyPage button").forEach(el => {
+    let text = (el.textContent || "").trim();
+    let allowed = text === "Logout" || el.closest(".salesTabs");
+    if(!allowed){
+      el.disabled = true;
+      if(el.tagName === "INPUT") el.readOnly = true;
+    }
+  });
 }
 
 function renderSalesParties(){
@@ -2152,6 +2225,7 @@ function renderSalesBaleWorkArea(){
 }
 
 async function importSalesPartyCsv(event){
+  if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
   rows.forEach(row => {
@@ -2165,6 +2239,7 @@ async function importSalesPartyCsv(event){
 }
 
 async function importSalesMiscCsv(event){
+  if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
   rows.forEach(row => {
@@ -2179,6 +2254,7 @@ async function importSalesMiscCsv(event){
 }
 
 async function importSalesColorCsv(event){
+  if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
   let merged = {};
@@ -2195,6 +2271,7 @@ async function importSalesColorCsv(event){
 }
 
 async function importSalesOrderCsv(event){
+  if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
   rows.forEach(row => {
@@ -2227,6 +2304,7 @@ async function logoutUser(auto=false){
 
   currentUser = null;
   currentRole = "viewer";
+  trialLoginActive = false;
   colors = [];
   recipes = [];
   programs = [];
