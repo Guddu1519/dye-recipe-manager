@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MTM Dyeing Manager</title>
-  <title>MTM Dyeing Manager</title>
-  <link rel="icon" type="image/svg+xml" href="mtm-favicon.svg?v=4">
-  <link rel="shortcut icon" type="image/svg+xml" href="mtm-favicon.svg?v=4">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MTM</title>
+  <link rel="icon" type="image/svg+xml" href="mtm-favicon.svg?v=5">
+  <link rel="shortcut icon" type="image/svg+xml" href="mtm-favicon.svg?v=5">
+  <link rel="apple-touch-icon" href="mtm-favicon.png?v=5">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <style>
@@ -162,7 +161,25 @@ th{background:#dbeafe}
   color:#16a34a;
   font-weight:bold;
 }
-.auth-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
+.manager-select-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;background:radial-gradient(circle at top left,#dbeafe,#f8fafc 42%,#e0f2fe)}
+.managerSelectCard{width:100%;max-width:760px;background:white;border:1px solid #dbeafe;border-radius:24px;box-shadow:0 24px 70px #0f172a22;padding:28px}
+.managerSelectHeader{text-align:center;margin-bottom:22px}
+.managerSelectLogo{width:82px;height:82px;object-fit:contain;background:white;border-radius:20px;padding:8px;box-shadow:0 12px 34px #0f172a18;margin-bottom:12px}
+.managerSelectHeader h1{font-size:30px;color:#0f172a;margin:0}
+.managerSelectHeader p{color:#64748b;margin:8px 0 0}
+.managerChoiceGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.managerChoice{border:1px solid #bfdbfe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:18px;padding:22px;text-align:left;cursor:pointer;box-shadow:0 12px 30px #0f172a10;color:#0f172a}
+.managerChoice:hover{transform:translateY(-2px);box-shadow:0 18px 38px #0f172a18}
+.managerChoice strong{display:block;font-size:22px;margin-bottom:8px}
+.managerChoice span{display:block;color:#64748b;line-height:1.4}
+.managerChoice.primary{background:linear-gradient(135deg,#0f172a,#1d4ed8);color:white}
+.managerChoice.primary span{color:#dbeafe}
+.salesEmptyPage{min-height:100vh;display:none;align-items:center;justify-content:center;padding:22px;background:#f4f6fb}
+.salesEmptyCard{width:100%;max-width:520px;background:white;border-radius:20px;padding:26px;box-shadow:0 18px 48px #0f172a18;text-align:center}
+.salesEmptyCard h1{color:#0f172a;margin:0 0 8px}
+.salesEmptyCard p{color:#64748b}
+@media(max-width:700px){.managerChoiceGrid{grid-template-columns:1fr}.managerSelectCard{padding:20px}.managerSelectHeader h1{font-size:24px}}
+.auth-page{min-height:100vh;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
 .auth-card h2{margin:0 0 8px}
 .auth-card p{margin:0 0 18px;color:#475569}
@@ -252,6 +269,35 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body>
 
+
+<div id="managerSelectPage" class="manager-select-page">
+  <div class="managerSelectCard">
+    <div class="managerSelectHeader">
+      <img class="managerSelectLogo" src="logo.svg" alt="MTM Logo">
+      <h1>MONICA TEXTILE MILLS</h1>
+      <p>Select which system you want to open.</p>
+    </div>
+    <div class="managerChoiceGrid">
+      <button class="managerChoice primary" onclick="openDyeingManager()">
+        <strong>Dyeing Manager</strong>
+        <span>Open recipes, programs, stock, costing, price master, and reports.</span>
+      </button>
+      <button class="managerChoice" onclick="openSalesManager()">
+        <strong>Sales Manager</strong>
+        <span>Empty module reserved for your next system.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="salesEmptyPage" class="salesEmptyPage">
+  <div class="salesEmptyCard">
+    <h1>Sales Manager</h1>
+    <p>This module is empty for now. Tell me what to add here next.</p>
+    <button class="btn" onclick="showManagerSelect()">Back</button>
+  </div>
+</div>
+
 <div id="loginPage" class="auth-page">
   <div class="auth-card">
     <h2>Dye Recipe Manager</h2>
@@ -260,6 +306,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
     <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginUser()">Login</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
     <div class="auth-meta">Your session stays active on this device until you logout.</div>
   </div>
 </div>
@@ -1224,6 +1271,38 @@ function applyRolePermissions(){
   });
 }
 
+function hideAllEntryScreens(){
+  let manager = document.getElementById("managerSelectPage");
+  let sales = document.getElementById("salesEmptyPage");
+  let login = document.getElementById("loginPage");
+  let shell = document.getElementById("appShell");
+  if(manager) manager.style.display = "none";
+  if(sales) sales.style.display = "none";
+  if(login) login.style.display = "none";
+  if(shell) shell.style.display = "none";
+}
+
+function showManagerSelect(){
+  hideAllEntryScreens();
+  let manager = document.getElementById("managerSelectPage");
+  if(manager) manager.style.display = "flex";
+  document.body.classList.remove("appReady");
+}
+
+function openDyeingManager(){
+  hideAllEntryScreens();
+  let login = document.getElementById("loginPage");
+  if(login) login.style.display = "flex";
+  setTimeout(() => document.getElementById("loginEmail")?.focus(), 80);
+}
+
+function openSalesManager(){
+  hideAllEntryScreens();
+  let sales = document.getElementById("salesEmptyPage");
+  if(sales) sales.style.display = "flex";
+  document.body.classList.remove("appReady");
+}
+
 function showLoginError(message){
   let box = document.getElementById("loginError");
   box.textContent = message;
@@ -1355,9 +1434,7 @@ async function logoutUser(auto=false){
     inactivityTimer = null;
   }
 
-  document.getElementById("appShell").style.display = "none";
-  document.getElementById("loginPage").style.display = "flex";
-  document.body.classList.remove("appReady");
+  showManagerSelect();
   if(auto) showLoginError("Session expired after 5 minutes of inactivity.");
 }
 
@@ -1366,7 +1443,7 @@ async function showDashboard(){
   clearLegacyLocalDataCaches();
   loadLocalColorTypes();
   loadStockNotificationState();
-  document.getElementById("loginPage").style.display = "none";
+  hideAllEntryScreens();
   document.getElementById("appShell").style.display = "block";
   document.body.classList.add("appReady");
 
@@ -1393,9 +1470,7 @@ async function initAuth(){
   await supabaseClient.auth.signOut();
   currentUser = null;
   currentRole = "viewer";
-  document.getElementById("appShell").style.display = "none";
-  document.getElementById("loginPage").style.display = "flex";
-  document.body.classList.remove("appReady");
+  showManagerSelect();
   startInactivityWatch();
 
   supabaseClient.auth.onAuthStateChange(async function(event, session){
@@ -1406,9 +1481,7 @@ async function initAuth(){
     } else if(event === "SIGNED_OUT"){
       currentUser = null;
       currentRole = "viewer";
-      document.getElementById("appShell").style.display = "none";
-      document.getElementById("loginPage").style.display = "flex";
-      document.body.classList.remove("appReady");
+      showManagerSelect();
     }
   });
 }
