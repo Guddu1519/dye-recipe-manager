@@ -167,7 +167,7 @@ th{background:#dbeafe}
 .managerSelectLogo{width:82px;height:82px;object-fit:contain;background:white;border-radius:20px;padding:8px;box-shadow:0 12px 34px #0f172a18;margin-bottom:12px}
 .managerSelectHeader h1{font-size:30px;color:#0f172a;margin:0}
 .managerSelectHeader p{color:#64748b;margin:8px 0 0}
-.managerChoiceGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.managerChoiceGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .managerChoice{border:1px solid #bfdbfe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:18px;padding:22px;text-align:left;cursor:pointer;box-shadow:0 12px 30px #0f172a10;color:#0f172a}
 .managerChoice:hover{transform:translateY(-2px);box-shadow:0 18px 38px #0f172a18}
 .managerChoice strong{display:block;font-size:22px;margin-bottom:8px}
@@ -184,6 +184,8 @@ th{background:#dbeafe}
 .salesPanel{display:none}.salesPanel.active{display:block}
 .staffPortalMode .salesTabs button:not(#salesTabStaff){display:none}
 .staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelMisc{display:none!important}
+.agentPortalMode .salesTabs button:not(#salesTabAgent){display:none}
+.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
 .salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
 .salesCard{background:white;border:1px solid #dbeafe;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0f172a0d}
 .salesCard h2,.salesCard h3{margin:0 0 12px;color:#0f172a}
@@ -311,6 +313,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <strong>Sales Manager</strong>
         <span>Admin sales orders, party master, misc master, and dispatch overview.</span>
       </button>
+      <button class="managerChoice" onclick="openAgentPortal()">
+        <strong>Agent Portal</strong>
+        <span>Check orders, paid/due status, pending colors, and sent colors.</span>
+      </button>
       <button class="managerChoice" onclick="openStaffPortal()">
         <strong>Staff Portal</strong>
         <span>Only assigned orders, packing workflow, and bale creation.</span>
@@ -333,6 +339,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <button id="salesTabOrders" class="active" onclick="showSalesTab('orders')">Orders</button>
       <button id="salesTabParties" onclick="showSalesTab('parties')">Party Master</button>
       <button id="salesTabMisc" onclick="showSalesTab('misc')">Misc Master</button>
+      <button id="salesTabAgent" onclick="showSalesTab('agent')">Agent Portal</button>
       <button id="salesTabStaff" onclick="showSalesTab('staff')">Staff Packing</button>
     </div>
 
@@ -353,6 +360,12 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
             <select id="salesStamping"><option value="">Stamping</option></select>
             <input id="salesQuality" placeholder="Quality">
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
+            <select id="salesPaymentStatus">
+              <option value="Due">Due</option>
+              <option value="Part Paid">Part Paid</option>
+              <option value="Paid">Paid</option>
+            </select>
+            <input id="salesPaidAmount" type="number" step="0.01" placeholder="Paid Amount">
             <input id="salesQtyPerBale" type="number" placeholder="Qty Per Bale">
             <input id="salesAssignStaff" placeholder="Assign Staff Email">
           </div>
@@ -380,6 +393,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Created Orders:</b> <span id="salesOrderCount">0</span></p>
           <p><b>Total Qty:</b> <span id="salesOverviewQty">0</span></p>
           <p><b>Ready / Packed:</b> <span id="salesPackedCount">0</span></p>
+          <p><b>Agents:</b> <span id="salesAgentCount">0</span></p>
+          <p><b>Staff:</b> <span id="salesStaffCount">0</span></p>
           <p class="muted">Admin sees all orders. Staff sees only assigned orders in Staff Packing.</p>
         </div>
       </div>
@@ -437,6 +452,18 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </div>
     </div>
 
+    <div id="salesPanelAgent" class="salesPanel">
+      <div class="salesCard">
+        <h2>Agent Order Status</h2>
+        <p class="muted">Shows paid/due amount, pending colors, sent colors, and dispatch status for this agent.</p>
+        <div id="salesAgentSummary" class="salesGrid"></div>
+      </div>
+      <div class="salesCard">
+        <h2>Agent Orders</h2>
+        <div class="salesTableWrap"><table class="salesTable" id="salesAgentOrdersTable"></table></div>
+      </div>
+    </div>
+
     <div id="salesPanelStaff" class="salesPanel">
       <div class="salesCard">
         <h2>Staff Order Workflow</h2>
@@ -487,6 +514,19 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <button class="btn green" style="width:100%" onclick="loginStaffUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
     <div class="auth-meta">Staff Portal shows assigned work only.</div>
+  </div>
+</div>
+
+<div id="agentLoginPage" class="auth-page">
+  <div class="auth-card">
+    <h2>Agent Portal Login</h2>
+    <p>Login to view only your party/order status.</p>
+    <div id="agentLoginError" class="auth-error"></div>
+    <input id="agentLoginEmail" type="email" placeholder="Agent Username / Email" autocomplete="email">
+    <input id="agentLoginPassword" type="password" placeholder="Agent Password" autocomplete="current-password">
+    <button class="btn green" style="width:100%" onclick="loginAgentUser()">Login</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
+    <div class="auth-meta">Agent Portal shows order status only.</div>
   </div>
 </div>
 
@@ -1271,7 +1311,7 @@ async function startTrialLogin(mode){
     isTrial: true
   };
   currentRole = "trial";
-  if(currentManagerMode === "sales" || currentManagerMode === "staff"){
+  if(currentManagerMode === "sales" || currentManagerMode === "staff" || currentManagerMode === "agent"){
     showSalesWorkspace(currentManagerMode);
   }else{
     await showDashboard();
@@ -1514,12 +1554,14 @@ function hideAllEntryScreens(){
   let login = document.getElementById("loginPage");
   let salesLogin = document.getElementById("salesLoginPage");
   let staffLogin = document.getElementById("staffLoginPage");
+  let agentLogin = document.getElementById("agentLoginPage");
   let shell = document.getElementById("appShell");
   if(manager) manager.style.display = "none";
   if(sales) sales.style.display = "none";
   if(login) login.style.display = "none";
   if(salesLogin) salesLogin.style.display = "none";
   if(staffLogin) staffLogin.style.display = "none";
+  if(agentLogin) agentLogin.style.display = "none";
   if(shell) shell.style.display = "none";
 }
 
@@ -1566,16 +1608,26 @@ function openStaffPortal(){
   setTimeout(() => document.getElementById("staffLoginEmail")?.focus(), 80);
 }
 
+function openAgentPortal(){
+  currentManagerMode = "agent";
+  hideAllEntryScreens();
+  let login = document.getElementById("agentLoginPage");
+  if(login) login.style.display = "flex";
+  updateModeSwitchButton(true);
+  setTimeout(() => document.getElementById("agentLoginEmail")?.focus(), 80);
+}
+
 async function showSalesWorkspace(portalMode=currentManagerMode){
   hideAllEntryScreens();
   let sales = document.getElementById("salesEmptyPage");
   if(sales) sales.style.display = "block";
   document.body.classList.toggle("staffPortalMode", portalMode === "staff");
+  document.body.classList.toggle("agentPortalMode", portalMode === "agent");
   let title = document.getElementById("salesWorkspaceTitle");
   let subtitle = document.getElementById("salesWorkspaceSubtitle");
-  if(title) title.textContent = portalMode === "staff" ? "Staff Portal" : "Sales & Dispatch";
-  if(subtitle) subtitle.textContent = portalMode === "staff" ? "Assigned orders and bale packing only." : "Orders, party master, dispatch planning, and staff bale packing.";
-  salesActiveTab = portalMode === "staff" ? "staff" : "orders";
+  if(title) title.textContent = portalMode === "staff" ? "Staff Portal" : portalMode === "agent" ? "Agent Portal" : "Sales & Dispatch";
+  if(subtitle) subtitle.textContent = portalMode === "staff" ? "Assigned orders and bale packing only." : portalMode === "agent" ? "Order payment, due, pending color, and dispatch status." : "Orders, party master, dispatch planning, and staff bale packing.";
+  salesActiveTab = portalMode === "staff" ? "staff" : portalMode === "agent" ? "agent" : "orders";
   document.body.classList.remove("appReady");
   updateModeSwitchButton(true);
   showSalesTab(salesActiveTab, false);
@@ -1611,6 +1663,13 @@ function showSalesLoginError(message){
 
 function showStaffLoginError(message){
   let box = document.getElementById("staffLoginError");
+  if(!box) return;
+  box.textContent = message;
+  box.style.display = "block";
+}
+
+function showAgentLoginError(message){
+  let box = document.getElementById("agentLoginError");
   if(!box) return;
   box.textContent = message;
   box.style.display = "block";
@@ -1659,6 +1718,16 @@ function setupLoginEnterKey(){
       if(event.key === "Enter"){
         event.preventDefault();
         loginStaffUser();
+      }
+    });
+  });
+  ["agentLoginEmail","agentLoginPassword"].forEach(id => {
+    let input = document.getElementById(id);
+    if(!input) return;
+    input.addEventListener("keydown", function(event){
+      if(event.key === "Enter"){
+        event.preventDefault();
+        loginAgentUser();
       }
     });
   });
@@ -1733,7 +1802,7 @@ async function loginUser(){
 
   currentUser = data.user;
   await loadUserRole();
-  if(currentManagerMode === "sales" || currentManagerMode === "staff"){
+  if(currentManagerMode === "sales" || currentManagerMode === "staff" || currentManagerMode === "agent"){
     showSalesWorkspace(currentManagerMode);
   } else {
     await showDashboard();
@@ -1777,6 +1846,9 @@ async function loginSalesUser(){
   if(currentRole === "staff"){
     currentManagerMode = "staff";
     showSalesWorkspace("staff");
+  }else if(currentRole === "agent"){
+    currentManagerMode = "agent";
+    showSalesWorkspace("agent");
   }else{
     showSalesWorkspace("sales");
   }
@@ -1820,12 +1892,54 @@ async function loginStaffUser(){
   resetInactivityTimer();
 }
 
+async function loginAgentUser(){
+  currentManagerMode = "agent";
+  let email = document.getElementById("agentLoginEmail").value.trim();
+  let password = document.getElementById("agentLoginPassword").value;
+
+  if(isTrialCredentials(email, password)){
+    await startTrialLogin("agent");
+    return;
+  }
+
+  if(!supabaseClient){
+    showAgentLoginError("Supabase is not connected. Please check your internet connection.");
+    return;
+  }
+
+  if(!email || !password){
+    showAgentLoginError("Agent username/email and password are required.");
+    return;
+  }
+
+  let loginEmail = await resolveSalesLoginIdentifier(email);
+  let { data, error } = await supabaseClient.auth.signInWithPassword({
+    email: loginEmail,
+    password
+  });
+
+  if(error){
+    showAgentLoginError(error.message);
+    return;
+  }
+
+  currentUser = data.user;
+  await loadSalesUserRole();
+  if(currentRole !== "agent" && currentRole !== "admin"){
+    showAgentLoginError("This login is not an Agent account.");
+    return;
+  }
+  showSalesWorkspace("agent");
+  resetInactivityTimer();
+}
+
 const SALES_STORAGE_KEY = "mtm_sales_dispatch_v1";
 let salesState = { parties: [], misc: [], orders: [] };
 let salesActiveTab = "orders";
 let salesSelectedOrderId = null;
 let salesProfile = null;
 let salesCloudLoaded = false;
+let salesProfiles = [];
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -1929,12 +2043,19 @@ async function loadSalesCloudState(){
   loadSalesState();
   if(!canUseSalesCloud()) return;
   try{
-    let { data, error } = await supabaseClient
+    let [{ data, error }, { data: profileRows, error: profileError }] = await Promise.all([
+      supabaseClient
       .from("sales_state")
       .select("data")
       .eq("id", "main")
-      .maybeSingle();
+      .maybeSingle(),
+      supabaseClient
+        .from("sales_profiles")
+        .select("username,role,full_name,active")
+        .eq("active", true)
+    ]);
     if(error) throw error;
+    if(!profileError && Array.isArray(profileRows)) salesProfiles = profileRows;
     if(data?.data){
       salesState = data.data;
       salesState.parties ||= [];
@@ -1985,8 +2106,9 @@ function downloadSalesCsv(filename, content){
 
 function showSalesTab(tab, shouldRender=true){
   if(currentManagerMode === "staff" && tab !== "staff") tab = "staff";
+  if(currentManagerMode === "agent" && tab !== "agent") tab = "agent";
   salesActiveTab = tab;
-  ["orders","parties","misc","staff"].forEach(name => {
+  ["orders","parties","misc","agent","staff"].forEach(name => {
     document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
     document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
   });
@@ -2146,6 +2268,8 @@ function saveSalesOrder(){
       stamping: document.getElementById("salesStamping").value,
       quality: document.getElementById("salesQuality").value.trim(),
       rate: Number(document.getElementById("salesRate").value) || 0,
+      paymentStatus: document.getElementById("salesPaymentStatus").value || "Due",
+      paidAmount: Number(document.getElementById("salesPaidAmount").value) || 0,
       qtyPerBale,
       assignedStaff: document.getElementById("salesAssignStaff").value.trim().toLowerCase(),
       colors: colorsList,
@@ -2167,11 +2291,11 @@ function saveSalesOrder(){
 }
 
 function clearSalesOrderForm(){
-  ["salesMtmOrderNo","salesPartyOrderNo","salesGstNo","salesAgentName","salesStation","salesQuality","salesRate","salesQtyPerBale","salesAssignStaff"].forEach(id => {
+  ["salesMtmOrderNo","salesPartyOrderNo","salesGstNo","salesAgentName","salesStation","salesQuality","salesRate","salesPaidAmount","salesQtyPerBale","salesAssignStaff"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
-  ["salesPartyName","salesTransport","salesPacking","salesPatta","salesStamping"].forEach(id => {
+  ["salesPartyName","salesTransport","salesPacking","salesPatta","salesStamping","salesPaymentStatus"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
@@ -2207,6 +2331,36 @@ function getVisibleSalesOrders(){
   }
   let email = getSalesUserEmail();
   return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
+}
+
+function getSalesOrderAmount(order){
+  return (Number(order.totalQty) || 0) * (Number(order.rate) || 0);
+}
+
+function getSalesOrderPaid(order){
+  if(order.paymentStatus === "Paid") return getSalesOrderAmount(order);
+  return Number(order.paidAmount) || 0;
+}
+
+function getSalesOrderDue(order){
+  return Math.max(0, getSalesOrderAmount(order) - getSalesOrderPaid(order));
+}
+
+function getSalesSentQty(order){
+  return (order.colors || []).reduce((sum, c) => sum + ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)), 0);
+}
+
+function getSalesPendingQty(order){
+  return (order.colors || []).reduce((sum, c) => sum + (Number(c.pendingQty) || 0), 0);
+}
+
+function getSalesColorSummary(order, mode){
+  return (order.colors || [])
+    .filter(c => mode === "pending" ? (Number(c.pendingQty) || 0) > 0 : ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)) > 0)
+    .map(c => {
+      let qty = mode === "pending" ? Number(c.pendingQty) || 0 : (Number(c.qty) || 0) - (Number(c.pendingQty) || 0);
+      return `${c.colorNo}: ${qty}`;
+    }).join(", ") || "None";
 }
 
 function acceptSalesOrder(id){
@@ -2290,6 +2444,7 @@ function renderSalesManager(shouldLoadLocal=true){
   renderSalesParties();
   renderSalesMisc();
   renderSalesOrders();
+  renderSalesAgentPortal();
   renderSalesStaffOrders();
   renderSalesBaleWorkArea();
   updateSalesOrderTotals();
@@ -2307,6 +2462,9 @@ function applySalesRoleUi(){
   document.querySelectorAll("#salesEmptyPage input, #salesEmptyPage select, #salesEmptyPage button").forEach(el => {
     let text = (el.textContent || "").trim();
     let allowed = text === "Logout" || el.closest(".salesTabs");
+    if(isSalesAgent()){
+      allowed = text === "Logout" || el.closest(".salesTabs");
+    }
     if(isSalesStaff()){
       allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Finish Bale" || el.classList.contains("salesPackQty") || el.type === "checkbox";
     }
@@ -2338,13 +2496,46 @@ function renderSalesOrders(){
   document.getElementById("salesOrderCount").textContent = orders.length;
   document.getElementById("salesOverviewQty").textContent = orders.reduce((sum,o)=>sum + (Number(o.totalQty)||0),0);
   document.getElementById("salesPackedCount").textContent = orders.filter(o=>o.status === "Packed").length;
-  table.innerHTML = `<tr><th>MTM Order</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+  let agentCount = document.getElementById("salesAgentCount");
+  let staffCount = document.getElementById("salesStaffCount");
+  if(agentCount) agentCount.textContent = salesProfiles.filter(p => p.role === "agent").length;
+  if(staffCount) staffCount.textContent = salesProfiles.filter(p => p.role === "staff").length;
+  table.innerHTML = `<tr><th>MTM Order</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff</th><th>Total Qty</th><th>Paid</th><th>Due</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}</td>
-      <td>${salesEscape(o.assignedStaff)}</td><td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
+      <td>${salesEscape(o.assignedStaff)}</td><td>${o.totalQty}</td><td>${getSalesOrderPaid(o)}</td><td>${getSalesOrderDue(o)}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
       <td><button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
+    </tr>`).join("");
+}
+
+function renderSalesAgentPortal(){
+  let summary = document.getElementById("salesAgentSummary");
+  let table = document.getElementById("salesAgentOrdersTable");
+  if(!summary || !table) return;
+  let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
+  let totalAmount = orders.reduce((sum,o)=>sum + getSalesOrderAmount(o),0);
+  let paid = orders.reduce((sum,o)=>sum + getSalesOrderPaid(o),0);
+  let due = orders.reduce((sum,o)=>sum + getSalesOrderDue(o),0);
+  let pendingColors = orders.reduce((sum,o)=>sum + getSalesPendingQty(o),0);
+  let sentColors = orders.reduce((sum,o)=>sum + getSalesSentQty(o),0);
+  summary.innerHTML = `
+    <div class="salesCard"><h3>Total Orders</h3><b style="font-size:28px">${orders.length}</b></div>
+    <div class="salesCard"><h3>Paid Amount</h3><b style="font-size:28px">${paid}</b></div>
+    <div class="salesCard"><h3>Due Amount</h3><b style="font-size:28px">${due}</b></div>
+    <div class="salesCard"><h3>Pending Qty</h3><b style="font-size:28px">${pendingColors}</b></div>
+    <div class="salesCard"><h3>Sent Qty</h3><b style="font-size:28px">${sentColors}</b></div>
+    <div class="salesCard"><h3>Total Value</h3><b style="font-size:28px">${totalAmount}</b></div>
+  `;
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Paid</th><th>Due</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
+    orders.map(o => `<tr>
+      <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
+      <td>${salesEscape(o.partyName)}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
+      <td>${getSalesOrderPaid(o)}</td><td>${getSalesOrderDue(o)}</td>
+      <td>${salesEscape(getSalesColorSummary(o, "pending"))}</td>
+      <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
+      <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
     </tr>`).join("");
 }
 
@@ -2530,7 +2721,7 @@ async function initAuth(){
     currentUser = session?.user || null;
     if(currentUser && event === "SIGNED_IN"){
       await loadUserRole();
-      if(currentManagerMode === "sales" || currentManagerMode === "staff"){
+      if(currentManagerMode === "sales" || currentManagerMode === "staff" || currentManagerMode === "agent"){
         showSalesWorkspace(currentManagerMode);
       } else {
         await showDashboard();
