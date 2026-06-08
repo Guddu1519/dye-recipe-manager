@@ -438,7 +438,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <input id="partyMasterPhone" placeholder="Phone Number">
           <select id="partyMasterAgent"><option value="">Select Agent</option></select>
           <div class="salesActions">
-            <button class="salesSmallBtn green" onclick="addSalesParty()">Add Party</button>
+            <button id="partyMasterSaveBtn" class="salesSmallBtn green" onclick="addSalesParty()">Add Party</button>
             <input id="partyCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesPartyCsv(event)">
             <button class="salesSmallBtn gray" onclick="document.getElementById('partyCsvFile').click()">Import CSV</button>
             <button class="salesSmallBtn gray" onclick="downloadSalesPartySample()">Sample CSV</button>
@@ -460,7 +460,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <input id="salesLedgerAgentMobile" placeholder="Mobile Number">
           <input id="salesLedgerAgentEmail" type="email" placeholder="Agent Email">
           <div class="salesActions">
-            <button class="salesSmallBtn green" onclick="addSalesAgent()">Add Agent</button>
+            <button id="salesAgentSaveBtn" class="salesSmallBtn green" onclick="addSalesAgent()">Add Agent</button>
             <input id="agentCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesAgentCsv(event)">
             <button class="salesSmallBtn gray" onclick="document.getElementById('agentCsvFile').click()">Import Agents</button>
             <button class="salesSmallBtn gray" onclick="downloadSalesAgentSample()">Sample CSV</button>
@@ -487,7 +487,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           </select>
           <input id="miscMasterName" placeholder="Name">
           <div class="salesActions">
-            <button class="salesSmallBtn green" onclick="addSalesMisc()">Add Misc</button>
+            <button id="salesMiscSaveBtn" class="salesSmallBtn green" onclick="addSalesMisc()">Add Misc</button>
             <input id="miscCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesMiscCsv(event)">
             <button class="salesSmallBtn gray" onclick="document.getElementById('miscCsvFile').click()">Import CSV</button>
             <button class="salesSmallBtn gray" onclick="downloadSalesMiscSample()">Sample CSV</button>
@@ -1999,6 +1999,9 @@ let salesSelectedOrderId = null;
 let salesProfile = null;
 let salesCloudLoaded = false;
 let salesProfiles = [];
+let editingSalesPartyId = null;
+let editingSalesAgentId = null;
+let editingSalesMiscId = null;
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -2276,24 +2279,35 @@ function addSalesParty(){
   let agent = salesState.agents.find(a => normalizeName(a.email || a.name) === normalizeName(agentKey));
   if(!partyName) return alert("Party Name is required.");
   if(!agent) return alert("Select Agent from Agent Ledger first.");
-  let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
+  let existing = editingSalesPartyId
+    ? salesState.parties.find(p => p.id === editingSalesPartyId)
+    : salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
   if(existing){
+    let oldPartyName = existing.partyName;
     existing.gstNo = gstNo;
     existing.address = address;
     existing.phone = phone;
+    existing.partyName = partyName;
     existing.agentName = agent.name;
     existing.agentEmail = agent.email || "";
+    salesState.orders.forEach(o => {
+      if(normalizeName(o.partyName) === normalizeName(oldPartyName)){
+        o.partyName = partyName;
+        o.gstNo = gstNo;
+        o.partyAddress = address;
+        o.partyPhone = phone;
+        o.agentName = agent.name;
+        o.agentEmail = agent.email || "";
+      }
+    });
   }else{
     salesState.parties.push({id:Date.now().toString(), partyName, gstNo, address, phone, agentName: agent.name, agentEmail: agent.email || ""});
   }
+  editingSalesPartyId = null;
   saveSalesState();
-  document.getElementById("partyMasterName").value = "";
-  document.getElementById("partyMasterGst").value = "";
-  document.getElementById("partyMasterAddress").value = "";
-  document.getElementById("partyMasterPhone").value = "";
-  document.getElementById("partyMasterAgent").value = "";
+  clearSalesPartyForm();
   renderSalesManager();
-  showSuccessToast("Party saved");
+  showSuccessToast(existing ? "Party updated" : "Party saved");
 }
 
 function addSalesAgent(){
@@ -2304,26 +2318,35 @@ function addSalesAgent(){
   let email = document.getElementById("salesLedgerAgentEmail").value.trim().toLowerCase();
   if(!name) return alert("Agent Name is required.");
   if(!email || !email.includes("@")) return alert("Valid Agent Email is required.");
-  let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(email) || normalizeName(a.name) === normalizeName(name));
+  let existing = editingSalesAgentId
+    ? salesState.agents.find(a => a.id === editingSalesAgentId)
+    : salesState.agents.find(a => normalizeName(a.email) === normalizeName(email) || normalizeName(a.name) === normalizeName(name));
   if(existing){
+    let oldName = existing.name;
+    let oldEmail = existing.email;
     existing.name = name;
     existing.mobile = mobile;
     existing.email = email;
+    salesState.parties.forEach(p => {
+      if(normalizeName(p.agentEmail) === normalizeName(oldEmail) || normalizeName(p.agentName) === normalizeName(oldName)){
+        p.agentName = name;
+        p.agentEmail = email;
+      }
+    });
+    salesState.orders.forEach(o => {
+      if(normalizeName(o.agentEmail) === normalizeName(oldEmail) || normalizeName(o.agentName) === normalizeName(oldName)){
+        o.agentName = name;
+        o.agentEmail = email;
+      }
+    });
   }else{
     salesState.agents.push({id:Date.now().toString(), name, mobile, email});
   }
-  salesState.parties.forEach(p => {
-    if(normalizeName(p.agentEmail) === normalizeName(email) || normalizeName(p.agentName) === normalizeName(name)){
-      p.agentName = name;
-      p.agentEmail = email;
-    }
-  });
+  editingSalesAgentId = null;
   saveSalesState();
-  document.getElementById("salesLedgerAgentName").value = "";
-  document.getElementById("salesLedgerAgentMobile").value = "";
-  document.getElementById("salesLedgerAgentEmail").value = "";
+  clearSalesAgentForm();
   renderSalesManager();
-  showSuccessToast("Agent saved");
+  showSuccessToast(existing ? "Agent updated" : "Agent saved");
 }
 
 function deleteSalesAgent(id){
@@ -2334,6 +2357,84 @@ function deleteSalesAgent(id){
   salesState.agents = salesState.agents.filter(a => a.id !== id);
   saveSalesState();
   renderSalesManager();
+}
+
+function editSalesParty(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can edit parties.");
+  let party = salesState.parties.find(p => p.id === id);
+  if(!party) return;
+  editingSalesPartyId = id;
+  showSalesTab("parties", false);
+  refreshSalesDropdowns();
+  document.getElementById("partyMasterName").value = party.partyName || "";
+  document.getElementById("partyMasterGst").value = party.gstNo || "";
+  document.getElementById("partyMasterAddress").value = party.address || "";
+  document.getElementById("partyMasterPhone").value = party.phone || "";
+  document.getElementById("partyMasterAgent").value = party.agentEmail || party.agentName || "";
+  let btn = document.getElementById("partyMasterSaveBtn");
+  if(btn) btn.textContent = "Update Party";
+  document.getElementById("salesPanelParties")?.scrollIntoView({behavior:"smooth", block:"start"});
+  document.getElementById("partyMasterName")?.focus();
+}
+
+function editSalesAgent(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can edit agents.");
+  let agent = salesState.agents.find(a => a.id === id);
+  if(!agent) return;
+  editingSalesAgentId = id;
+  showSalesTab("agents", false);
+  document.getElementById("salesLedgerAgentName").value = agent.name || "";
+  document.getElementById("salesLedgerAgentMobile").value = agent.mobile || "";
+  document.getElementById("salesLedgerAgentEmail").value = agent.email || "";
+  let btn = document.getElementById("salesAgentSaveBtn");
+  if(btn) btn.textContent = "Update Agent";
+  document.getElementById("salesPanelAgents")?.scrollIntoView({behavior:"smooth", block:"start"});
+  document.getElementById("salesLedgerAgentName")?.focus();
+}
+
+function editSalesMisc(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can edit misc values.");
+  let misc = salesState.misc.find(m => m.id === id);
+  if(!misc) return;
+  editingSalesMiscId = id;
+  showSalesTab("misc", false);
+  document.getElementById("miscMasterType").value = misc.type || "packing";
+  document.getElementById("miscMasterName").value = misc.name || "";
+  let btn = document.getElementById("salesMiscSaveBtn");
+  if(btn) btn.textContent = "Update Misc";
+  document.getElementById("salesPanelMisc")?.scrollIntoView({behavior:"smooth", block:"start"});
+  document.getElementById("miscMasterName")?.focus();
+}
+
+function clearSalesPartyForm(){
+  editingSalesPartyId = null;
+  ["partyMasterName","partyMasterGst","partyMasterAddress","partyMasterPhone","partyMasterAgent"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  let btn = document.getElementById("partyMasterSaveBtn");
+  if(btn) btn.textContent = "Add Party";
+}
+
+function clearSalesAgentForm(){
+  editingSalesAgentId = null;
+  ["salesLedgerAgentName","salesLedgerAgentMobile","salesLedgerAgentEmail"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  let btn = document.getElementById("salesAgentSaveBtn");
+  if(btn) btn.textContent = "Add Agent";
+}
+
+function clearSalesMiscForm(){
+  editingSalesMiscId = null;
+  let name = document.getElementById("miscMasterName");
+  if(name) name.value = "";
+  let btn = document.getElementById("salesMiscSaveBtn");
+  if(btn) btn.textContent = "Add Misc";
 }
 
 function deleteSalesParty(id){
@@ -2351,12 +2452,20 @@ function addSalesMisc(){
   let type = document.getElementById("miscMasterType").value;
   let name = document.getElementById("miscMasterName").value.trim();
   if(!type || !name) return alert("Type and name are required.");
-  let exists = salesState.misc.find(m => m.type === type && normalizeName(m.name) === normalizeName(name));
-  if(!exists) salesState.misc.push({id:Date.now().toString(), type, name});
+  let existing = editingSalesMiscId
+    ? salesState.misc.find(m => m.id === editingSalesMiscId)
+    : salesState.misc.find(m => m.type === type && normalizeName(m.name) === normalizeName(name));
+  if(existing){
+    existing.type = type;
+    existing.name = name;
+  }else{
+    salesState.misc.push({id:Date.now().toString(), type, name});
+  }
+  editingSalesMiscId = null;
   saveSalesState();
-  document.getElementById("miscMasterName").value = "";
+  clearSalesMiscForm();
   renderSalesManager();
-  showSuccessToast("Misc value saved");
+  showSuccessToast(existing ? "Misc value updated" : "Misc value saved");
 }
 
 function deleteSalesMisc(id){
@@ -2684,7 +2793,7 @@ function renderSalesParties(){
   let table = document.getElementById("salesPartyTable");
   if(!table) return;
   table.innerHTML = `<tr><th>Party Name</th><th>GST No.</th><th>Address</th><th>Phone</th><th>Agent Name</th><th>Agent Email</th><th>Action</th></tr>` +
-    salesState.parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.address)}</td><td>${salesEscape(p.phone)}</td><td>${salesEscape(p.agentName)}</td><td>${salesEscape(p.agentEmail)}</td><td><button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("");
+    salesState.parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.address)}</td><td>${salesEscape(p.phone)}</td><td>${salesEscape(p.agentName)}</td><td>${salesEscape(p.agentEmail)}</td><td><button class="salesSmallBtn gray" onclick="editSalesParty('${p.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("");
 }
 
 function renderSalesAgents(){
@@ -2693,7 +2802,7 @@ function renderSalesAgents(){
   table.innerHTML = `<tr><th>Agent Name</th><th>Mobile Number</th><th>Agent Login Email</th><th>Assigned Parties</th><th>Action</th></tr>` +
     salesState.agents.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(agent => {
       let partyCount = salesState.parties.filter(p => normalizeName(p.agentEmail) === normalizeName(agent.email) || normalizeName(p.agentName) === normalizeName(agent.name)).length;
-      return `<tr><td>${salesEscape(agent.name)}</td><td>${salesEscape(agent.mobile)}</td><td>${salesEscape(agent.email)}</td><td>${partyCount}</td><td><button class="salesSmallBtn red" onclick="deleteSalesAgent('${agent.id}')">Delete</button></td></tr>`;
+      return `<tr><td>${salesEscape(agent.name)}</td><td>${salesEscape(agent.mobile)}</td><td>${salesEscape(agent.email)}</td><td>${partyCount}</td><td><button class="salesSmallBtn gray" onclick="editSalesAgent('${agent.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesAgent('${agent.id}')">Delete</button></td></tr>`;
     }).join("");
 }
 
@@ -2701,7 +2810,7 @@ function renderSalesMisc(){
   let table = document.getElementById("salesMiscTable");
   if(!table) return;
   table.innerHTML = `<tr><th>Type</th><th>Name</th><th>Action</th></tr>` +
-    salesState.misc.map(m => `<tr><td>${salesEscape(m.type)}</td><td>${salesEscape(m.name)}</td><td><button class="salesSmallBtn red" onclick="deleteSalesMisc('${m.id}')">Delete</button></td></tr>`).join("");
+    salesState.misc.map(m => `<tr><td>${salesEscape(m.type)}</td><td>${salesEscape(m.name)}</td><td><button class="salesSmallBtn gray" onclick="editSalesMisc('${m.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesMisc('${m.id}')">Delete</button></td></tr>`).join("");
 }
 
 function renderSalesOrders(){
