@@ -178,6 +178,9 @@ th{background:#dbeafe}
 .salesEmptyCard{width:100%;max-width:520px;background:white;border-radius:20px;padding:26px;box-shadow:0 18px 48px #0f172a18;text-align:center}
 .salesEmptyCard h1{color:#0f172a;margin:0 0 8px}
 .salesEmptyCard p{color:#64748b}
+.modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
+.modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
+.modeSwitchBtn:hover{background:#1d4ed8}
 @media(max-width:700px){.managerChoiceGrid{grid-template-columns:1fr}.managerSelectCard{padding:20px}.managerSelectHeader h1{font-size:24px}}
 .auth-page{min-height:100vh;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
@@ -269,6 +272,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body>
 
+<div id="modeSwitchBar" class="modeSwitchBar">
+  <button id="modeSwitchButton" class="modeSwitchBtn" onclick="switchManagerMode()">Switch Mode</button>
+</div>
 
 <div id="managerSelectPage" class="manager-select-page">
   <div class="managerSelectCard">
@@ -293,14 +299,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 <div id="salesEmptyPage" class="salesEmptyPage">
   <div class="salesEmptyCard">
     <h1>Sales Manager</h1>
-    <p>This module is empty for now. Tell me what to add here next.</p>
-    <button class="btn" onclick="showManagerSelect()">Back</button>
+    <p>You are logged in to Sales Manager. This module is empty for now.</p>
+    <button class="btn danger" onclick="logoutUser()">Logout</button>
   </div>
 </div>
 
 <div id="loginPage" class="auth-page">
   <div class="auth-card">
-    <h2>Dye Recipe Manager</h2>
+    <h2 id="loginTitle">Dye Recipe Manager</h2>
     <p>Login to view and manage your cloud recipes.</p>
     <div id="loginError" class="auth-error"></div>
     <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
@@ -918,6 +924,8 @@ let programSaveInProgress = false;
 let colorSaveInProgress = false;
 let currentUser = null;
 let currentRole = "viewer";
+let currentManagerMode = "dyeing";
+let switchingManagerMode = false;
 let refreshTimer = null;
 let inactivityTimer = null;
 let localColorTypes = {};
@@ -1247,7 +1255,7 @@ function applyRolePermissions(){
     let isSearch = id === "priceSearch" || id === "recipeSearch" || id === "historySearch" || id === "versionSearch" || id === "stockSearch" || id === "stockFilter" || id === "reportMonth";
     let isCosting = id === "recipeSelect" || id === "thanCount" || id === "meterCount" || id === "chemicalCost" || id === "processCharge" || id === "labourCost" || id === "profitPercent" || id === "multiCostSelectAll" || id === "compareThans" || id === "compareCount" || el.classList.contains("multiCostRecipeCheck") || el.classList.contains("recipeCompareSelect") || text === "Calculate Cost" || text === "Calculate Multiple Recipe Cost" || text === "Compare Recipes" || text === "Print / Export PDF";
     let isProgramView = text === "Export" || text === "Export PDF";
-    let isNavigation = id === "mobileMenuBtn" || text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Recipe Compare" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
+    let isNavigation = id === "mobileMenuBtn" || id === "modeSwitchButton" || text === "Dashboard" || text === "Price Master" || text === "Recipe Master" || text === "Batch Costing" || text === "Recipe Compare" || text === "Program" || text === "Program Management" || text === "Process House" || text === "Chemical Stock" || text === "Stock Master" || text === "Contact Us" || text === "Import / Export" || text === "Settings / Backup" || text === "Reports" || text === "Activity Log" || text === "Activity Logs" || text === "Refresh Cloud Data" || text === "Load Report" || id === "stockBellButton" || text === "Clear";
     let isLogout = text === "Logout";
     let isLogin = id === "loginEmail" || id === "loginPassword" || text === "Login";
     let isAllowedViewerControl = isSearch || isCosting || isProgramView || isNavigation || isLogout || isLogin;
@@ -1282,25 +1290,65 @@ function hideAllEntryScreens(){
   if(shell) shell.style.display = "none";
 }
 
+function updateModeSwitchButton(show=true){
+  let bar = document.getElementById("modeSwitchBar");
+  let button = document.getElementById("modeSwitchButton");
+  if(!bar || !button) return;
+  bar.style.display = show ? "block" : "none";
+  button.textContent = currentManagerMode === "sales" ? "Switch to Dyeing Manager" : "Switch to Sales Manager";
+}
+
 function showManagerSelect(){
   hideAllEntryScreens();
   let manager = document.getElementById("managerSelectPage");
   if(manager) manager.style.display = "flex";
   document.body.classList.remove("appReady");
+  updateModeSwitchButton(false);
 }
 
 function openDyeingManager(){
+  currentManagerMode = "dyeing";
   hideAllEntryScreens();
+  let title = document.getElementById("loginTitle");
+  if(title) title.textContent = "Dyeing Manager Login";
   let login = document.getElementById("loginPage");
   if(login) login.style.display = "flex";
+  updateModeSwitchButton(true);
   setTimeout(() => document.getElementById("loginEmail")?.focus(), 80);
 }
 
 function openSalesManager(){
+  currentManagerMode = "sales";
+  hideAllEntryScreens();
+  let title = document.getElementById("loginTitle");
+  if(title) title.textContent = "Sales Manager Login";
+  let login = document.getElementById("loginPage");
+  if(login) login.style.display = "flex";
+  updateModeSwitchButton(true);
+  setTimeout(() => document.getElementById("loginEmail")?.focus(), 80);
+}
+
+function showSalesWorkspace(){
   hideAllEntryScreens();
   let sales = document.getElementById("salesEmptyPage");
   if(sales) sales.style.display = "flex";
   document.body.classList.remove("appReady");
+  updateModeSwitchButton(true);
+}
+
+async function switchManagerMode(){
+  switchingManagerMode = true;
+  if(supabaseClient){
+    await supabaseClient.auth.signOut();
+  }
+  currentUser = null;
+  currentRole = "viewer";
+  if(currentManagerMode === "sales"){
+    openDyeingManager();
+  } else {
+    openSalesManager();
+  }
+  switchingManagerMode = false;
 }
 
 function showLoginError(message){
@@ -1401,7 +1449,11 @@ async function loginUser(){
 
   currentUser = data.user;
   await loadUserRole();
-  await showDashboard();
+  if(currentManagerMode === "sales"){
+    showSalesWorkspace();
+  } else {
+    await showDashboard();
+  }
   resetInactivityTimer();
 }
 
@@ -1446,6 +1498,7 @@ async function showDashboard(){
   hideAllEntryScreens();
   document.getElementById("appShell").style.display = "block";
   document.body.classList.add("appReady");
+  updateModeSwitchButton(true);
 
   if(document.querySelectorAll(".dyeRow").length === 0){
     ensureDefaultDyeLines();
@@ -1477,11 +1530,15 @@ async function initAuth(){
     currentUser = session?.user || null;
     if(currentUser && event === "SIGNED_IN"){
       await loadUserRole();
-      await showDashboard();
+      if(currentManagerMode === "sales"){
+        showSalesWorkspace();
+      } else {
+        await showDashboard();
+      }
     } else if(event === "SIGNED_OUT"){
       currentUser = null;
       currentRole = "viewer";
-      showManagerSelect();
+      if(!switchingManagerMode) showManagerSelect();
     }
   });
 }
