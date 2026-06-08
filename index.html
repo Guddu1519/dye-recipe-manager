@@ -2334,9 +2334,16 @@ function refreshSalesDropdowns(){
   [["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"]].forEach(([id,type]) => {
     let select = document.getElementById(id);
     if(!select) return;
+    let current = select.value;
     let label = id.replace("sales", "");
     let values = salesState.misc.filter(m => m.type === type).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
     select.innerHTML = `<option value="">${salesEscape(label)}</option>` + values.map(m => `<option value="${salesEscape(m.name)}">${salesEscape(m.name)}</option>`).join("");
+    if(current){
+      if(!Array.from(select.options).some(option => option.value === current)){
+        select.insertAdjacentHTML("beforeend", `<option value="${salesEscape(current)}">${salesEscape(current)}</option>`);
+      }
+      select.value = current;
+    }
   });
   let agentSelect = document.getElementById("partyMasterAgent");
   if(agentSelect){
@@ -2717,9 +2724,17 @@ async function saveSalesOrder(){
     let colorsList = collectSalesColorRows();
     let totalQty = colorsList.reduce((sum, row) => sum + row.qty, 0);
     let qtyPerBale = Number(document.getElementById("salesQtyPerBale").value);
+    let transport = getSalesSelectValue("salesTransport");
+    let packing = getSalesSelectValue("salesPacking");
+    let patta = getSalesSelectValue("salesPatta");
+    let stamping = getSalesSelectValue("salesStamping");
     if(!document.getElementById("salesMtmOrderNo").value.trim()) throw new Error("MTM Order No. is required.");
     if(!document.getElementById("salesPartyName").value.trim()) throw new Error("Party Name is required.");
     if(!document.getElementById("salesAgentName").value.trim() || !document.getElementById("salesAgentEmail")?.value.trim()) throw new Error("Selected party must have an agent linked.");
+    if(!packing) throw new Error("Packing is required.");
+    if(!patta) throw new Error("Patta is required.");
+    if(!stamping) throw new Error("Stamping is required.");
+    if(!transport) throw new Error("Transport is required.");
     if(!(qtyPerBale > 0)) throw new Error("Qty Per Bale must be greater than 0.");
     if(colorsList.length === 0) throw new Error("Add at least one color row.");
 
@@ -2733,10 +2748,10 @@ async function saveSalesOrder(){
       agentName: document.getElementById("salesAgentName").value.trim(),
       agentEmail: document.getElementById("salesAgentEmail")?.value.trim().toLowerCase() || "",
       partyAddress: document.getElementById("salesPartyAddress")?.value.trim() || "",
-      transport: document.getElementById("salesTransport").value,
-      packing: document.getElementById("salesPacking").value,
-      patta: document.getElementById("salesPatta").value,
-      stamping: document.getElementById("salesStamping").value,
+      transport,
+      packing,
+      patta,
+      stamping,
       quality: document.getElementById("salesQuality").value.trim(),
       rate: Number(document.getElementById("salesRate").value) || 0,
       qtyPerBale,
@@ -2913,6 +2928,16 @@ function getSalesOrderPacking(order){ return getSalesOrderValue(order, ["packing
 function getSalesOrderPatta(order){ return getSalesOrderValue(order, ["patta","pattaName","patta_name","pattaType","patta_type"]); }
 function getSalesOrderStamping(order){ return getSalesOrderValue(order, ["stamping","stampingName","stamping_name","stamp","stampName"]); }
 function getSalesOrderTransport(order){ return getSalesOrderValue(order, ["transport","transportName","transport_name","transportType","transport_type"]); }
+
+function getSalesSelectValue(id){
+  let el = document.getElementById(id);
+  if(!el) return "";
+  let value = String(el.value || "").trim();
+  if(value) return value;
+  let text = String(el.selectedOptions?.[0]?.textContent || "").trim();
+  if(text && !["Transport","Packing","Patta","Stamping"].includes(text)) return text;
+  return "";
+}
 
 function updateCurrentBaleTotal(){
   let total = 0;
