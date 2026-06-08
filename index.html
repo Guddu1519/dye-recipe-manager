@@ -3104,40 +3104,41 @@ async function importSalesPartyCsv(event){
   salesImportInProgress = true;
   try{
   let rows = parseSalesCsv(await file.text());
-  if(!rows.length) return alert("No party rows found in CSV.");
+  if(!rows.length) return alert("No party rows found in CSV. Use: party_name,gst_no,city,agent_name");
+  salesState = await getLatestSalesCloudState();
   let errors = [];
   rows.forEach((row, index) => {
     let partyName = salesCsvPick(row, ["party_name","party","name"]);
-    if(!partyName) return;
     let agentName = salesCsvPick(row, ["agent_name","agent"]);
-    let agentEmail = salesCsvPick(row, ["agent_email","agent_login_email","agent_login_emal","email"]).toLowerCase();
-    if(!agentName || !agentEmail){
-      errors.push(`Row ${index + 2}: ${partyName} missing agent_name or agent_email`);
+    if(!partyName || !agentName){
+      errors.push(`Row ${index + 2}: party_name and agent_name are required`);
+    }
+    if(agentName && !salesState.agents.find(a => normalizeName(a.name) === normalizeName(agentName))){
+      errors.push(`Row ${index + 2}: agent_name "${agentName}" not found in Agent Ledger`);
     }
   });
   if(errors.length) return alert("Party import stopped:\n" + errors.join("\n"));
   let importedCount = 0;
   rows.forEach(row => {
     let partyName = salesCsvPick(row, ["party_name","party","name"]);
-    if(!partyName) return;
     let agentName = salesCsvPick(row, ["agent_name","agent"]);
-    let agentEmail = salesCsvPick(row, ["agent_email","agent_login_email","agent_login_emal","email"]).toLowerCase();
-    if(agentName && agentEmail && !salesState.agents.find(a => normalizeName(a.email) === normalizeName(agentEmail))){
-      salesState.agents.push({id:(Date.now() + Math.random()).toString(), name: agentName, email: agentEmail});
-    }
-    if(agentEmail && !agentName){
-      let foundAgent = salesState.agents.find(a => normalizeName(a.email) === normalizeName(agentEmail));
-      agentName = foundAgent?.name || "";
-    }
+    let agent = salesState.agents.find(a => normalizeName(a.name) === normalizeName(agentName));
     let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
-    let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: salesCsvPick(row, ["gst_no","gst"]), address: salesCsvPick(row, ["address"]), phone: salesCsvPick(row, ["phone","mobile","mobile_number"]), agentName, agentEmail};
+    let payload = {
+      id: existing?.id || (Date.now() + Math.random()).toString(),
+      partyName,
+      gstNo: salesCsvPick(row, ["gst_no","gst"]),
+      address: salesCsvPick(row, ["city"]),
+      city: salesCsvPick(row, ["city"]),
+      phone: "",
+      agentName: agent.name,
+      agentEmail: agent.email || ""
+    };
     if(existing) Object.assign(existing, payload); else salesState.parties.push(payload);
     importedCount++;
   });
   if(importedCount === 0) return alert("No parties imported. Please check CSV format.");
   await saveSalesState();
-  let partyVerified = await verifySalesCloudCount("parties", salesState.parties.length);
-  if(!partyVerified) alert("Party import saved locally but cloud verification did not show the new rows. Press Refresh Sales Cloud and check Supabase sales_state.");
   renderSalesManager(false);
   showSalesTab("parties", false);
   renderSalesParties();
@@ -3156,21 +3157,18 @@ async function importSalesAgentCsv(event){
   let rows = parseSalesCsv(await file.text());
   if(!rows.length) return alert("No agent rows found in CSV. Use: agent_name,mobile_number,agent_login_email");
   let errors = [];
-  rows.forEach((row, index) => {
-    let name = salesCsvPick(row, ["agent_name","agent","name"]);
-    let email = salesCsvPick(row, ["agent_login_email","agent_login_emal","agent_email","login_email","login_emal","email"]).toLowerCase();
-    if(!name || !email || !email.includes("@")){
-      errors.push(`Row ${index + 2}: agent_name and agent_login_email are required`);
-    }
-  });
-  if(errors.length) return alert("Agent import stopped:\n" + errors.join("\n"));
   let importedAgents = [];
-  rows.forEach(row => {
+  rows.forEach((row, index) => {
     let name = salesCsvPick(row, ["agent_name","agent","name"]);
     let mobile = salesCsvPick(row, ["mobile_number","mobile_no","mobile","phone_number","phone"]);
     let email = salesCsvPick(row, ["agent_login_email","agent_login_emal","agent_email","login_email","login_emal","email"]).toLowerCase();
+    if(!name){
+      errors.push(`Row ${index + 2}: agent_name is required`);
+      return;
+    }
     importedAgents.push({id:(Date.now() + Math.random()).toString(), name, mobile, email});
   });
+  if(errors.length) return alert("Agent import stopped:\n" + errors.join("\n"));
   if(importedAgents.length === 0) return alert("No agents imported. Please check CSV format.");
 
   salesState = await getLatestSalesCloudState();
@@ -3178,31 +3176,30 @@ async function importSalesAgentCsv(event){
   let addedCount = 0;
   let updatedCount = 0;
   importedAgents.forEach(agent => {
-    let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(agent.email));
+    let existing = agent.email
+      ? salesState.agents.find(a => normalizeName(a.email) === normalizeName(agent.email))
+      : salesState.agents.find(a => normalizeName(a.name) === normalizeName(agent.name) && normalizeName(a.mobile) === normalizeName(agent.mobile));
     if(existing){
       existing.name = agent.name;
       existing.mobile = agent.mobile;
-      existing.email = agent.email;
+      existing.email = agent.email || existing.email || "";
       updatedCount++;
     }else{
       salesState.agents.push(agent);
       addedCount++;
     }
     salesState.parties.forEach(p => {
-      if(normalizeName(p.agentEmail) === normalizeName(agent.email) || normalizeName(p.agentName) === normalizeName(agent.name)){
+      if((agent.email && normalizeName(p.agentEmail) === normalizeName(agent.email)) || normalizeName(p.agentName) === normalizeName(agent.name)){
         p.agentName = agent.name;
-        p.agentEmail = agent.email;
+        p.agentEmail = agent.email || p.agentEmail || "";
       }
     });
   });
   await saveSalesState();
-  let afterCount = salesState.agents.length;
-  let agentVerified = await verifySalesCloudCount("agents", afterCount);
-  if(!agentVerified) alert("Agent import saved locally but cloud verification did not show the new rows. Press Refresh Sales Cloud and check Supabase sales_state.");
   renderSalesManager(false);
   showSalesTab("agents", false);
   renderSalesAgents();
-  showSuccessToast(`Agents import done. Before: ${beforeCount}, Added: ${addedCount}, Updated: ${updatedCount}, Total: ${afterCount}`);
+  showSuccessToast(`Agents import done. Before: ${beforeCount}, Added: ${addedCount}, Updated: ${updatedCount}, Total: ${salesState.agents.length}`);
   }finally{
     salesImportInProgress = false;
   }
@@ -3264,7 +3261,7 @@ async function importSalesOrderCsv(event){
   showSuccessToast("Order CSV loaded");
 }
 
-function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,address,phone,agent_name,agent_email\nShree Textiles,24ABCDE1234F1Z5,Pali Rajasthan,9999999999,Agent 1,agent1@example.com\n"); }
+function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,city,agent_name\nShree Textiles,24ABCDE1234F1Z5,Pali,Agent 1\n"); }
 function downloadSalesAgentSample(){ downloadSalesCsv("agent-ledger-sample.csv", "agent_name,mobile_number,agent_login_email\nAgent 1,9462023854,agent1@example.com\n"); }
 function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
 function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
