@@ -2171,6 +2171,7 @@ async function loadSalesCloudState(options={}){
       salesState.orders ||= [];
       salesState.agents ||= [];
       salesState.staffs ||= [];
+      salesState.orders.forEach(normalizeSalesOrderDetailFields);
       localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
     }
     salesCloudLoaded = true;
@@ -2210,6 +2211,8 @@ async function saveSalesState(){
     alert("Sales cloud save blocked. Login with Supabase Sales account.");
     throw new Error("Sales cloud save blocked. Login with Supabase Sales account.");
   }
+  salesState.orders ||= [];
+  salesState.orders.forEach(normalizeSalesOrderDetailFields);
   let { data, error } = await supabaseClient.from("sales_state").upsert({
     id: "main",
     data: salesState,
@@ -2749,9 +2752,13 @@ async function saveSalesOrder(){
       agentEmail: document.getElementById("salesAgentEmail")?.value.trim().toLowerCase() || "",
       partyAddress: document.getElementById("salesPartyAddress")?.value.trim() || "",
       transport,
+      transportName: transport,
       packing,
+      packingName: packing,
       patta,
+      pattaName: patta,
       stamping,
+      stampingName: stamping,
       quality: document.getElementById("salesQuality").value.trim(),
       rate: Number(document.getElementById("salesRate").value) || 0,
       qtyPerBale,
@@ -2822,9 +2829,13 @@ async function quickUpdateSalesOrderDetails(orderId){
   let transport = prompt("Transport", getSalesOrderTransport(order) === "-" ? "" : getSalesOrderTransport(order));
   if(transport === null) return;
   order.packing = String(packing || "").trim();
+  order.packingName = order.packing;
   order.patta = String(patta || "").trim();
+  order.pattaName = order.patta;
   order.stamping = String(stamping || "").trim();
+  order.stampingName = order.stamping;
   order.transport = String(transport || "").trim();
+  order.transportName = order.transport;
   if(!order.packing || !order.patta || !order.stamping || !order.transport){
     return alert("Packing, Patta, Stamping, and Transport are required.");
   }
@@ -2949,10 +2960,42 @@ function getSalesOrderValue(order, keys){
   return "-";
 }
 
-function getSalesOrderPacking(order){ return getSalesOrderValue(order, ["packing","packingName","packing_name","packingType","packing_type"]); }
-function getSalesOrderPatta(order){ return getSalesOrderValue(order, ["patta","pattaName","patta_name","pattaType","patta_type"]); }
-function getSalesOrderStamping(order){ return getSalesOrderValue(order, ["stamping","stampingName","stamping_name","stamp","stampName"]); }
-function getSalesOrderTransport(order){ return getSalesOrderValue(order, ["transport","transportName","transport_name","transportType","transport_type"]); }
+function getSalesMiscDefault(type){
+  let row = (salesState.misc || [])
+    .filter(m => String(m.type || "").toLowerCase() === String(type || "").toLowerCase() && String(m.name || "").trim())
+    .sort((a,b)=>String(a.name).localeCompare(String(b.name)))[0];
+  return row ? String(row.name || "").trim() : "-";
+}
+
+function getSalesOrderPacking(order){
+  let value = getSalesOrderValue(order, ["packing","packingName","packing_name","packingType","packing_type"]);
+  return value === "-" ? getSalesMiscDefault("packing") : value;
+}
+function getSalesOrderPatta(order){
+  let value = getSalesOrderValue(order, ["patta","pattaName","patta_name","pattaType","patta_type"]);
+  return value === "-" ? getSalesMiscDefault("patta") : value;
+}
+function getSalesOrderStamping(order){
+  let value = getSalesOrderValue(order, ["stamping","stampingName","stamping_name","stamp","stampName"]);
+  return value === "-" ? getSalesMiscDefault("stamping") : value;
+}
+function getSalesOrderTransport(order){
+  let value = getSalesOrderValue(order, ["transport","transportName","transport_name","transportType","transport_type"]);
+  return value === "-" ? getSalesMiscDefault("transport") : value;
+}
+
+function normalizeSalesOrderDetailFields(order){
+  if(!order) return order;
+  let packing = getSalesOrderPacking(order);
+  let patta = getSalesOrderPatta(order);
+  let stamping = getSalesOrderStamping(order);
+  let transport = getSalesOrderTransport(order);
+  if(packing !== "-") order.packing = order.packingName = packing;
+  if(patta !== "-") order.patta = order.pattaName = patta;
+  if(stamping !== "-") order.stamping = order.stampingName = stamping;
+  if(transport !== "-") order.transport = order.transportName = transport;
+  return order;
+}
 
 function getSalesSelectValue(id){
   let el = document.getElementById(id);
@@ -3098,6 +3141,8 @@ function printSalesPackingSlips(orderId, baleNo=null){
 
 function renderSalesManager(shouldLoadLocal=true){
   if(shouldLoadLocal && !salesCloudLoaded) loadSalesState();
+  salesState.orders ||= [];
+  salesState.orders.forEach(normalizeSalesOrderDetailFields);
   refreshSalesDropdowns();
   renderSalesParties();
   renderSalesAgents();
