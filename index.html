@@ -174,14 +174,31 @@ th{background:#dbeafe}
 .managerChoice span{display:block;color:#64748b;line-height:1.4}
 .managerChoice.primary{background:linear-gradient(135deg,#0f172a,#1d4ed8);color:white}
 .managerChoice.primary span{color:#dbeafe}
-.salesEmptyPage{min-height:100vh;display:none;align-items:center;justify-content:center;padding:22px;background:#f4f6fb}
-.salesEmptyCard{width:100%;max-width:520px;background:white;border-radius:20px;padding:26px;box-shadow:0 18px 48px #0f172a18;text-align:center}
-.salesEmptyCard h1{color:#0f172a;margin:0 0 8px}
-.salesEmptyCard p{color:#64748b}
+.salesEmptyPage{min-height:100vh;display:none;padding:74px 22px 26px;background:#eef2f7;box-sizing:border-box}
+.salesTop{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:0 auto 14px;max-width:1400px}
+.salesTop h1{margin:0;color:#0f172a}.salesTop p{margin:4px 0 0;color:#64748b}
+.salesShell{max-width:1400px;margin:0 auto;display:grid;gap:14px}
+.salesTabs{display:flex;gap:8px;flex-wrap:wrap;background:white;border:1px solid #dbeafe;border-radius:16px;padding:10px;box-shadow:0 12px 30px #0f172a0d}
+.salesTabs button{border:0;border-radius:12px;background:#eff6ff;color:#0f172a;font-weight:800;padding:10px 13px;cursor:pointer}
+.salesTabs button.active{background:#1d4ed8;color:white}
+.salesPanel{display:none}.salesPanel.active{display:block}
+.salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
+.salesCard{background:white;border:1px solid #dbeafe;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0f172a0d}
+.salesCard h2,.salesCard h3{margin:0 0 12px;color:#0f172a}
+.salesActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.salesSmallBtn{border:0;border-radius:10px;background:#2563eb;color:white;font-weight:800;padding:9px 11px;cursor:pointer}
+.salesSmallBtn.gray{background:#64748b}.salesSmallBtn.green{background:#16a34a}.salesSmallBtn.red{background:#dc2626}
+.salesTableWrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:white}
+.salesTable{min-width:760px}.salesTable th{position:sticky;top:0;z-index:1}
+.salesBadge{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px;background:#dbeafe;color:#1e3a8a}
+.salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
+.salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
+.salesPackRow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:center;border-bottom:1px solid #e2e8f0;padding:8px 0}
+.salesBaleHistory{display:grid;gap:8px}.salesBaleBox{border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#f8fafc}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
 .modeSwitchBtn:hover{background:#1d4ed8}
-@media(max-width:700px){.managerChoiceGrid{grid-template-columns:1fr}.managerSelectCard{padding:20px}.managerSelectHeader h1{font-size:24px}}
+@media(max-width:700px){.managerChoiceGrid,.salesGrid,.salesPackRow{grid-template-columns:1fr}.managerSelectCard{padding:20px}.managerSelectHeader h1{font-size:24px}.salesEmptyPage{padding:72px 12px 18px}.salesTop{align-items:flex-start;flex-direction:column}.salesTop .btn{width:100%}}
 .auth-page{min-height:100vh;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
 .auth-card h2{margin:0 0 8px}
@@ -297,10 +314,134 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </div>
 
 <div id="salesEmptyPage" class="salesEmptyPage">
-  <div class="salesEmptyCard">
-    <h1>Sales Manager</h1>
-    <p>You are logged in to Sales Manager. This module is empty for now.</p>
+  <div class="salesTop">
+    <div>
+      <h1>Sales & Dispatch</h1>
+      <p>Orders, party master, dispatch planning, and staff bale packing.</p>
+    </div>
     <button class="btn danger" onclick="logoutUser()">Logout</button>
+  </div>
+
+  <div class="salesShell">
+    <div class="salesTabs">
+      <button id="salesTabOrders" class="active" onclick="showSalesTab('orders')">Orders</button>
+      <button id="salesTabParties" onclick="showSalesTab('parties')">Party Master</button>
+      <button id="salesTabMisc" onclick="showSalesTab('misc')">Misc Master</button>
+      <button id="salesTabStaff" onclick="showSalesTab('staff')">Staff Packing</button>
+    </div>
+
+    <div id="salesPanelOrders" class="salesPanel active">
+      <div class="salesGrid">
+        <div class="salesCard" style="grid-column:span 2">
+          <h2>Create Order</h2>
+          <div class="salesGrid">
+            <input id="salesMtmOrderNo" placeholder="MTM Order No.">
+            <input id="salesPartyOrderNo" placeholder="Party Order No.">
+            <select id="salesPartyName" onchange="fillSalesPartyDetails()"><option value="">Select Party</option></select>
+            <input id="salesGstNo" placeholder="GST No.">
+            <input id="salesAgentName" placeholder="Agent Name">
+            <input id="salesStation" placeholder="Station">
+            <select id="salesTransport"><option value="">Transport</option></select>
+            <select id="salesPacking"><option value="">Packing</option></select>
+            <select id="salesPatta"><option value="">Patta</option></select>
+            <select id="salesStamping"><option value="">Stamping</option></select>
+            <input id="salesQuality" placeholder="Quality">
+            <input id="salesRate" type="number" step="0.01" placeholder="Rate">
+            <input id="salesQtyPerBale" type="number" placeholder="Qty Per Bale">
+            <input id="salesAssignStaff" placeholder="Assign Staff Email">
+          </div>
+
+          <h3>Color Order Entry</h3>
+          <div id="salesColorRows" style="display:grid;gap:8px"></div>
+          <div class="salesActions">
+            <button class="salesSmallBtn" onclick="addSalesColorRow()">Add Color Row</button>
+            <input id="salesColorCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesColorCsv(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('salesColorCsvFile').click()">Import Color CSV</button>
+            <button class="salesSmallBtn gray" onclick="downloadSalesColorSample()">Sample CSV</button>
+            <button class="salesSmallBtn gray" onclick="clearSalesColorRows()">Clear Colors</button>
+          </div>
+          <p><b>Total Order Qty:</b> <span id="salesTotalQty">0</span> | <b>Expected Bales:</b> <span id="salesExpectedBales">0</span></p>
+          <div class="salesActions">
+            <button class="salesSmallBtn green" onclick="saveSalesOrder()">Save Order</button>
+            <input id="salesOrderCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesOrderCsv(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('salesOrderCsvFile').click()">Import Order CSV</button>
+            <button class="salesSmallBtn gray" onclick="downloadSalesOrderSample()">Sample Order CSV</button>
+          </div>
+        </div>
+
+        <div class="salesCard">
+          <h2>Admin Overview</h2>
+          <p><b>Created Orders:</b> <span id="salesOrderCount">0</span></p>
+          <p><b>Total Qty:</b> <span id="salesOverviewQty">0</span></p>
+          <p><b>Ready / Packed:</b> <span id="salesPackedCount">0</span></p>
+          <p class="muted">Admin sees all orders. Staff sees only assigned orders in Staff Packing.</p>
+        </div>
+      </div>
+      <div class="salesCard">
+        <h2>Created Orders</h2>
+        <div class="salesTableWrap"><table class="salesTable" id="salesOrdersTable"></table></div>
+      </div>
+    </div>
+
+    <div id="salesPanelParties" class="salesPanel">
+      <div class="salesGrid">
+        <div class="salesCard">
+          <h2>Party Master</h2>
+          <input id="partyMasterName" placeholder="Party Name">
+          <input id="partyMasterGst" placeholder="GST No.">
+          <input id="partyMasterAgent" placeholder="Agent Name">
+          <div class="salesActions">
+            <button class="salesSmallBtn green" onclick="addSalesParty()">Add Party</button>
+            <input id="partyCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesPartyCsv(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('partyCsvFile').click()">Import CSV</button>
+            <button class="salesSmallBtn gray" onclick="downloadSalesPartySample()">Sample CSV</button>
+            <button class="salesSmallBtn gray" onclick="clearPartyCsv()">Clear CSV</button>
+          </div>
+        </div>
+        <div class="salesCard" style="grid-column:span 2">
+          <h2>Saved Parties</h2>
+          <div class="salesTableWrap"><table class="salesTable" id="salesPartyTable"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="salesPanelMisc" class="salesPanel">
+      <div class="salesGrid">
+        <div class="salesCard">
+          <h2>Misc Master</h2>
+          <select id="miscMasterType">
+            <option value="packing">Packing</option>
+            <option value="patta">Patta</option>
+            <option value="stamping">Stamping</option>
+            <option value="transport">Transport</option>
+          </select>
+          <input id="miscMasterName" placeholder="Name">
+          <div class="salesActions">
+            <button class="salesSmallBtn green" onclick="addSalesMisc()">Add Misc</button>
+            <input id="miscCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesMiscCsv(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('miscCsvFile').click()">Import CSV</button>
+            <button class="salesSmallBtn gray" onclick="downloadSalesMiscSample()">Sample CSV</button>
+            <button class="salesSmallBtn gray" onclick="clearMiscCsv()">Clear CSV</button>
+          </div>
+        </div>
+        <div class="salesCard" style="grid-column:span 2">
+          <h2>Saved Misc Values</h2>
+          <div class="salesTableWrap"><table class="salesTable" id="salesMiscTable"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="salesPanelStaff" class="salesPanel">
+      <div class="salesCard">
+        <h2>Staff Order Workflow</h2>
+        <p class="muted">Only orders assigned to the logged-in staff email are shown here.</p>
+        <div class="salesTableWrap"><table class="salesTable" id="salesStaffOrdersTable"></table></div>
+      </div>
+      <div class="salesCard">
+        <h2>Bale Creation</h2>
+        <div id="salesBaleWorkArea" class="muted">Select an assigned order to start bale creation.</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1342,9 +1483,10 @@ function openSalesManager(){
 function showSalesWorkspace(){
   hideAllEntryScreens();
   let sales = document.getElementById("salesEmptyPage");
-  if(sales) sales.style.display = "flex";
+  if(sales) sales.style.display = "block";
   document.body.classList.remove("appReady");
   updateModeSwitchButton(true);
+  renderSalesManager();
 }
 
 async function switchManagerMode(){
@@ -1512,6 +1654,485 @@ async function loginSalesUser(){
   showSalesWorkspace();
   resetInactivityTimer();
 }
+
+const SALES_STORAGE_KEY = "mtm_sales_dispatch_v1";
+let salesState = { parties: [], misc: [], orders: [] };
+let salesActiveTab = "orders";
+let salesSelectedOrderId = null;
+
+function salesEscape(value){
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  })[ch]);
+}
+
+function getSalesUserEmail(){
+  return String(currentUser?.email || "").trim().toLowerCase();
+}
+
+function loadSalesState(){
+  try{
+    let raw = localStorage.getItem(SALES_STORAGE_KEY);
+    salesState = raw ? JSON.parse(raw) : { parties: [], misc: [], orders: [] };
+  }catch(err){
+    salesState = { parties: [], misc: [], orders: [] };
+  }
+  salesState.parties ||= [];
+  salesState.misc ||= [];
+  salesState.orders ||= [];
+}
+
+function saveSalesState(){
+  localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+}
+
+function parseSalesCsv(text){
+  let rows = String(text || "").trim().split(/\r?\n/).filter(Boolean).map(line => line.split(",").map(cell => cell.trim()));
+  if(rows.length < 2) return [];
+  let headers = rows[0].map(h => h.toLowerCase().replace(/\s+/g, "_"));
+  return rows.slice(1).map(cols => {
+    let row = {};
+    headers.forEach((h, i) => row[h] = cols[i] || "");
+    return row;
+  });
+}
+
+function downloadSalesCsv(filename, content){
+  let blob = new Blob([content], {type:"text/csv"});
+  let url = URL.createObjectURL(blob);
+  let link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function showSalesTab(tab){
+  salesActiveTab = tab;
+  ["orders","parties","misc","staff"].forEach(name => {
+    document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
+    document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
+  });
+  renderSalesManager();
+}
+
+function refreshSalesDropdowns(){
+  let partySelect = document.getElementById("salesPartyName");
+  if(partySelect){
+    partySelect.innerHTML = '<option value="">Select Party</option>' + salesState.parties
+      .sort((a,b)=>String(a.partyName).localeCompare(String(b.partyName)))
+      .map(p => `<option value="${salesEscape(p.partyName)}">${salesEscape(p.partyName)}</option>`).join("");
+  }
+  [["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"]].forEach(([id,type]) => {
+    let select = document.getElementById(id);
+    if(!select) return;
+    let label = id.replace("sales", "");
+    let values = salesState.misc.filter(m => m.type === type).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    select.innerHTML = `<option value="">${salesEscape(label)}</option>` + values.map(m => `<option value="${salesEscape(m.name)}">${salesEscape(m.name)}</option>`).join("");
+  });
+}
+
+function fillSalesPartyDetails(){
+  let name = document.getElementById("salesPartyName")?.value;
+  let party = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(name));
+  if(!party) return;
+  document.getElementById("salesGstNo").value = party.gstNo || "";
+  document.getElementById("salesAgentName").value = party.agentName || "";
+}
+
+function addSalesColorRow(colorNo="", qty=""){
+  let wrap = document.getElementById("salesColorRows");
+  if(!wrap) return;
+  let row = document.createElement("div");
+  row.className = "salesColorRow";
+  row.innerHTML = `
+    <input class="salesColorNo" type="number" min="1" max="390" placeholder="Color No." value="${salesEscape(colorNo)}" oninput="updateSalesOrderTotals()">
+    <input class="salesColorQty" type="number" min="0" step="1" placeholder="Qty" value="${salesEscape(qty)}" oninput="updateSalesOrderTotals()">
+    <button class="salesSmallBtn red" onclick="this.closest('.salesColorRow').remove();updateSalesOrderTotals()">Delete</button>
+  `;
+  wrap.appendChild(row);
+  updateSalesOrderTotals();
+}
+
+function clearSalesColorRows(){
+  let wrap = document.getElementById("salesColorRows");
+  if(wrap) wrap.innerHTML = "";
+  addSalesColorRow();
+}
+
+function collectSalesColorRows(){
+  let merged = {};
+  document.querySelectorAll("#salesColorRows .salesColorRow").forEach(row => {
+    let colorNo = Number(row.querySelector(".salesColorNo")?.value);
+    let qty = Number(row.querySelector(".salesColorQty")?.value);
+    if(!colorNo && !qty) return;
+    if(!Number.isInteger(colorNo) || colorNo < 1 || colorNo > 390) throw new Error("Color No. must be 1 to 390.");
+    if(!(qty > 0)) throw new Error("Qty must be greater than 0 for Color No. " + colorNo);
+    merged[colorNo] = (merged[colorNo] || 0) + qty;
+  });
+  return Object.keys(merged).sort((a,b)=>Number(a)-Number(b)).map(colorNo => ({
+    colorNo: Number(colorNo),
+    qty: merged[colorNo],
+    pendingQty: merged[colorNo]
+  }));
+}
+
+function updateSalesOrderTotals(){
+  let total = 0;
+  document.querySelectorAll("#salesColorRows .salesColorQty").forEach(input => total += Number(input.value) || 0);
+  let baleSize = Number(document.getElementById("salesQtyPerBale")?.value) || 0;
+  let expected = baleSize > 0 ? Math.ceil(total / baleSize) : 0;
+  let totalEl = document.getElementById("salesTotalQty");
+  let expectedEl = document.getElementById("salesExpectedBales");
+  if(totalEl) totalEl.textContent = total;
+  if(expectedEl) expectedEl.textContent = expected;
+}
+
+function addSalesParty(){
+  let partyName = document.getElementById("partyMasterName").value.trim();
+  let gstNo = document.getElementById("partyMasterGst").value.trim();
+  let agentName = document.getElementById("partyMasterAgent").value.trim();
+  if(!partyName) return alert("Party Name is required.");
+  let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
+  if(existing){
+    existing.gstNo = gstNo;
+    existing.agentName = agentName;
+  }else{
+    salesState.parties.push({id:Date.now().toString(), partyName, gstNo, agentName});
+  }
+  saveSalesState();
+  document.getElementById("partyMasterName").value = "";
+  document.getElementById("partyMasterGst").value = "";
+  document.getElementById("partyMasterAgent").value = "";
+  renderSalesManager();
+  showSuccessToast("Party saved");
+}
+
+function deleteSalesParty(id){
+  if(!confirm("Delete this party?")) return;
+  salesState.parties = salesState.parties.filter(p => p.id !== id);
+  saveSalesState();
+  renderSalesManager();
+}
+
+function addSalesMisc(){
+  let type = document.getElementById("miscMasterType").value;
+  let name = document.getElementById("miscMasterName").value.trim();
+  if(!type || !name) return alert("Type and name are required.");
+  let exists = salesState.misc.find(m => m.type === type && normalizeName(m.name) === normalizeName(name));
+  if(!exists) salesState.misc.push({id:Date.now().toString(), type, name});
+  saveSalesState();
+  document.getElementById("miscMasterName").value = "";
+  renderSalesManager();
+  showSuccessToast("Misc value saved");
+}
+
+function deleteSalesMisc(id){
+  if(!confirm("Delete this misc value?")) return;
+  salesState.misc = salesState.misc.filter(m => m.id !== id);
+  saveSalesState();
+  renderSalesManager();
+}
+
+function saveSalesOrder(){
+  if(currentRole !== "admin") return alert("Only admin can create orders.");
+  try{
+    let colorsList = collectSalesColorRows();
+    let totalQty = colorsList.reduce((sum, row) => sum + row.qty, 0);
+    let qtyPerBale = Number(document.getElementById("salesQtyPerBale").value);
+    if(!document.getElementById("salesMtmOrderNo").value.trim()) throw new Error("MTM Order No. is required.");
+    if(!document.getElementById("salesPartyName").value.trim()) throw new Error("Party Name is required.");
+    if(!(qtyPerBale > 0)) throw new Error("Qty Per Bale must be greater than 0.");
+    if(!document.getElementById("salesAssignStaff").value.trim()) throw new Error("Assign Staff is required.");
+    if(colorsList.length === 0) throw new Error("Add at least one color row.");
+
+    let order = {
+      id: Date.now().toString(),
+      mtmOrderNo: document.getElementById("salesMtmOrderNo").value.trim(),
+      partyOrderNo: document.getElementById("salesPartyOrderNo").value.trim(),
+      partyName: document.getElementById("salesPartyName").value.trim(),
+      gstNo: document.getElementById("salesGstNo").value.trim(),
+      agentName: document.getElementById("salesAgentName").value.trim(),
+      station: document.getElementById("salesStation").value.trim(),
+      transport: document.getElementById("salesTransport").value,
+      packing: document.getElementById("salesPacking").value,
+      patta: document.getElementById("salesPatta").value,
+      stamping: document.getElementById("salesStamping").value,
+      quality: document.getElementById("salesQuality").value.trim(),
+      rate: Number(document.getElementById("salesRate").value) || 0,
+      qtyPerBale,
+      assignedStaff: document.getElementById("salesAssignStaff").value.trim().toLowerCase(),
+      colors: colorsList,
+      totalQty,
+      expectedBales: Math.ceil(totalQty / qtyPerBale),
+      status: "Assigned",
+      bales: [],
+      createdBy: getSalesUserEmail(),
+      createdAt: new Date().toISOString()
+    };
+    salesState.orders.push(order);
+    saveSalesState();
+    clearSalesOrderForm();
+    renderSalesManager();
+    showSuccessToast("Sales order created");
+  }catch(err){
+    alert(err.message || err);
+  }
+}
+
+function clearSalesOrderForm(){
+  ["salesMtmOrderNo","salesPartyOrderNo","salesGstNo","salesAgentName","salesStation","salesQuality","salesRate","salesQtyPerBale","salesAssignStaff"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  ["salesPartyName","salesTransport","salesPacking","salesPatta","salesStamping"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  clearSalesColorRows();
+}
+
+function cancelSalesOrder(id){
+  let order = salesState.orders.find(o => o.id === id);
+  if(!order || !confirm("Cancel this assigned order?")) return;
+  order.status = "Cancelled";
+  saveSalesState();
+  renderSalesManager();
+}
+
+function deleteSalesOrder(id){
+  if(currentRole !== "admin") return alert("Only admin can delete orders.");
+  if(!confirm("Delete this sales order?")) return;
+  salesState.orders = salesState.orders.filter(o => o.id !== id);
+  if(salesSelectedOrderId === id) salesSelectedOrderId = null;
+  saveSalesState();
+  renderSalesManager();
+}
+
+function getVisibleSalesOrders(){
+  if(currentRole === "admin") return salesState.orders;
+  let email = getSalesUserEmail();
+  return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
+}
+
+function acceptSalesOrder(id){
+  let order = salesState.orders.find(o => o.id === id);
+  if(!order) return;
+  order.status = "Accepted";
+  saveSalesState();
+  renderSalesManager();
+}
+
+function startSalesBaleCreation(id){
+  let order = salesState.orders.find(o => o.id === id);
+  if(!order) return;
+  if(order.status === "Assigned") order.status = "Accepted";
+  if(order.status === "Accepted") order.status = "In Packing";
+  salesSelectedOrderId = id;
+  saveSalesState();
+  renderSalesManager();
+}
+
+function setSalesTakeAll(input, colorNo){
+  let row = input.closest(".salesPackRow");
+  let qtyInput = row?.querySelector(".salesPackQty");
+  if(qtyInput) qtyInput.value = input.checked ? input.dataset.pending : "";
+  updateCurrentBaleTotal();
+}
+
+function updateCurrentBaleTotal(){
+  let total = 0;
+  document.querySelectorAll(".salesPackQty").forEach(input => total += Number(input.value) || 0);
+  let el = document.getElementById("salesCurrentBaleTotal");
+  if(el) el.textContent = total;
+}
+
+function finishSalesBale(){
+  try{
+    let order = salesState.orders.find(o => o.id === salesSelectedOrderId);
+    if(!order) return;
+    let packed = [];
+    let total = 0;
+    document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => {
+      let colorNo = Number(row.dataset.colorNo);
+      let qty = Number(row.querySelector(".salesPackQty")?.value) || 0;
+      let color = order.colors.find(c => c.colorNo === colorNo);
+      if(qty > 0){
+        if(qty > color.pendingQty) throw new Error("Cannot pack more than pending qty for Color No. " + colorNo);
+        packed.push({colorNo, qty});
+        total += qty;
+      }
+    });
+    if(packed.length === 0) return alert("Enter pack qty for this bale.");
+    let remainingBefore = order.colors.reduce((sum,c)=>sum + c.pendingQty,0);
+    let isFinal = total === remainingBefore;
+    if(total !== order.qtyPerBale && !isFinal){
+      if(!confirm("Bale total is not equal to Qty Per Bale. Continue?")) return;
+    }
+    packed.forEach(p => {
+      let color = order.colors.find(c => c.colorNo === p.colorNo);
+      color.pendingQty -= p.qty;
+    });
+    order.bales.push({baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: getSalesUserEmail()});
+    if(order.colors.every(c => c.pendingQty <= 0)){
+      order.status = "Packed";
+    }else{
+      order.status = "In Packing";
+    }
+    saveSalesState();
+    renderSalesManager();
+    showSuccessToast(order.status === "Packed" ? "Order ready for dispatch" : "Bale finished");
+  }catch(err){
+    alert(err.message || err);
+  }
+}
+
+function renderSalesManager(){
+  loadSalesState();
+  refreshSalesDropdowns();
+  renderSalesParties();
+  renderSalesMisc();
+  renderSalesOrders();
+  renderSalesStaffOrders();
+  renderSalesBaleWorkArea();
+  updateSalesOrderTotals();
+  if(document.querySelectorAll("#salesColorRows .salesColorRow").length === 0) addSalesColorRow();
+}
+
+function renderSalesParties(){
+  let table = document.getElementById("salesPartyTable");
+  if(!table) return;
+  table.innerHTML = `<tr><th>Party Name</th><th>GST No.</th><th>Agent Name</th><th>Action</th></tr>` +
+    salesState.parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.agentName)}</td><td><button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("");
+}
+
+function renderSalesMisc(){
+  let table = document.getElementById("salesMiscTable");
+  if(!table) return;
+  table.innerHTML = `<tr><th>Type</th><th>Name</th><th>Action</th></tr>` +
+    salesState.misc.map(m => `<tr><td>${salesEscape(m.type)}</td><td>${salesEscape(m.name)}</td><td><button class="salesSmallBtn red" onclick="deleteSalesMisc('${m.id}')">Delete</button></td></tr>`).join("");
+}
+
+function renderSalesOrders(){
+  let table = document.getElementById("salesOrdersTable");
+  if(!table) return;
+  let orders = salesState.orders.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  document.getElementById("salesOrderCount").textContent = orders.length;
+  document.getElementById("salesOverviewQty").textContent = orders.reduce((sum,o)=>sum + (Number(o.totalQty)||0),0);
+  document.getElementById("salesPackedCount").textContent = orders.filter(o=>o.status === "Packed").length;
+  table.innerHTML = `<tr><th>MTM Order</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+    orders.map(o => `<tr>
+      <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
+      <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}</td>
+      <td>${salesEscape(o.assignedStaff)}</td><td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
+      <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
+      <td><button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
+    </tr>`).join("");
+}
+
+function renderSalesStaffOrders(){
+  let table = document.getElementById("salesStaffOrdersTable");
+  if(!table) return;
+  let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
+    orders.map(o => `<tr>
+      <td>${salesEscape(o.mtmOrderNo)}</td><td>${salesEscape(o.partyName)}</td><td>${o.totalQty}</td><td>${o.qtyPerBale}</td>
+      <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
+      <td>${o.status === "Assigned" ? `<button class="salesSmallBtn green" onclick="acceptSalesOrder('${o.id}')">Accept Order</button>` : ""}
+          ${o.status !== "Packed" ? `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">Start Bale Creation</button>` : "Order ready for dispatch"}</td>
+    </tr>`).join("");
+}
+
+function renderSalesBaleWorkArea(){
+  let area = document.getElementById("salesBaleWorkArea");
+  if(!area) return;
+  let order = salesState.orders.find(o => o.id === salesSelectedOrderId);
+  if(!order){
+    area.innerHTML = "Select an assigned order to start bale creation.";
+    return;
+  }
+  let pending = order.colors.filter(c => c.pendingQty > 0);
+  let rows = pending.map(c => `<div class="salesPackRow" data-color-no="${c.colorNo}">
+    <div><b>Color ${c.colorNo}</b><br><span class="muted">Ordered ${c.qty}</span></div>
+    <div>Pending: <b>${c.pendingQty}</b></div>
+    <label><input type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Take All</label>
+    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Pack Qty" oninput="updateCurrentBaleTotal()">
+  </div>`).join("");
+  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><b>Bale ${bale.baleNo}</b> - ${bale.totalQty} qty<br>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}</div>`).join("");
+  area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
+    <p><b>Qty Per Bale:</b> ${order.qtyPerBale} | <b>Current Bale Total:</b> <span id="salesCurrentBaleTotal">0</span></p>
+    ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div id="salesPendingPackRows">${rows}</div><button class="salesSmallBtn green" onclick="finishSalesBale()">Finish Bale</button>`}
+    <h3>Completed Bale History</h3><div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
+}
+
+async function importSalesPartyCsv(event){
+  let file = event.target.files?.[0]; if(!file) return;
+  let rows = parseSalesCsv(await file.text());
+  rows.forEach(row => {
+    let partyName = row.party_name || row.party || row.name;
+    if(!partyName) return;
+    let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
+    let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: row.gst_no || "", agentName: row.agent_name || ""};
+    if(existing) Object.assign(existing, payload); else salesState.parties.push(payload);
+  });
+  saveSalesState(); renderSalesManager(); showSuccessToast("Party CSV imported");
+}
+
+async function importSalesMiscCsv(event){
+  let file = event.target.files?.[0]; if(!file) return;
+  let rows = parseSalesCsv(await file.text());
+  rows.forEach(row => {
+    let type = String(row.type || "").toLowerCase();
+    let name = row.name || "";
+    if(!["packing","patta","stamping","transport"].includes(type) || !name) return;
+    if(!salesState.misc.find(m => m.type === type && normalizeName(m.name) === normalizeName(name))){
+      salesState.misc.push({id:(Date.now() + Math.random()).toString(), type, name});
+    }
+  });
+  saveSalesState(); renderSalesManager(); showSuccessToast("Misc CSV imported");
+}
+
+async function importSalesColorCsv(event){
+  let file = event.target.files?.[0]; if(!file) return;
+  let rows = parseSalesCsv(await file.text());
+  let merged = {};
+  rows.forEach(row => {
+    let colorNo = Number(row.color_no || row.color || row.colorno);
+    let qty = Number(row.qty || row.quantity);
+    if(Number.isInteger(colorNo) && colorNo >= 1 && colorNo <= 390 && qty > 0) merged[colorNo] = (merged[colorNo] || 0) + qty;
+  });
+  let wrap = document.getElementById("salesColorRows");
+  if(wrap) wrap.innerHTML = "";
+  Object.keys(merged).sort((a,b)=>Number(a)-Number(b)).forEach(colorNo => addSalesColorRow(colorNo, merged[colorNo]));
+  updateSalesOrderTotals();
+  showSuccessToast("Color CSV imported");
+}
+
+async function importSalesOrderCsv(event){
+  let file = event.target.files?.[0]; if(!file) return;
+  let rows = parseSalesCsv(await file.text());
+  rows.forEach(row => {
+    if(row.mtm_order_no) document.getElementById("salesMtmOrderNo").value = row.mtm_order_no;
+    if(row.party_order_no) document.getElementById("salesPartyOrderNo").value = row.party_order_no;
+    if(row.party_name) document.getElementById("salesPartyName").value = row.party_name;
+    if(row.gst_no) document.getElementById("salesGstNo").value = row.gst_no;
+    if(row.agent_name) document.getElementById("salesAgentName").value = row.agent_name;
+    if(row.station) document.getElementById("salesStation").value = row.station;
+    if(row.quality) document.getElementById("salesQuality").value = row.quality;
+    if(row.rate) document.getElementById("salesRate").value = row.rate;
+    if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
+    if(row.assign_staff) document.getElementById("salesAssignStaff").value = row.assign_staff;
+  });
+  updateSalesOrderTotals();
+  showSuccessToast("Order CSV loaded");
+}
+
+function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,agent_name\nShree Textiles,24ABCDE1234F1Z5,Agent 1\n"); }
+function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
+function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
+function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,party_name,gst_no,agent_name,station,quality,rate,qty_per_bale,assign_staff\nMTM-1,PO-1,Shree Textiles,24ABCDE1234F1Z5,Agent 1,Pali,Cotton,100,50,staff@example.com\n"); }
+function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
+function clearMiscCsv(){ let f = document.getElementById("miscCsvFile"); if(f) f.value = ""; showSuccessToast("Misc CSV cleared"); }
 
 async function logoutUser(auto=false){
   if(supabaseClient){
