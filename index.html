@@ -197,7 +197,12 @@ th{background:#dbeafe}
 .salesBadge{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px;background:#dbeafe;color:#1e3a8a}
 .salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
 .salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
-.salesPackRow{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:center;border-bottom:1px solid #e2e8f0;padding:8px 0}
+.salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff}
+.salesBaleTotal{font-size:22px;font-weight:900;color:#1d4ed8}
+.salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:10px}
+.salesPackRow{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff}
+.salesPackColorNo{grid-row:1 / span 4;font-size:32px;font-weight:900;color:#1d4ed8;text-align:center;border-right:1px solid #e2e8f0;padding-right:8px}
+.salesPackRow label{font-weight:800;display:flex;align-items:center;gap:6px}.salesPackRow input[type="number"]{width:100%;margin:0}
 .salesBaleHistory{display:grid;gap:8px}.salesBaleBox{border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#f8fafc}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
@@ -311,7 +316,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </button>
       <button class="managerChoice" onclick="openSalesManager()">
         <strong>Sales Manager</strong>
-        <span>Open admin, agent, and staff sales portals.</span>
+        <span>Open admin, agent, and team member sales portals.</span>
       </button>
     </div>
   </div>
@@ -327,14 +332,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div class="managerChoiceGrid">
       <button class="managerChoice primary" onclick="openSalesAdminPortal()">
         <strong>Admin Portal</strong>
-        <span>Create orders, assign staff, manage ledgers, and print packing slips.</span>
+        <span>Create orders, assign team members, manage ledgers, and print packing slips.</span>
       </button>
       <button class="managerChoice" onclick="openAgentPortal()">
         <strong>Agent Portal</strong>
         <span>View only your parties, order status, dispatched bales, and pending balances.</span>
       </button>
       <button class="managerChoice" onclick="openStaffPortal()">
-        <strong>Staff Portal</strong>
+        <strong>Team Member Portal</strong>
         <span>View assigned orders only, create bales, and print packing slips.</span>
       </button>
     </div>
@@ -346,7 +351,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <div class="salesTop">
     <div>
       <h1 id="salesWorkspaceTitle">Sales & Dispatch</h1>
-      <p id="salesWorkspaceSubtitle">Orders, party master, dispatch planning, and staff bale packing.</p>
+      <p id="salesWorkspaceSubtitle">Orders, party master, dispatch planning, and team member bale packing.</p>
     </div>
     <div class="salesActions">
       <button class="btn" onclick="refreshSalesCloudData()">Refresh Sales Cloud</button>
@@ -359,10 +364,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <button id="salesTabOrders" class="active" onclick="showSalesTab('orders')">Orders</button>
       <button id="salesTabParties" onclick="showSalesTab('parties')">Party Master</button>
       <button id="salesTabAgents" onclick="showSalesTab('agents')">Agent Ledger</button>
-      <button id="salesTabStaffs" onclick="showSalesTab('staffs')">Staff Ledger</button>
+      <button id="salesTabStaffs" onclick="showSalesTab('staffs')">Team Member Ledger</button>
       <button id="salesTabMisc" onclick="showSalesTab('misc')">Misc Master</button>
       <button id="salesTabAgent" onclick="showSalesTab('agent')">Agent Portal</button>
-      <button id="salesTabStaff" onclick="showSalesTab('staff')">Staff Packing</button>
+      <button id="salesTabStaff" onclick="showSalesTab('staff')">Team Member Packing</button>
     </div>
 
     <div id="salesPanelOrders" class="salesPanel active">
@@ -378,13 +383,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
             <input id="salesAgentName" placeholder="Agent Name">
             <input id="salesAgentEmail" type="hidden">
             <input id="salesPartyAddress" placeholder="Party Address">
-            <input id="salesPartyPhone" placeholder="Party Phone">
-            <input id="salesStation" placeholder="Station">
             <select id="salesTransport"><option value="">Transport</option></select>
             <select id="salesPacking"><option value="">Packing</option></select>
             <select id="salesPatta"><option value="">Patta</option></select>
             <select id="salesStamping"><option value="">Stamping</option></select>
-            <input id="salesConfirmation" placeholder="Confirmation / Note">
             <input id="salesQuality" placeholder="Quality">
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
             <input id="salesQtyPerBale" type="number" placeholder="Qty Per Bale">
@@ -414,8 +416,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Total Qty:</b> <span id="salesOverviewQty">0</span></p>
           <p><b>Ready / Packed:</b> <span id="salesPackedCount">0</span></p>
           <p><b>Agents:</b> <span id="salesAgentCount">0</span></p>
-          <p><b>Staff:</b> <span id="salesStaffCount">0</span></p>
-          <p class="muted">Create orders first, then push/change assigned staff from Order History.</p>
+          <p><b>Team Members:</b> <span id="salesStaffCount">0</span></p>
+          <p class="muted">Create orders first, then push/change assigned team member from Order History.</p>
         </div>
       </div>
       <div class="salesCard">
@@ -474,16 +476,16 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div id="salesPanelStaffs" class="salesPanel">
       <div class="salesGrid">
         <div class="salesCard">
-          <h2>Staff Ledger</h2>
-          <input id="salesLedgerStaffName" placeholder="Staff Name">
-          <input id="salesLedgerStaffEmail" type="email" placeholder="Staff Login Email">
+          <h2>Team Member Ledger</h2>
+          <input id="salesLedgerStaffName" placeholder="Team Member Name">
+          <input id="salesLedgerStaffEmail" type="email" placeholder="Team Member Login Email">
           <div class="salesActions">
-            <button id="salesStaffSaveBtn" class="salesSmallBtn green" onclick="addSalesStaff()">Add Staff</button>
+            <button id="salesStaffSaveBtn" class="salesSmallBtn green" onclick="addSalesStaff()">Add Team Member</button>
           </div>
-          <p class="muted">Use the same email as the staff login email.</p>
+          <p class="muted">Use the same email as the team member login email.</p>
         </div>
         <div class="salesCard" style="grid-column:span 2">
-          <h2>Saved Staff</h2>
+          <h2>Saved Team Members</h2>
           <div class="salesTableWrap"><table class="salesTable" id="salesStaffLedgerTable"></table></div>
         </div>
       </div>
@@ -529,8 +531,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
     <div id="salesPanelStaff" class="salesPanel">
       <div class="salesCard">
-        <h2>Staff Order Workflow</h2>
-        <p class="muted">Only orders assigned to the logged-in staff email are shown here.</p>
+        <h2>Team Member Order Workflow</h2>
+        <p class="muted">Only orders assigned to the logged-in team member email are shown here.</p>
         <div class="salesTableWrap"><table class="salesTable" id="salesStaffOrdersTable"></table></div>
       </div>
       <div class="salesCard">
@@ -569,14 +571,14 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
 <div id="staffLoginPage" class="auth-page">
   <div class="auth-card">
-    <h2>Staff Portal Login</h2>
+    <h2>Team Member Portal Login</h2>
     <p>Login to view only your assigned sales orders.</p>
     <div id="staffLoginError" class="auth-error"></div>
-    <input id="staffLoginEmail" type="email" placeholder="Staff Email" autocomplete="email">
-    <input id="staffLoginPassword" type="password" placeholder="Staff Password" autocomplete="current-password">
+    <input id="staffLoginEmail" type="email" placeholder="Team Member Email" autocomplete="email">
+    <input id="staffLoginPassword" type="password" placeholder="Team Member Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginStaffUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
-    <div class="auth-meta">Staff Portal shows assigned work only.</div>
+    <div class="auth-meta">Team Member Portal shows assigned work only.</div>
   </div>
 </div>
 
@@ -608,7 +610,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     </div>
   </div>
   <div class="companyHeader"></div>
-  <p> Recipe Master • Batch Costing • Price Master</p>
+  <p> Recipe Master &bull; Batch Costing &bull; Price Master</p>
 </header>
 
 <div id="sidebarOverlay" class="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -648,7 +650,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <div class="dashboardLogoBox">
       <div>
         <div class="dashboardCompany">MONICA TEXTILE MILLS</div>
-        <div class="dashboardAddress">📍 F-238, Mandia Road, Pali, Rajasthan – 306401, India</div>
+        <div class="dashboardAddress">F-238, Mandia Road, Pali, Rajasthan - 306401, India</div>
       </div>
       <img class="dashboardLogo" src="logo.svg" alt="Monica Textile Mills Logo">
     </div>
@@ -749,7 +751,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <div class="card">
     <h2>Price Master</h2>
     <input id="colorName" placeholder="Dye / Color Name">
-    <input id="colorRate" type="number" placeholder="Price per kg ₹">
+    <input id="colorRate" type="number" placeholder="Price per kg Rs.">
     <select id="colorType">
       <option value="">Select Color Type</option>
       <option value="COTTON">Cotton</option>
@@ -762,7 +764,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="priceSearch" oninput="renderColors()" placeholder="Search color/dye name or Cotton/Polyster">
     <table>
       <thead>
-        <tr><th>Color Name</th><th>Type</th><th>Rate/kg ₹</th><th>Action</th></tr>
+        <tr><th>Color Name</th><th>Type</th><th>Rate/kg Rs.</th><th>Action</th></tr>
       </thead>
       <tbody id="colorTable"></tbody>
     </table>
@@ -1086,7 +1088,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <div class="contactHero">
     <h2>Contact Us</h2>
     <h1>MONICA TEXTILE MILLS</h1>
-    <p>📍 F-238, Mandia Road, Pali, Rajasthan – 306401, India</p>
+    <p>F-238, Mandia Road, Pali, Rajasthan - 306401, India</p>
     <div class="contactActions">
       <a class="btn green" href="https://api.whatsapp.com/send?phone=919462023854" rel="noopener">WhatsApp</a>
       <a class="btn" href="tel:7014334854">Call</a>
@@ -1698,8 +1700,9 @@ async function showSalesWorkspace(portalMode=currentManagerMode){
   document.body.classList.toggle("agentPortalMode", portalMode === "agent");
   let title = document.getElementById("salesWorkspaceTitle");
   let subtitle = document.getElementById("salesWorkspaceSubtitle");
-  if(title) title.textContent = portalMode === "staff" ? "Staff Portal" : portalMode === "agent" ? "Agent Portal" : "Sales & Dispatch";
-  if(subtitle) subtitle.textContent = portalMode === "staff" ? "Assigned orders and bale packing only." : portalMode === "agent" ? "Order payment, due, pending color, and dispatch status." : "Orders, party master, dispatch planning, and staff bale packing.";
+  if(title) title.textContent = portalMode === "staff" ? "Team Member Portal" : portalMode === "agent" ? "Agent Portal" : "Sales & Dispatch";
+  if(subtitle) subtitle.textContent = portalMode === "staff" ? "Assigned orders and bale packing only." : portalMode === "agent" ? "Party order status, pending colors, sent colors, and bale dispatch." : "Orders, party master, dispatch planning, and team member bale packing.";
+  resetSalesScreenState();
   salesActiveTab = portalMode === "staff" ? "staff" : portalMode === "agent" ? "agent" : "orders";
   document.body.classList.remove("appReady");
   updateModeSwitchButton(true);
@@ -1707,6 +1710,7 @@ async function showSalesWorkspace(portalMode=currentManagerMode){
   await loadSalesCloudState();
   renderSalesManager(false);
   startSalesCloudRefresh();
+  resetSalesPagePosition();
 }
 
 async function switchManagerMode(){
@@ -1951,7 +1955,7 @@ async function loginStaffUser(){
   }
 
   if(!email || !password){
-    showStaffLoginError("Staff email and password are required.");
+    showStaffLoginError("Team member email and password are required.");
     return;
   }
 
@@ -2115,7 +2119,7 @@ function canUseSalesCloud(){
 function requireSalesCloud(){
   if(canUseSalesCloud()) return true;
   if(isTrialUser()) return false;
-  alert("Sales cloud is not connected for this login. Please login with Supabase Sales Admin/Staff/Agent email, not local-only login.");
+  alert("Sales cloud is not connected for this login. Please login with Supabase Sales Admin/Team Member/Agent email, not local-only login.");
   return false;
 }
 
@@ -2282,12 +2286,36 @@ function downloadSalesCsv(filename, content){
 function showSalesTab(tab, shouldRender=true){
   if(currentManagerMode === "staff" && tab !== "staff") tab = "staff";
   if(currentManagerMode === "agent" && tab !== "agent") tab = "agent";
+  let previousTab = salesActiveTab;
+  if(previousTab && previousTab !== tab) resetSalesScreenState();
   salesActiveTab = tab;
   ["orders","parties","agents","staffs","misc","agent","staff"].forEach(name => {
     document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
     document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
   });
   if(shouldRender) renderSalesManager();
+  resetSalesPagePosition();
+}
+
+function resetSalesPagePosition(){
+  window.scrollTo({top:0, left:0, behavior:"auto"});
+  let sales = document.getElementById("salesEmptyPage");
+  if(sales) sales.scrollTop = 0;
+}
+
+function resetSalesScreenState(){
+  editingSalesPartyId = null;
+  editingSalesAgentId = null;
+  editingSalesStaffId = null;
+  editingSalesMiscId = null;
+  salesSelectedOrderId = null;
+  clearSalesOrderForm();
+  clearSalesPartyForm();
+  clearSalesAgentForm();
+  clearSalesStaffForm();
+  clearSalesMiscForm();
+  let bale = document.getElementById("salesBaleWorkArea");
+  if(bale) bale.innerHTML = "Select an assigned order to start bale creation.";
 }
 
 function refreshSalesDropdowns(){
@@ -2326,9 +2354,7 @@ function fillSalesPartyDetails(){
   let emailEl = document.getElementById("salesAgentEmail");
   if(emailEl) emailEl.value = party.agentEmail || "";
   let addressEl = document.getElementById("salesPartyAddress");
-  let phoneEl = document.getElementById("salesPartyPhone");
   if(addressEl) addressEl.value = party.address || "";
-  if(phoneEl) phoneEl.value = party.phone || "";
 }
 
 function addSalesColorRow(colorNo="", qty=""){
@@ -2472,11 +2498,11 @@ async function deleteSalesAgent(id){
 
 async function addSalesStaff(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
-  if(!isSalesAdmin()) return alert("Only Sales Admin can manage Staff Ledger.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can manage Team Member Ledger.");
   let name = document.getElementById("salesLedgerStaffName").value.trim();
   let email = document.getElementById("salesLedgerStaffEmail").value.trim().toLowerCase();
-  if(!name) return alert("Staff Name is required.");
-  if(!email || !email.includes("@")) return alert("Valid Staff Login Email is required.");
+  if(!name) return alert("Team Member Name is required.");
+  if(!email || !email.includes("@")) return alert("Valid Team Member Login Email is required.");
   let existing = editingSalesStaffId
     ? salesState.staffs.find(s => s.id === editingSalesStaffId)
     : salesState.staffs.find(s => normalizeName(s.email) === normalizeName(email) || normalizeName(s.name) === normalizeName(name));
@@ -2497,12 +2523,12 @@ async function addSalesStaff(){
   await saveSalesState();
   clearSalesStaffForm();
   renderSalesManager();
-  showSuccessToast(existing ? "Staff updated" : "Staff saved");
+  showSuccessToast(existing ? "Team Member updated" : "Team Member saved");
 }
 
 function editSalesStaff(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
-  if(!isSalesAdmin()) return alert("Only Sales Admin can edit staff.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can edit team members.");
   let staff = salesState.staffs.find(s => s.id === id);
   if(!staff) return;
   editingSalesStaffId = id;
@@ -2510,16 +2536,16 @@ function editSalesStaff(id){
   document.getElementById("salesLedgerStaffName").value = staff.name || "";
   document.getElementById("salesLedgerStaffEmail").value = staff.email || "";
   let btn = document.getElementById("salesStaffSaveBtn");
-  if(btn) btn.textContent = "Update Staff";
+  if(btn) btn.textContent = "Update Team Member";
   document.getElementById("salesPanelStaffs")?.scrollIntoView({behavior:"smooth", block:"start"});
   document.getElementById("salesLedgerStaffName")?.focus();
 }
 
 async function deleteSalesStaff(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
-  if(!isSalesAdmin()) return alert("Only Sales Admin can delete staff.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete team members.");
   let staff = salesState.staffs.find(s => s.id === id);
-  if(!staff || !confirm("Delete this staff from ledger? Existing assigned orders will remain assigned by email.")) return;
+  if(!staff || !confirm("Delete this team member from ledger? Existing assigned orders will remain assigned by email.")) return;
   salesState.staffs = salesState.staffs.filter(s => s.id !== id);
   await saveSalesState();
   renderSalesManager();
@@ -2532,7 +2558,7 @@ function clearSalesStaffForm(){
     if(el) el.value = "";
   });
   let btn = document.getElementById("salesStaffSaveBtn");
-  if(btn) btn.textContent = "Add Staff";
+  if(btn) btn.textContent = "Add Team Member";
 }
 
 function getSalesStaffByEmail(email){
@@ -2547,7 +2573,7 @@ async function assignSalesOrderToStaff(orderId){
   let select = document.getElementById("assignStaff_" + orderId);
   let staffEmail = String(select?.value || "").trim().toLowerCase();
   let staff = getSalesStaffByEmail(staffEmail);
-  if(!staff) return alert("Select staff from Staff Ledger first.");
+  if(!staff) return alert("Select team member from Team Member Ledger first.");
   let action = order.assignedStaff ? "change this order to " : "push this order to ";
   if(!confirm("Are you sure you want to " + action + staff.name + "?")) return;
   order.assignedStaff = staff.email;
@@ -2701,13 +2727,10 @@ async function saveSalesOrder(){
       agentName: document.getElementById("salesAgentName").value.trim(),
       agentEmail: document.getElementById("salesAgentEmail")?.value.trim().toLowerCase() || "",
       partyAddress: document.getElementById("salesPartyAddress")?.value.trim() || "",
-      partyPhone: document.getElementById("salesPartyPhone")?.value.trim() || "",
-      station: document.getElementById("salesStation").value.trim(),
       transport: document.getElementById("salesTransport").value,
       packing: document.getElementById("salesPacking").value,
       patta: document.getElementById("salesPatta").value,
       stamping: document.getElementById("salesStamping").value,
-      confirmation: document.getElementById("salesConfirmation")?.value.trim() || "",
       quality: document.getElementById("salesQuality").value.trim(),
       rate: Number(document.getElementById("salesRate").value) || 0,
       qtyPerBale,
@@ -2733,7 +2756,7 @@ async function saveSalesOrder(){
 }
 
 function clearSalesOrderForm(){
-  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesPartyPhone","salesStation","salesConfirmation","salesQuality","salesRate","salesQtyPerBale"].forEach(id => {
+  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesQuality","salesRate","salesQtyPerBale"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
@@ -2807,7 +2830,7 @@ function getSalesBaleStatusSummary(order){
 }
 
 async function acceptSalesOrder(id){
-  if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
+  if(isTrialUser()) return alert("Trial login can only view. Team member actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
   order.status = "Accepted";
@@ -2816,10 +2839,10 @@ async function acceptSalesOrder(id){
 }
 
 async function startSalesBaleCreation(id){
-  if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
+  if(isTrialUser()) return alert("Trial login can only view. Team member actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
-  if(!order.assignedStaff) return alert("This order is not assigned to staff yet.");
+  if(!order.assignedStaff) return alert("This order is not assigned to a team member yet.");
   if(order.status === "Assigned") order.status = "Accepted";
   if(order.status === "Accepted") order.status = "In Packing";
   salesSelectedOrderId = id;
@@ -2830,19 +2853,39 @@ async function startSalesBaleCreation(id){
 function setSalesTakeAll(input, colorNo){
   let row = input.closest(".salesPackRow");
   let qtyInput = row?.querySelector(".salesPackQty");
+  let customCheck = row?.querySelector(".salesUseCustom");
   if(qtyInput) qtyInput.value = input.checked ? input.dataset.pending : "";
+  if(customCheck && input.checked) customCheck.checked = false;
   updateCurrentBaleTotal();
+}
+
+function setSalesUseCustom(input){
+  let row = input.closest(".salesPackRow");
+  let takeAll = row?.querySelector(".salesTakeAll");
+  let qtyInput = row?.querySelector(".salesPackQty");
+  if(takeAll && input.checked) takeAll.checked = false;
+  if(qtyInput && input.checked) qtyInput.focus();
+  updateCurrentBaleTotal();
+}
+
+function getSalesPackRowQty(row){
+  let takeAll = row.querySelector(".salesTakeAll");
+  let useCustom = row.querySelector(".salesUseCustom");
+  let qtyInput = row.querySelector(".salesPackQty");
+  if(takeAll?.checked) return Number(takeAll.dataset.pending) || 0;
+  if(useCustom?.checked) return Number(qtyInput?.value) || 0;
+  return 0;
 }
 
 function updateCurrentBaleTotal(){
   let total = 0;
-  document.querySelectorAll(".salesPackQty").forEach(input => total += Number(input.value) || 0);
+  document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => total += getSalesPackRowQty(row));
   let el = document.getElementById("salesCurrentBaleTotal");
   if(el) el.textContent = total;
 }
 
 async function finishSalesBale(){
-  if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
+  if(isTrialUser()) return alert("Trial login can only view. Team member actions are disabled.");
   try{
     let order = salesState.orders.find(o => o.id === salesSelectedOrderId);
     if(!order) return;
@@ -2850,7 +2893,7 @@ async function finishSalesBale(){
     let total = 0;
     document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => {
       let colorNo = Number(row.dataset.colorNo);
-      let qty = Number(row.querySelector(".salesPackQty")?.value) || 0;
+      let qty = getSalesPackRowQty(row);
       let color = order.colors.find(c => c.colorNo === colorNo);
       if(qty > 0){
         if(qty > color.pendingQty) throw new Error("Cannot pack more than pending qty for Color No. " + colorNo);
@@ -2860,15 +2903,14 @@ async function finishSalesBale(){
     });
     if(packed.length === 0) return alert("Enter pack qty for this bale.");
     let remainingBefore = order.colors.reduce((sum,c)=>sum + c.pendingQty,0);
-    let isFinal = total === remainingBefore;
-    if(total !== order.qtyPerBale && !isFinal){
-      if(!confirm("Bale total is not equal to Qty Per Bale. Continue?")) return;
+    if(total > order.qtyPerBale){
+      if(!confirm("Ordered quantity was " + order.qtyPerBale + " per bale, but you are saving " + total + ". Are you sure you want to save?")) return;
     }
     packed.forEach(p => {
       let color = order.colors.find(c => c.colorNo === p.colorNo);
       color.pendingQty -= p.qty;
     });
-    order.bales.push({baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: getSalesUserEmail()});
+    order.bales.push({baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: order.assignedStaffName || getSalesUserEmail()});
     if(order.colors.every(c => c.pendingQty <= 0)){
       order.status = "Packed";
     }else{
@@ -2900,9 +2942,9 @@ function printSalesPackingSlips(orderId, baleNo=null){
         <p><b>Packing:</b> ${salesEscape(order.packing || "-")}</p>
         <p><b>Patta:</b> ${salesEscape(order.patta || "-")}</p>
         <p><b>Stamping:</b> ${salesEscape(order.stamping || "-")}</p>
-        <p><b>Station:</b> ${salesEscape(order.station || "-")}</p>
+        <p><b>Address:</b> ${salesEscape(order.partyAddress || "-")}</p>
         <p><b>Transport:</b> ${salesEscape(order.transport || "-")}</p>
-        <p><b>Staff:</b> ${salesEscape(bale.staff || order.assignedStaff || "-")}</p>
+        <p><b>Team Member:</b> ${salesEscape(bale.staff || order.assignedStaffName || "-")}</p>
       </div>
       <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
     </section>`;
@@ -2997,7 +3039,7 @@ function renderSalesAgents(){
 function renderSalesStaffLedger(){
   let table = document.getElementById("salesStaffLedgerTable");
   if(!table) return;
-  table.innerHTML = `<tr><th>Staff Name</th><th>Staff Login Email</th><th>Assigned Orders</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>Team Member Name</th><th>Team Member Login Email</th><th>Assigned Orders</th><th>Action</th></tr>` +
     salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => {
       let orderCount = salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === String(staff.email || "").toLowerCase()).length;
       return `<tr><td>${salesEscape(staff.name)}</td><td>${salesEscape(staff.email)}</td><td>${orderCount}</td><td><button class="salesSmallBtn gray" onclick="editSalesStaff('${staff.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesStaff('${staff.id}')">Delete</button></td></tr>`;
@@ -3022,8 +3064,8 @@ function renderSalesOrders(){
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
   if(staffCount) staffCount.textContent = salesState.staffs.length || salesProfiles.filter(p => p.role === "staff").length;
-  let staffOptions = '<option value="">Select Staff</option>' + salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => `<option value="${salesEscape(staff.email)}">${salesEscape(staff.name)} - ${salesEscape(staff.email)}</option>`).join("");
-  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+  let staffOptions = '<option value="">Select Team Member</option>' + salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => `<option value="${salesEscape(staff.email)}">${salesEscape(staff.name)} - ${salesEscape(staff.email)}</option>`).join("");
+  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Team Member Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
@@ -3031,7 +3073,7 @@ function renderSalesOrders(){
       <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(o.assignedStaffName || o.assignedStaff) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
-      <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Staff" : "Push to Staff"}</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
+      <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
   orders.forEach(o => {
     let select = document.getElementById("assignStaff_" + o.id);
@@ -3066,9 +3108,9 @@ function renderSalesStaffOrders(){
   let table = document.getElementById("salesStaffOrdersTable");
   if(!table) return;
   let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Assigned To</th><th>Total Qty</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
-      <td>${salesEscape(o.mtmOrderNo)}</td><td>${salesEscape(o.partyName)}</td><td>${o.totalQty}</td><td>${o.qtyPerBale}</td>
+      <td>${salesEscape(o.mtmOrderNo)}</td><td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.assignedStaffName || salesProfile?.fullName || "Team Member")}</td><td>${o.totalQty}</td><td>${o.qtyPerBale}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
       <td>${o.status === "Assigned" ? `<button class="salesSmallBtn green" onclick="acceptSalesOrder('${o.id}')">Accept Order</button>` : ""}
           ${o.status !== "Packed" ? `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">Start Bale Creation</button>` : "Order ready for dispatch"}</td>
@@ -3085,16 +3127,16 @@ function renderSalesBaleWorkArea(){
   }
   let pending = order.colors.filter(c => c.pendingQty > 0);
   let rows = pending.map(c => `<div class="salesPackRow" data-color-no="${c.colorNo}">
-    <div><b>Color ${c.colorNo}</b><br><span class="muted">Ordered ${c.qty}</span></div>
-    <div>Pending: <b>${c.pendingQty}</b></div>
-    <label><input type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Take All</label>
-    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Pack Qty" oninput="updateCurrentBaleTotal()">
+    <div class="salesPackColorNo">${salesEscape(c.colorNo)}</div>
+    <div><b>Ordered:</b> ${salesEscape(c.qty)} | <b>Pending:</b> ${salesEscape(c.pendingQty)}</div>
+    <label><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Full qty</label>
+    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Custom qty" oninput="updateCurrentBaleTotal()">
+    <label><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)"> Use custom qty</label>
   </div>`).join("");
   let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><b>Bale ${bale.baleNo}</b> - ${bale.totalQty} qty<br>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print Packing Slip</button></div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
-    <p><b>Assigned Staff:</b> ${salesEscape(order.assignedStaffName || order.assignedStaff || "-")}</p>
-    <p><b>Qty Per Bale:</b> ${order.qtyPerBale} | <b>Current Bale Total:</b> <span id="salesCurrentBaleTotal">0</span></p>
-    ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div id="salesPendingPackRows">${rows}</div><button class="salesSmallBtn green" onclick="finishSalesBale()">Finish Bale</button>`}
+    <p><b>Assigned Team Member:</b> ${salesEscape(order.assignedStaffName || order.assignedStaff || "-")}</p>
+    ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackTools"><div><b>Qty Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div><div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>`}
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}')">Print All Packing Slips</button>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
 }
 
@@ -3255,9 +3297,6 @@ async function importSalesOrderCsv(event){
     if(row.agent_name) document.getElementById("salesAgentName").value = row.agent_name;
     if(row.agent_email) document.getElementById("salesAgentEmail").value = String(row.agent_email).trim().toLowerCase();
     if(row.address) document.getElementById("salesPartyAddress").value = row.address;
-    if(row.phone || row.mobile) document.getElementById("salesPartyPhone").value = row.phone || row.mobile;
-    if(row.station) document.getElementById("salesStation").value = row.station;
-    if(row.confirmation || row.note) document.getElementById("salesConfirmation").value = row.confirmation || row.note;
     if(row.quality) document.getElementById("salesQuality").value = row.quality;
     if(row.rate) document.getElementById("salesRate").value = row.rate;
     if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
@@ -3270,7 +3309,7 @@ function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv",
 function downloadSalesAgentSample(){ downloadSalesCsv("agent-ledger-sample.csv", "agent_name,mobile_number,agent_login_email\nAgent 1,9462023854,agent1@example.com\n"); }
 function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
 function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
-function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,phone,station,confirmation,quality,rate,qty_per_bale\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,9999999999,Pali,Confirmed,Cotton,100,50\n"); }
+function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,quality,rate,qty_per_bale\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,Cotton,100,50\n"); }
 function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
 function clearAgentCsv(){ let f = document.getElementById("agentCsvFile"); if(f) f.value = ""; showSuccessToast("Agent CSV cleared"); }
 function clearMiscCsv(){ let f = document.getElementById("miscCsvFile"); if(f) f.value = ""; showSuccessToast("Misc CSV cleared"); }
@@ -4124,7 +4163,7 @@ function renderColors(){
       <tr>
         <td>${c.name}</td>
         <td>${c.colorType || getDefaultColorType(c.name)}</td>
-        <td>₹${c.rate}</td>
+        <td>Rs. ${c.rate}</td>
         <td>
           <button ${isAdmin() ? "" : "disabled"} onclick="editColor(${realIndex})">Edit</button>
           <button ${isAdmin() ? "" : "disabled"} class="danger" onclick="deleteColor(${realIndex})">Delete</button>
@@ -4375,7 +4414,7 @@ function showDyeSuggestions(input){
     let item = document.createElement("div");
     item.className = "suggestionItem";
     item.dataset.name = c.name;
-    item.innerHTML = `${c.name} <span>₹${c.rate}/kg</span>`;
+    item.innerHTML = `${c.name} <span>Rs. ${c.rate}/kg</span>`;
 
     item.onmousedown = function(event){
       event.preventDefault();
@@ -4930,8 +4969,8 @@ function calculateCost(){
         <td>${d.name}</td>
         <td>${d.qty} g</td>
         <td>${qtyKg.toFixed(3)} kg</td>
-        <td>₹${rate}</td>
-        <td>₹${itemCost.toFixed(2)}</td>
+        <td>Rs. ${rate}</td>
+        <td>Rs. ${itemCost.toFixed(2)}</td>
       </tr>`;
   });
 
@@ -4966,8 +5005,8 @@ function calculateCost(){
       <tbody>${rows}</tbody>
     </table>
 
-    <h3>Per Batch Cost (${recipeThans} Thans): ₹${baseBatchCost.toFixed(2)}</h3>
-    <h3>Per Than Cost: ₹${perThanCost.toFixed(2)}</h3>
+    <h3>Per Batch Cost (${recipeThans} Thans): Rs. ${baseBatchCost.toFixed(2)}</h3>
+    <h3>Per Than Cost: Rs. ${perThanCost.toFixed(2)}</h3>
     <h3>Dye Cost for ${askedThans} Thans: Rs. ${askedBatchCost.toFixed(2)}</h3>
     <table>
       <tbody>
@@ -6055,7 +6094,7 @@ function renderProgramHtml(program, requiredThans){
         <img class="printLogo" src="logo.svg" alt="Logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-flex'">
         <span class="miniLogo" style="display:none">MTM</span>
         <h1>MONICA TEXTILE MILLS</h1>
-        <p>📍 F-238, Mandia Road, Pali, Rajasthan – 306401, India</p>
+        <p>F-238, Mandia Road, Pali, Rajasthan - 306401, India</p>
       </div>
       <div>
         <h2>${program.programName || "Dyeing / Process House"}</h2>
@@ -7885,3 +7924,4 @@ initAuth();
 </script>
 </body>
 </html>
+
