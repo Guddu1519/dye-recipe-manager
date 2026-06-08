@@ -2213,14 +2213,21 @@ async function saveSalesState(){
 }
 
 function parseSalesCsv(text){
-  let rows = String(text || "").trim().split(/\r?\n/).filter(Boolean).map(line => line.split(",").map(cell => cell.trim()));
+  let rows = String(text || "").replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter(Boolean).map(line => line.split(",").map(cell => cell.trim().replace(/^"|"$/g, "")));
   if(rows.length < 2) return [];
-  let headers = rows[0].map(h => h.toLowerCase().replace(/\s+/g, "_"));
+  let headers = rows[0].map(h => h.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
   return rows.slice(1).map(cols => {
     let row = {};
     headers.forEach((h, i) => row[h] = cols[i] || "");
     return row;
   });
+}
+
+function salesCsvPick(row, keys){
+  for(let key of keys){
+    if(row[key] !== undefined && String(row[key]).trim() !== "") return String(row[key]).trim();
+  }
+  return "";
 }
 
 function downloadSalesCsv(filename, content){
@@ -3056,22 +3063,24 @@ async function importSalesPartyCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
+  if(!rows.length) return alert("No party rows found in CSV.");
   let errors = [];
   rows.forEach((row, index) => {
-    let partyName = row.party_name || row.party || row.name;
+    let partyName = salesCsvPick(row, ["party_name","party","name"]);
     if(!partyName) return;
-    let agentName = row.agent_name || "";
-    let agentEmail = String(row.agent_email || row.email || "").trim().toLowerCase();
+    let agentName = salesCsvPick(row, ["agent_name","agent"]);
+    let agentEmail = salesCsvPick(row, ["agent_email","agent_login_email","agent_login_emal","email"]).toLowerCase();
     if(!agentName || !agentEmail){
       errors.push(`Row ${index + 2}: ${partyName} missing agent_name or agent_email`);
     }
   });
   if(errors.length) return alert("Party import stopped:\n" + errors.join("\n"));
+  let importedCount = 0;
   rows.forEach(row => {
-    let partyName = row.party_name || row.party || row.name;
+    let partyName = salesCsvPick(row, ["party_name","party","name"]);
     if(!partyName) return;
-    let agentName = row.agent_name || "";
-    let agentEmail = String(row.agent_email || row.email || "").trim().toLowerCase();
+    let agentName = salesCsvPick(row, ["agent_name","agent"]);
+    let agentEmail = salesCsvPick(row, ["agent_email","agent_login_email","agent_login_emal","email"]).toLowerCase();
     if(agentName && agentEmail && !salesState.agents.find(a => normalizeName(a.email) === normalizeName(agentEmail))){
       salesState.agents.push({id:(Date.now() + Math.random()).toString(), name: agentName, email: agentEmail});
     }
@@ -3080,10 +3089,12 @@ async function importSalesPartyCsv(event){
       agentName = foundAgent?.name || "";
     }
     let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
-    let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: row.gst_no || "", address: row.address || "", phone: row.phone || row.mobile || "", agentName, agentEmail};
+    let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: salesCsvPick(row, ["gst_no","gst"]), address: salesCsvPick(row, ["address"]), phone: salesCsvPick(row, ["phone","mobile","mobile_number"]), agentName, agentEmail};
     if(existing) Object.assign(existing, payload); else salesState.parties.push(payload);
+    importedCount++;
   });
-  await saveSalesState(); renderSalesManager(); showSuccessToast("Party CSV imported");
+  if(importedCount === 0) return alert("No parties imported. Please check CSV format.");
+  await saveSalesState(); await refreshSalesCloudData({silent:true}); renderSalesManager(); showSuccessToast(`${importedCount} party(s) imported successfully`);
 }
 
 async function importSalesAgentCsv(event){
@@ -3091,19 +3102,21 @@ async function importSalesAgentCsv(event){
   if(!isSalesAdmin()) return alert("Only Sales Admin can import agents.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
+  if(!rows.length) return alert("No agent rows found in CSV. Use: agent_name,mobile_number,agent_login_email");
   let errors = [];
   rows.forEach((row, index) => {
-    let name = row.agent_name || row.name || "";
-    let email = String(row.agent_login_email || row.agent_email || row.email || "").trim().toLowerCase();
+    let name = salesCsvPick(row, ["agent_name","agent","name"]);
+    let email = salesCsvPick(row, ["agent_login_email","agent_login_emal","agent_email","login_email","login_emal","email"]).toLowerCase();
     if(!name || !email || !email.includes("@")){
       errors.push(`Row ${index + 2}: agent_name and agent_login_email are required`);
     }
   });
   if(errors.length) return alert("Agent import stopped:\n" + errors.join("\n"));
+  let importedCount = 0;
   rows.forEach(row => {
-    let name = row.agent_name || row.name || "";
-    let mobile = row.mobile_number || row.mobile || row.phone || "";
-    let email = String(row.agent_login_email || row.agent_email || row.email || "").trim().toLowerCase();
+    let name = salesCsvPick(row, ["agent_name","agent","name"]);
+    let mobile = salesCsvPick(row, ["mobile_number","mobile_no","mobile","phone_number","phone"]);
+    let email = salesCsvPick(row, ["agent_login_email","agent_login_emal","agent_email","login_email","login_emal","email"]).toLowerCase();
     let existing = salesState.agents.find(a => normalizeName(a.email) === normalizeName(email) || normalizeName(a.name) === normalizeName(name));
     if(existing){
       existing.name = name;
@@ -3118,10 +3131,13 @@ async function importSalesAgentCsv(event){
         p.agentEmail = email;
       }
     });
+    importedCount++;
   });
+  if(importedCount === 0) return alert("No agents imported. Please check CSV format.");
   await saveSalesState();
+  await refreshSalesCloudData({silent:true});
   renderSalesManager();
-  showSuccessToast("Agents imported successfully");
+  showSuccessToast(`${importedCount} agent(s) imported successfully`);
 }
 
 async function importSalesMiscCsv(event){
