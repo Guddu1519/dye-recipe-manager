@@ -2808,6 +2808,31 @@ async function deleteSalesOrder(id){
   renderSalesManager();
 }
 
+async function quickUpdateSalesOrderDetails(orderId){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can update order details.");
+  let order = salesState.orders.find(o => o.id === orderId);
+  if(!order) return alert("Order not found.");
+  let packing = prompt("Packing", getSalesOrderPacking(order) === "-" ? "" : getSalesOrderPacking(order));
+  if(packing === null) return;
+  let patta = prompt("Patta", getSalesOrderPatta(order) === "-" ? "" : getSalesOrderPatta(order));
+  if(patta === null) return;
+  let stamping = prompt("Stamping", getSalesOrderStamping(order) === "-" ? "" : getSalesOrderStamping(order));
+  if(stamping === null) return;
+  let transport = prompt("Transport", getSalesOrderTransport(order) === "-" ? "" : getSalesOrderTransport(order));
+  if(transport === null) return;
+  order.packing = String(packing || "").trim();
+  order.patta = String(patta || "").trim();
+  order.stamping = String(stamping || "").trim();
+  order.transport = String(transport || "").trim();
+  if(!order.packing || !order.patta || !order.stamping || !order.transport){
+    return alert("Packing, Patta, Stamping, and Transport are required.");
+  }
+  await saveSalesState();
+  renderSalesManager();
+  showSuccessToast("Order details updated");
+}
+
 function getVisibleSalesOrders(){
   if(isTrialUser()) return salesState.orders;
   if(isSalesAdmin()) return salesState.orders;
@@ -2937,6 +2962,17 @@ function getSalesSelectValue(id){
   let text = String(el.selectedOptions?.[0]?.textContent || "").trim();
   if(text && !["Transport","Packing","Patta","Stamping"].includes(text)) return text;
   return "";
+}
+
+function setSalesSelectValue(id, value){
+  let el = document.getElementById(id);
+  if(!el) return;
+  value = String(value || "").trim();
+  if(!value) return;
+  if(!Array.from(el.options).some(option => option.value === value)){
+    el.insertAdjacentHTML("beforeend", `<option value="${salesEscape(value)}">${salesEscape(value)}</option>`);
+  }
+  el.value = value;
 }
 
 function updateCurrentBaleTotal(){
@@ -3146,15 +3182,16 @@ function renderSalesOrders(){
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
   if(staffCount) staffCount.textContent = salesState.staffs.length || salesProfiles.filter(p => p.role === "staff").length;
   let staffOptions = '<option value="">Select Team Member</option>' + salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => `<option value="${salesEscape(staff.email)}">${salesEscape(staff.name)} - ${salesEscape(staff.email)}</option>`).join("");
-  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Team Member Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Order Details</th><th>Team Member Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
+      <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(o.assignedStaffName || o.assignedStaff) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
-      <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
+      <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
   orders.forEach(o => {
     let select = document.getElementById("assignStaff_" + o.id);
@@ -3387,6 +3424,10 @@ async function importSalesOrderCsv(event){
     if(row.agent_name) document.getElementById("salesAgentName").value = row.agent_name;
     if(row.agent_email) document.getElementById("salesAgentEmail").value = String(row.agent_email).trim().toLowerCase();
     if(row.address) document.getElementById("salesPartyAddress").value = row.address;
+    setSalesSelectValue("salesPacking", salesCsvPick(row, ["packing","packing_name"]));
+    setSalesSelectValue("salesPatta", salesCsvPick(row, ["patta","patta_name"]));
+    setSalesSelectValue("salesStamping", salesCsvPick(row, ["stamping","stamp","stamping_name"]));
+    setSalesSelectValue("salesTransport", salesCsvPick(row, ["transport","transport_name"]));
     if(row.quality) document.getElementById("salesQuality").value = row.quality;
     if(row.rate) document.getElementById("salesRate").value = row.rate;
     if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
@@ -3399,7 +3440,7 @@ function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv",
 function downloadSalesAgentSample(){ downloadSalesCsv("agent-ledger-sample.csv", "agent_name,mobile_number,agent_login_email\nAgent 1,9462023854,agent1@example.com\n"); }
 function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
 function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
-function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,quality,rate,qty_per_bale\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,Cotton,100,50\n"); }
+function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,packing,patta,stamping,transport,quality,rate,qty_per_bale\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,Box Packing,Single Patta,MTM Stamp,VRL,Cotton,100,50\n"); }
 function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
 function clearAgentCsv(){ let f = document.getElementById("agentCsvFile"); if(f) f.value = ""; showSuccessToast("Agent CSV cleared"); }
 function clearMiscCsv(){ let f = document.getElementById("miscCsvFile"); if(f) f.value = ""; showSuccessToast("Misc CSV cleared"); }
