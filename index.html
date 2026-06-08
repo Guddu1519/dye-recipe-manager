@@ -1566,7 +1566,7 @@ function openStaffPortal(){
   setTimeout(() => document.getElementById("staffLoginEmail")?.focus(), 80);
 }
 
-function showSalesWorkspace(portalMode=currentManagerMode){
+async function showSalesWorkspace(portalMode=currentManagerMode){
   hideAllEntryScreens();
   let sales = document.getElementById("salesEmptyPage");
   if(sales) sales.style.display = "block";
@@ -1579,7 +1579,8 @@ function showSalesWorkspace(portalMode=currentManagerMode){
   document.body.classList.remove("appReady");
   updateModeSwitchButton(true);
   showSalesTab(salesActiveTab, false);
-  renderSalesManager();
+  await loadSalesCloudState();
+  renderSalesManager(false);
 }
 
 async function switchManagerMode(){
@@ -1750,11 +1751,6 @@ async function loginSalesUser(){
     return;
   }
 
-  if(isSalesAdminCredentials(email, password)){
-    startSalesAdminLogin();
-    return;
-  }
-
   if(!supabaseClient){
     showSalesLoginError("Supabase is not connected. Please check your internet connection.");
     return;
@@ -1765,8 +1761,9 @@ async function loginSalesUser(){
     return;
   }
 
+  let loginEmail = await resolveSalesLoginIdentifier(email);
   let { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
+    email: loginEmail,
     password
   });
 
@@ -1776,8 +1773,13 @@ async function loginSalesUser(){
   }
 
   currentUser = data.user;
-  await loadUserRole();
-  showSalesWorkspace("sales");
+  await loadSalesUserRole();
+  if(currentRole === "staff"){
+    currentManagerMode = "staff";
+    showSalesWorkspace("staff");
+  }else{
+    showSalesWorkspace("sales");
+  }
   resetInactivityTimer();
 }
 
@@ -1801,8 +1803,9 @@ async function loginStaffUser(){
     return;
   }
 
+  let loginEmail = await resolveSalesLoginIdentifier(email);
   let { data, error } = await supabaseClient.auth.signInWithPassword({
-    email,
+    email: loginEmail,
     password
   });
 
@@ -1812,7 +1815,7 @@ async function loginStaffUser(){
   }
 
   currentUser = data.user;
-  await loadUserRole();
+  await loadSalesUserRole();
   showSalesWorkspace("staff");
   resetInactivityTimer();
 }
@@ -1821,6 +1824,8 @@ const SALES_STORAGE_KEY = "mtm_sales_dispatch_v1";
 let salesState = { parties: [], misc: [], orders: [] };
 let salesActiveTab = "orders";
 let salesSelectedOrderId = null;
+let salesProfile = null;
+let salesCloudLoaded = false;
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -1830,6 +1835,81 @@ function salesEscape(value){
 
 function getSalesUserEmail(){
   return String(currentUser?.email || "").trim().toLowerCase();
+}
+
+function isSalesAdmin(){
+  return currentRole === "admin";
+}
+
+function isSalesAgent(){
+  return currentRole === "agent";
+}
+
+function isSalesStaff(){
+  return currentRole === "staff";
+}
+
+function normalizeSalesRole(role){
+  role = String(role || "").toLowerCase().trim();
+  return ["admin","agent","staff"].includes(role) ? role : "staff";
+}
+
+async function resolveSalesLoginIdentifier(loginValue){
+  let raw = String(loginValue || "").trim();
+  if(!raw || raw.includes("@") || !supabaseClient) return raw;
+  try{
+    let { data, error } = await supabaseClient
+      .from("sales_profiles")
+      .select("login_email,username,active")
+      .ilike("username", raw)
+      .eq("active", true)
+      .maybeSingle();
+    if(!error && data?.login_email) return data.login_email;
+  }catch(err){
+    console.warn("Sales username lookup failed.", err);
+  }
+  return raw;
+}
+
+async function loadSalesUserRole(){
+  if(isTrialUser()){
+    salesProfile = {role:"trial", username:"TRIAL", fullName:"Trial"};
+    currentRole = "trial";
+    return;
+  }
+  if(currentUser?.isSalesLocalAdmin){
+    salesProfile = {role:"admin", username:"GARVIT", fullName:"Garvit"};
+    currentRole = "admin";
+    return;
+  }
+  salesProfile = null;
+  currentRole = "staff";
+  if(!supabaseClient || !currentUser?.id) return;
+  try{
+    let { data, error } = await supabaseClient
+      .from("sales_profiles")
+      .select("*")
+      .eq("id", currentUser.id)
+      .eq("active", true)
+      .maybeSingle();
+    if(error) throw error;
+    if(data){
+      salesProfile = {
+        id: data.id,
+        username: data.username || "",
+        role: normalizeSalesRole(data.role),
+        fullName: data.full_name || "",
+        loginEmail: data.login_email || currentUser.email || ""
+      };
+      currentRole = salesProfile.role;
+    }
+  }catch(err){
+    console.warn("Sales role lookup failed. Run Sales Manager SQL.", err);
+  }
+}
+
+function canUseSalesCloud(){
+  return !!(supabaseClient && currentUser && !isTrialUser() && !currentUser.isSalesLocalAdmin);
 }
 
 function loadSalesState(){
@@ -1844,8 +1924,42 @@ function loadSalesState(){
   salesState.orders ||= [];
 }
 
+async function loadSalesCloudState(){
+  salesCloudLoaded = false;
+  loadSalesState();
+  if(!canUseSalesCloud()) return;
+  try{
+    let { data, error } = await supabaseClient
+      .from("sales_state")
+      .select("data")
+      .eq("id", "main")
+      .maybeSingle();
+    if(error) throw error;
+    if(data?.data){
+      salesState = data.data;
+      salesState.parties ||= [];
+      salesState.misc ||= [];
+      salesState.orders ||= [];
+      localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+    }
+    salesCloudLoaded = true;
+  }catch(err){
+    console.warn("Sales cloud load failed. Using local fallback.", err);
+  }
+}
+
 function saveSalesState(){
   localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+  if(canUseSalesCloud()){
+    supabaseClient.from("sales_state").upsert({
+      id: "main",
+      data: salesState,
+      updated_by: currentUser.id,
+      updated_at: new Date().toISOString()
+    }).then(({error}) => {
+      if(error) console.warn("Sales cloud save failed. Run Sales Manager SQL.", error);
+    });
+  }
 }
 
 function parseSalesCsv(text){
@@ -1953,6 +2067,7 @@ function updateSalesOrderTotals(){
 
 function addSalesParty(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can manage Party Master.");
   let partyName = document.getElementById("partyMasterName").value.trim();
   let gstNo = document.getElementById("partyMasterGst").value.trim();
   let agentName = document.getElementById("partyMasterAgent").value.trim();
@@ -1974,6 +2089,7 @@ function addSalesParty(){
 
 function deleteSalesParty(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete parties.");
   if(!confirm("Delete this party?")) return;
   salesState.parties = salesState.parties.filter(p => p.id !== id);
   saveSalesState();
@@ -1982,6 +2098,7 @@ function deleteSalesParty(id){
 
 function addSalesMisc(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can manage Misc Master.");
   let type = document.getElementById("miscMasterType").value;
   let name = document.getElementById("miscMasterName").value.trim();
   if(!type || !name) return alert("Type and name are required.");
@@ -1995,6 +2112,7 @@ function addSalesMisc(){
 
 function deleteSalesMisc(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete misc values.");
   if(!confirm("Delete this misc value?")) return;
   salesState.misc = salesState.misc.filter(m => m.id !== id);
   saveSalesState();
@@ -2003,7 +2121,7 @@ function deleteSalesMisc(id){
 
 function saveSalesOrder(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
-  if(currentRole !== "admin") return alert("Only admin can create orders.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can create orders.");
   try{
     let colorsList = collectSalesColorRows();
     let totalQty = colorsList.reduce((sum, row) => sum + row.qty, 0);
@@ -2062,6 +2180,7 @@ function clearSalesOrderForm(){
 
 function cancelSalesOrder(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can cancel orders.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order || !confirm("Cancel this assigned order?")) return;
   order.status = "Cancelled";
@@ -2071,7 +2190,7 @@ function cancelSalesOrder(id){
 
 function deleteSalesOrder(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
-  if(currentRole !== "admin") return alert("Only admin can delete orders.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete orders.");
   if(!confirm("Delete this sales order?")) return;
   salesState.orders = salesState.orders.filter(o => o.id !== id);
   if(salesSelectedOrderId === id) salesSelectedOrderId = null;
@@ -2081,7 +2200,11 @@ function deleteSalesOrder(id){
 
 function getVisibleSalesOrders(){
   if(isTrialUser()) return salesState.orders;
-  if(currentRole === "admin") return salesState.orders;
+  if(isSalesAdmin()) return salesState.orders;
+  if(isSalesAgent()){
+    let keys = [salesProfile?.fullName, salesProfile?.username, salesProfile?.loginEmail, getSalesUserEmail()].map(normalizeName).filter(Boolean);
+    return salesState.orders.filter(o => keys.includes(normalizeName(o.agentName)));
+  }
   let email = getSalesUserEmail();
   return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
 }
@@ -2161,8 +2284,8 @@ function finishSalesBale(){
   }
 }
 
-function renderSalesManager(){
-  loadSalesState();
+function renderSalesManager(shouldLoadLocal=true){
+  if(shouldLoadLocal && !salesCloudLoaded) loadSalesState();
   refreshSalesDropdowns();
   renderSalesParties();
   renderSalesMisc();
@@ -2171,14 +2294,22 @@ function renderSalesManager(){
   renderSalesBaleWorkArea();
   updateSalesOrderTotals();
   if(document.querySelectorAll("#salesColorRows .salesColorRow").length === 0) addSalesColorRow();
-  applySalesTrialReadonly();
+  applySalesRoleUi();
 }
 
-function applySalesTrialReadonly(){
-  if(!isTrialUser()) return;
+function applySalesRoleUi(){
+  let readonly = isTrialUser() || isSalesAgent() || isSalesStaff();
+  document.querySelectorAll("#salesEmptyPage input, #salesEmptyPage select, #salesEmptyPage button").forEach(el => {
+    el.disabled = false;
+    if(el.tagName === "INPUT") el.readOnly = false;
+  });
+  if(!readonly) return;
   document.querySelectorAll("#salesEmptyPage input, #salesEmptyPage select, #salesEmptyPage button").forEach(el => {
     let text = (el.textContent || "").trim();
     let allowed = text === "Logout" || el.closest(".salesTabs");
+    if(isSalesStaff()){
+      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Finish Bale" || el.classList.contains("salesPackQty") || el.type === "checkbox";
+    }
     if(!allowed){
       el.disabled = true;
       if(el.tagName === "INPUT") el.readOnly = true;
@@ -2203,7 +2334,7 @@ function renderSalesMisc(){
 function renderSalesOrders(){
   let table = document.getElementById("salesOrdersTable");
   if(!table) return;
-  let orders = salesState.orders.slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  let orders = getVisibleSalesOrders().slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   document.getElementById("salesOrderCount").textContent = orders.length;
   document.getElementById("salesOverviewQty").textContent = orders.reduce((sum,o)=>sum + (Number(o.totalQty)||0),0);
   document.getElementById("salesPackedCount").textContent = orders.filter(o=>o.status === "Packed").length;
