@@ -197,20 +197,23 @@ th{background:#dbeafe}
 .salesBadge{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px;background:#dbeafe;color:#1e3a8a}
 .salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
 .salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
-.salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff}
-.salesBaleTotal{font-size:22px;font-weight:900;color:#1d4ed8}
-.salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:10px}
-.salesPackRow{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff;box-shadow:0 8px 18px #0f172a08}
-.salesPackColorNo{grid-row:1 / span 4;font-size:32px;font-weight:900;color:#1d4ed8;text-align:center;border-right:1px solid #e2e8f0;padding-right:8px}
-.salesPackMeta{font-size:14px;color:#334155}.salesPackMeta b{color:#0f172a}
-.salesPackRow label{font-weight:800;display:flex;align-items:center;gap:6px}.salesPackRow input[type="number"]{width:100%;margin:0;font-size:18px;font-weight:800}
+.salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:12px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(135deg,#eff6ff,#fff);box-shadow:0 10px 24px #0f172a0d}
+.salesBaleTotal{font-size:26px;font-weight:900;color:#1d4ed8}
+.salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:12px;margin-top:10px}
+.salesPackRow{display:grid;grid-template-columns:78px 1fr;gap:10px;align-items:center;border:1px solid #bfdbfe;border-radius:16px;padding:12px;background:linear-gradient(135deg,#ffffff,#f8fbff);box-shadow:0 10px 24px #0f172a10}
+.salesPackColorNo{grid-row:1 / span 4;font-size:38px;font-weight:900;color:#1d4ed8;text-align:center;border-right:1px solid #dbeafe;padding-right:10px;line-height:1}
+.salesPackMeta{font-size:15px;color:#334155;line-height:1.35}.salesPackMeta b{color:#0f172a}
+.salesPackControl{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}
+.salesPackChoice{border:1px solid #dbeafe;border-radius:12px;padding:9px 10px;background:#fff;font-weight:900;display:flex;align-items:center;gap:8px;cursor:pointer;color:#334155}
+.salesPackChoice input{width:18px;height:18px;accent-color:#1d4ed8}
+.salesPackRow input[type="number"]{width:100%;margin:0;font-size:22px;font-weight:900;border:1px solid #bfdbfe;border-radius:12px;padding:10px 12px}
 .salesBalePrintTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .salesBaleSelect{display:flex;align-items:center;gap:6px;font-weight:800}
 .salesBaleHistory{display:grid;gap:8px}.salesBaleBox{border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#f8fafc}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
 .modeSwitchBtn:hover{background:#1d4ed8}
-@media(max-width:700px){.managerChoiceGrid,.salesGrid,.salesPackRow{grid-template-columns:1fr}.managerSelectCard{padding:20px}.managerSelectHeader h1{font-size:24px}.salesEmptyPage{padding:72px 12px 18px}.salesTop{align-items:flex-start;flex-direction:column}.salesTop .btn{width:100%}}
+@media(max-width:700px){.managerChoiceGrid,.salesGrid{grid-template-columns:1fr}.salesPackGrid{grid-template-columns:1fr}.salesPackRow{grid-template-columns:72px 1fr}.managerSelectCard{padding:20px}.managerSelectHeader h1{font-size:24px}.salesEmptyPage{padding:72px 12px 18px}.salesTop{align-items:flex-start;flex-direction:column}.salesTop .btn{width:100%}}
 .auth-page{min-height:100vh;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
 .auth-card h2{margin:0 0 8px}
@@ -2989,14 +2992,15 @@ function printSalesPackingSlips(orderId, baleNo=null){
   if(!printWindow) return alert("Popup blocked. Please allow popups to print packing slip.");
   printWindow.document.write(`<!DOCTYPE html><html><head><title>Packing Slip</title>
     <style>
-      *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:14px;color:#111;background:#fff}
+      @page{size:A5 landscape;margin:6mm}
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:8px;color:#111;background:#fff}
       .printAction{display:block;margin:0 auto 12px;padding:12px 22px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:800;font-size:16px;box-shadow:0 10px 24px #0f766e33}
-      .sheet{display:grid;grid-template-columns:1fr;gap:8px}
-      .packingSlip{border:2px solid #111;padding:10px;min-height:390px;break-inside:avoid;page-break-inside:avoid}
+      .sheet{display:grid;grid-template-columns:1fr;gap:6px}
+      .packingSlip{border:2px solid #111;padding:8px;height:calc((148mm - 12mm) / 2);min-height:0;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
       .slipHead{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #111;margin-bottom:8px;padding-bottom:5px}
-      h2{margin:0;font-size:18px}.slipMeta{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:12px}
-      p{margin:0}table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}th,td{border:1px solid #777;padding:5px;text-align:left}th{background:#dbeafe}
-      @media print{.printAction{display:none!important}body{padding:8px}.packingSlip{height:calc(50vh - 12px);min-height:0}.packingSlip:nth-of-type(2n){page-break-after:always}}
+      h2{margin:0;font-size:17px}.slipMeta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 8px;font-size:11px}
+      p{margin:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left}th{background:#dbeafe}
+      @media print{.printAction{display:none!important}body{padding:0}.packingSlip:nth-of-type(2n){page-break-after:always}}
       @media(max-width:700px){.sheet{grid-template-columns:1fr}.packingSlip{min-height:auto}}
     </style>
     <script>
@@ -3166,9 +3170,11 @@ function renderSalesBaleWorkArea(){
   let rows = pending.map(c => `<div class="salesPackRow" data-color-no="${c.colorNo}">
     <div class="salesPackColorNo">${salesEscape(c.colorNo)}</div>
     <div class="salesPackMeta"><b>Ordered:</b> ${salesEscape(c.qty)} pcs &nbsp; <b>Pending:</b> ${salesEscape(c.pendingQty)} pcs</div>
-    <label><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Full qty</label>
-    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Custom qty" oninput="markSalesCustomQty(this)">
-    <label><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)"> Use custom qty</label>
+    <div class="salesPackControl">
+      <label class="salesPackChoice"><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Full qty</label>
+      <label class="salesPackChoice"><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)"> Custom</label>
+    </div>
+    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Enter qty" oninput="markSalesCustomQty(this)">
   </div>`).join("");
   let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button></div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
