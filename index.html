@@ -348,7 +348,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <h1 id="salesWorkspaceTitle">Sales & Dispatch</h1>
       <p id="salesWorkspaceSubtitle">Orders, party master, dispatch planning, and staff bale packing.</p>
     </div>
-    <button class="btn danger" onclick="logoutUser()">Logout</button>
+    <div class="salesActions">
+      <button class="btn" onclick="refreshSalesCloudData()">Refresh Sales Cloud</button>
+      <button class="btn danger" onclick="logoutUser()">Logout</button>
+    </div>
   </div>
 
   <div class="salesShell">
@@ -1703,6 +1706,7 @@ async function showSalesWorkspace(portalMode=currentManagerMode){
   showSalesTab(salesActiveTab, false);
   await loadSalesCloudState();
   renderSalesManager(false);
+  startSalesCloudRefresh();
 }
 
 async function switchManagerMode(){
@@ -1840,6 +1844,12 @@ function setupGlobalSaveShortcut(){
   document.addEventListener("keyup", runF10SaveShortcut, true);
   window.addEventListener("keyup", runF10SaveShortcut, true);
 }
+
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden && ["sales","agent","staff"].includes(currentManagerMode)){
+    refreshSalesCloudData({silent:true});
+  }
+});
 
 async function loginUser(){
   let email = document.getElementById("loginEmail").value.trim();
@@ -2010,6 +2020,7 @@ let salesSelectedOrderId = null;
 let salesProfile = null;
 let salesCloudLoaded = false;
 let salesProfiles = [];
+let salesRefreshTimer = null;
 let editingSalesPartyId = null;
 let editingSalesAgentId = null;
 let editingSalesMiscId = null;
@@ -2121,7 +2132,8 @@ function loadSalesState(){
   salesState.staffs ||= [];
 }
 
-async function loadSalesCloudState(){
+async function loadSalesCloudState(options={}){
+  let silent = !!options.silent;
   salesCloudLoaded = false;
   if(!canUseSalesCloud()){
     loadSalesState();
@@ -2153,8 +2165,28 @@ async function loadSalesCloudState(){
     salesCloudLoaded = true;
   }catch(err){
     console.warn("Sales cloud load failed.", err);
-    alert("Sales cloud load failed. Please check Supabase sales_state table/policies. Local cached data will not be used for cloud work.");
+    if(!silent) alert("Sales cloud load failed. Please check Supabase sales_state table/policies. Local cached data will not be used for cloud work.");
   }
+}
+
+async function refreshSalesCloudData(options={}){
+  if(!canUseSalesCloud()){
+    if(!options.silent) alert("Login with Supabase Sales account to refresh Sales cloud.");
+    return;
+  }
+  await loadSalesCloudState({silent: !!options.silent});
+  renderSalesManager(false);
+  if(!options.silent) showSuccessToast("Sales cloud refreshed");
+}
+
+function startSalesCloudRefresh(){
+  if(salesRefreshTimer) clearInterval(salesRefreshTimer);
+  if(!canUseSalesCloud()) return;
+  salesRefreshTimer = setInterval(() => {
+    if(document.hidden) return;
+    if(!["sales","agent","staff"].includes(currentManagerMode)) return;
+    refreshSalesCloudData({silent:true});
+  }, 12000);
 }
 
 async function saveSalesState(){
@@ -3181,6 +3213,10 @@ async function logoutUser(auto=false){
   if(refreshTimer){
     clearInterval(refreshTimer);
     refreshTimer = null;
+  }
+  if(salesRefreshTimer){
+    clearInterval(salesRefreshTimer);
+    salesRefreshTimer = null;
   }
   if(inactivityTimer){
     clearTimeout(inactivityTimer);
