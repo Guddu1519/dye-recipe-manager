@@ -167,7 +167,7 @@ th{background:#dbeafe}
 .managerSelectLogo{width:82px;height:82px;object-fit:contain;background:white;border-radius:20px;padding:8px;box-shadow:0 12px 34px #0f172a18;margin-bottom:12px}
 .managerSelectHeader h1{font-size:30px;color:#0f172a;margin:0}
 .managerSelectHeader p{color:#64748b;margin:8px 0 0}
-.managerChoiceGrid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.managerChoiceGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 .managerChoice{border:1px solid #bfdbfe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:18px;padding:22px;text-align:left;cursor:pointer;box-shadow:0 12px 30px #0f172a10;color:#0f172a}
 .managerChoice:hover{transform:translateY(-2px);box-shadow:0 18px 38px #0f172a18}
 .managerChoice strong{display:block;font-size:22px;margin-bottom:8px}
@@ -182,6 +182,8 @@ th{background:#dbeafe}
 .salesTabs button{border:0;border-radius:12px;background:#eff6ff;color:#0f172a;font-weight:800;padding:10px 13px;cursor:pointer}
 .salesTabs button.active{background:#1d4ed8;color:white}
 .salesPanel{display:none}.salesPanel.active{display:block}
+.staffPortalMode .salesTabs button:not(#salesTabStaff){display:none}
+.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelMisc{display:none!important}
 .salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
 .salesCard{background:white;border:1px solid #dbeafe;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0f172a0d}
 .salesCard h2,.salesCard h3{margin:0 0 12px;color:#0f172a}
@@ -307,7 +309,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </button>
       <button class="managerChoice" onclick="openSalesManager()">
         <strong>Sales Manager</strong>
-        <span>Empty module reserved for your next system.</span>
+        <span>Admin sales orders, party master, misc master, and dispatch overview.</span>
+      </button>
+      <button class="managerChoice" onclick="openStaffPortal()">
+        <strong>Staff Portal</strong>
+        <span>Only assigned orders, packing workflow, and bale creation.</span>
       </button>
     </div>
   </div>
@@ -316,8 +322,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 <div id="salesEmptyPage" class="salesEmptyPage">
   <div class="salesTop">
     <div>
-      <h1>Sales & Dispatch</h1>
-      <p>Orders, party master, dispatch planning, and staff bale packing.</p>
+      <h1 id="salesWorkspaceTitle">Sales & Dispatch</h1>
+      <p id="salesWorkspaceSubtitle">Orders, party master, dispatch planning, and staff bale packing.</p>
     </div>
     <button class="btn danger" onclick="logoutUser()">Logout</button>
   </div>
@@ -468,6 +474,19 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <button class="btn green" style="width:100%" onclick="loginSalesUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
     <div class="auth-meta">Sales Manager is separate from Dyeing Manager.</div>
+  </div>
+</div>
+
+<div id="staffLoginPage" class="auth-page">
+  <div class="auth-card">
+    <h2>Staff Portal Login</h2>
+    <p>Login to view only your assigned sales orders.</p>
+    <div id="staffLoginError" class="auth-error"></div>
+    <input id="staffLoginEmail" type="email" placeholder="Staff Email" autocomplete="email">
+    <input id="staffLoginPassword" type="password" placeholder="Staff Password" autocomplete="current-password">
+    <button class="btn green" style="width:100%" onclick="loginStaffUser()">Login</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
+    <div class="auth-meta">Staff Portal shows assigned work only.</div>
   </div>
 </div>
 
@@ -1438,11 +1457,13 @@ function hideAllEntryScreens(){
   let sales = document.getElementById("salesEmptyPage");
   let login = document.getElementById("loginPage");
   let salesLogin = document.getElementById("salesLoginPage");
+  let staffLogin = document.getElementById("staffLoginPage");
   let shell = document.getElementById("appShell");
   if(manager) manager.style.display = "none";
   if(sales) sales.style.display = "none";
   if(login) login.style.display = "none";
   if(salesLogin) salesLogin.style.display = "none";
+  if(staffLogin) staffLogin.style.display = "none";
   if(shell) shell.style.display = "none";
 }
 
@@ -1451,7 +1472,7 @@ function updateModeSwitchButton(show=true){
   let button = document.getElementById("modeSwitchButton");
   if(!bar || !button) return;
   bar.style.display = show ? "block" : "none";
-  button.textContent = currentManagerMode === "sales" ? "Switch to Dyeing Manager" : "Switch to Sales Manager";
+  button.textContent = "Switch Mode";
 }
 
 function showManagerSelect(){
@@ -1480,12 +1501,28 @@ function openSalesManager(){
   setTimeout(() => document.getElementById("salesLoginEmail")?.focus(), 80);
 }
 
-function showSalesWorkspace(){
+function openStaffPortal(){
+  currentManagerMode = "staff";
+  hideAllEntryScreens();
+  let login = document.getElementById("staffLoginPage");
+  if(login) login.style.display = "flex";
+  updateModeSwitchButton(true);
+  setTimeout(() => document.getElementById("staffLoginEmail")?.focus(), 80);
+}
+
+function showSalesWorkspace(portalMode=currentManagerMode){
   hideAllEntryScreens();
   let sales = document.getElementById("salesEmptyPage");
   if(sales) sales.style.display = "block";
+  document.body.classList.toggle("staffPortalMode", portalMode === "staff");
+  let title = document.getElementById("salesWorkspaceTitle");
+  let subtitle = document.getElementById("salesWorkspaceSubtitle");
+  if(title) title.textContent = portalMode === "staff" ? "Staff Portal" : "Sales & Dispatch";
+  if(subtitle) subtitle.textContent = portalMode === "staff" ? "Assigned orders and bale packing only." : "Orders, party master, dispatch planning, and staff bale packing.";
+  salesActiveTab = portalMode === "staff" ? "staff" : "orders";
   document.body.classList.remove("appReady");
   updateModeSwitchButton(true);
+  showSalesTab(salesActiveTab, false);
   renderSalesManager();
 }
 
@@ -1509,6 +1546,13 @@ function showLoginError(message){
 
 function showSalesLoginError(message){
   let box = document.getElementById("salesLoginError");
+  if(!box) return;
+  box.textContent = message;
+  box.style.display = "block";
+}
+
+function showStaffLoginError(message){
+  let box = document.getElementById("staffLoginError");
   if(!box) return;
   box.textContent = message;
   box.style.display = "block";
@@ -1547,6 +1591,16 @@ function setupLoginEnterKey(){
       if(event.key === "Enter"){
         event.preventDefault();
         loginSalesUser();
+      }
+    });
+  });
+  ["staffLoginEmail","staffLoginPassword"].forEach(id => {
+    let input = document.getElementById(id);
+    if(!input) return;
+    input.addEventListener("keydown", function(event){
+      if(event.key === "Enter"){
+        event.preventDefault();
+        loginStaffUser();
       }
     });
   });
@@ -1616,8 +1670,8 @@ async function loginUser(){
 
   currentUser = data.user;
   await loadUserRole();
-  if(currentManagerMode === "sales"){
-    showSalesWorkspace();
+  if(currentManagerMode === "sales" || currentManagerMode === "staff"){
+    showSalesWorkspace(currentManagerMode);
   } else {
     await showDashboard();
   }
@@ -1651,7 +1705,38 @@ async function loginSalesUser(){
 
   currentUser = data.user;
   await loadUserRole();
-  showSalesWorkspace();
+  showSalesWorkspace("sales");
+  resetInactivityTimer();
+}
+
+async function loginStaffUser(){
+  if(!supabaseClient){
+    showStaffLoginError("Supabase is not connected. Please check your internet connection.");
+    return;
+  }
+
+  currentManagerMode = "staff";
+  let email = document.getElementById("staffLoginEmail").value.trim();
+  let password = document.getElementById("staffLoginPassword").value;
+
+  if(!email || !password){
+    showStaffLoginError("Staff email and password are required.");
+    return;
+  }
+
+  let { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if(error){
+    showStaffLoginError(error.message);
+    return;
+  }
+
+  currentUser = data.user;
+  await loadUserRole();
+  showSalesWorkspace("staff");
   resetInactivityTimer();
 }
 
@@ -1707,13 +1792,14 @@ function downloadSalesCsv(filename, content){
   URL.revokeObjectURL(url);
 }
 
-function showSalesTab(tab){
+function showSalesTab(tab, shouldRender=true){
+  if(currentManagerMode === "staff" && tab !== "staff") tab = "staff";
   salesActiveTab = tab;
   ["orders","parties","misc","staff"].forEach(name => {
     document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
     document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
   });
-  renderSalesManager();
+  if(shouldRender) renderSalesManager();
 }
 
 function refreshSalesDropdowns(){
@@ -2207,8 +2293,8 @@ async function initAuth(){
     currentUser = session?.user || null;
     if(currentUser && event === "SIGNED_IN"){
       await loadUserRole();
-      if(currentManagerMode === "sales"){
-        showSalesWorkspace();
+      if(currentManagerMode === "sales" || currentManagerMode === "staff"){
+        showSalesWorkspace(currentManagerMode);
       } else {
         await showDashboard();
       }
