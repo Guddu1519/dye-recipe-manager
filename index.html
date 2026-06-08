@@ -167,7 +167,7 @@ th{background:#dbeafe}
 .managerSelectLogo{width:82px;height:82px;object-fit:contain;background:white;border-radius:20px;padding:8px;box-shadow:0 12px 34px #0f172a18;margin-bottom:12px}
 .managerSelectHeader h1{font-size:30px;color:#0f172a;margin:0}
 .managerSelectHeader p{color:#64748b;margin:8px 0 0}
-.managerChoiceGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.managerChoiceGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
 .managerChoice{border:1px solid #bfdbfe;background:linear-gradient(135deg,#eff6ff,#fff);border-radius:18px;padding:22px;text-align:left;cursor:pointer;box-shadow:0 12px 30px #0f172a10;color:#0f172a}
 .managerChoice:hover{transform:translateY(-2px);box-shadow:0 18px 38px #0f172a18}
 .managerChoice strong{display:block;font-size:22px;margin-bottom:8px}
@@ -311,17 +311,34 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </button>
       <button class="managerChoice" onclick="openSalesManager()">
         <strong>Sales Manager</strong>
-        <span>Admin sales orders, party master, misc master, and dispatch overview.</span>
+        <span>Open admin, agent, and staff sales portals.</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="salesPortalSelectPage" class="manager-select-page">
+  <div class="managerSelectCard">
+    <div class="managerSelectHeader">
+      <img class="managerSelectLogo" src="logo.svg" alt="MTM Logo">
+      <h1>Sales Manager</h1>
+      <p>Select your Sales portal.</p>
+    </div>
+    <div class="managerChoiceGrid">
+      <button class="managerChoice primary" onclick="openSalesAdminPortal()">
+        <strong>Admin Portal</strong>
+        <span>Create orders, assign staff, manage ledgers, and print packing slips.</span>
       </button>
       <button class="managerChoice" onclick="openAgentPortal()">
         <strong>Agent Portal</strong>
-        <span>Check orders, paid/due status, pending colors, and sent colors.</span>
+        <span>View only your parties, order status, dispatched bales, and pending balances.</span>
       </button>
       <button class="managerChoice" onclick="openStaffPortal()">
         <strong>Staff Portal</strong>
-        <span>Only assigned orders, packing workflow, and bale creation.</span>
+        <span>View assigned orders only, create bales, and print packing slips.</span>
       </button>
     </div>
+    <button class="btn" style="width:100%;margin-top:16px;background:#64748b" onclick="showManagerSelect()">Back</button>
   </div>
 </div>
 
@@ -351,15 +368,20 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <div class="salesGrid">
             <input id="salesMtmOrderNo" placeholder="MTM Order No.">
             <input id="salesPartyOrderNo" placeholder="Party Order No.">
+            <input id="salesOrderDate" type="date" placeholder="Order Date">
             <select id="salesPartyName" onchange="fillSalesPartyDetails()"><option value="">Select Party</option></select>
             <input id="salesGstNo" placeholder="GST No.">
             <input id="salesAgentName" placeholder="Agent Name">
             <input id="salesAgentEmail" type="hidden">
+            <input id="salesPartyAddress" placeholder="Party Address">
+            <input id="salesPartyPhone" placeholder="Party Phone">
             <input id="salesStation" placeholder="Station">
             <select id="salesTransport"><option value="">Transport</option></select>
             <select id="salesPacking"><option value="">Packing</option></select>
             <select id="salesPatta"><option value="">Patta</option></select>
             <select id="salesStamping"><option value="">Stamping</option></select>
+            <input id="salesTracking" placeholder="Tracking / LR No.">
+            <input id="salesConfirmation" placeholder="Confirmation / Note">
             <input id="salesQuality" placeholder="Quality">
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
             <select id="salesPaymentStatus">
@@ -412,6 +434,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <h2>Party Master</h2>
           <input id="partyMasterName" placeholder="Party Name">
           <input id="partyMasterGst" placeholder="GST No.">
+          <input id="partyMasterAddress" placeholder="Address">
+          <input id="partyMasterPhone" placeholder="Phone Number">
           <select id="partyMasterAgent"><option value="">Select Agent</option></select>
           <div class="salesActions">
             <button class="salesSmallBtn green" onclick="addSalesParty()">Add Party</button>
@@ -519,7 +543,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="salesLoginEmail" type="email" placeholder="Sales Email" autocomplete="email">
     <input id="salesLoginPassword" type="password" placeholder="Sales Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginSalesUser()">Login</button>
-    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Sales Manager is separate from Dyeing Manager.</div>
   </div>
 </div>
@@ -532,7 +556,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="staffLoginEmail" type="email" placeholder="Staff Email" autocomplete="email">
     <input id="staffLoginPassword" type="password" placeholder="Staff Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginStaffUser()">Login</button>
-    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Staff Portal shows assigned work only.</div>
   </div>
 </div>
@@ -545,7 +569,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <input id="agentLoginEmail" type="email" placeholder="Agent Username / Email" autocomplete="email">
     <input id="agentLoginPassword" type="password" placeholder="Agent Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginAgentUser()">Login</button>
-    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
+    <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Agent Portal shows order status only.</div>
   </div>
 </div>
@@ -1570,6 +1594,7 @@ function applyRolePermissions(){
 
 function hideAllEntryScreens(){
   let manager = document.getElementById("managerSelectPage");
+  let salesPortalSelect = document.getElementById("salesPortalSelectPage");
   let sales = document.getElementById("salesEmptyPage");
   let login = document.getElementById("loginPage");
   let salesLogin = document.getElementById("salesLoginPage");
@@ -1577,6 +1602,7 @@ function hideAllEntryScreens(){
   let agentLogin = document.getElementById("agentLoginPage");
   let shell = document.getElementById("appShell");
   if(manager) manager.style.display = "none";
+  if(salesPortalSelect) salesPortalSelect.style.display = "none";
   if(sales) sales.style.display = "none";
   if(login) login.style.display = "none";
   if(salesLogin) salesLogin.style.display = "none";
@@ -1611,6 +1637,14 @@ function openDyeingManager(){
 }
 
 function openSalesManager(){
+  currentManagerMode = "sales";
+  hideAllEntryScreens();
+  let selector = document.getElementById("salesPortalSelectPage");
+  if(selector) selector.style.display = "flex";
+  updateModeSwitchButton(false);
+}
+
+function openSalesAdminPortal(){
   currentManagerMode = "sales";
   hideAllEntryScreens();
   let login = document.getElementById("salesLoginPage");
@@ -2172,6 +2206,10 @@ function fillSalesPartyDetails(){
   document.getElementById("salesAgentName").value = party.agentName || "";
   let emailEl = document.getElementById("salesAgentEmail");
   if(emailEl) emailEl.value = party.agentEmail || "";
+  let addressEl = document.getElementById("salesPartyAddress");
+  let phoneEl = document.getElementById("salesPartyPhone");
+  if(addressEl) addressEl.value = party.address || "";
+  if(phoneEl) phoneEl.value = party.phone || "";
 }
 
 function addSalesColorRow(colorNo="", qty=""){
@@ -2227,6 +2265,8 @@ function addSalesParty(){
   if(!isSalesAdmin()) return alert("Only Sales Admin can manage Party Master.");
   let partyName = document.getElementById("partyMasterName").value.trim();
   let gstNo = document.getElementById("partyMasterGst").value.trim();
+  let address = document.getElementById("partyMasterAddress").value.trim();
+  let phone = document.getElementById("partyMasterPhone").value.trim();
   let agentKey = document.getElementById("partyMasterAgent").value.trim();
   let agent = salesState.agents.find(a => normalizeName(a.email || a.name) === normalizeName(agentKey));
   if(!partyName) return alert("Party Name is required.");
@@ -2234,14 +2274,18 @@ function addSalesParty(){
   let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
   if(existing){
     existing.gstNo = gstNo;
+    existing.address = address;
+    existing.phone = phone;
     existing.agentName = agent.name;
     existing.agentEmail = agent.email || "";
   }else{
-    salesState.parties.push({id:Date.now().toString(), partyName, gstNo, agentName: agent.name, agentEmail: agent.email || ""});
+    salesState.parties.push({id:Date.now().toString(), partyName, gstNo, address, phone, agentName: agent.name, agentEmail: agent.email || ""});
   }
   saveSalesState();
   document.getElementById("partyMasterName").value = "";
   document.getElementById("partyMasterGst").value = "";
+  document.getElementById("partyMasterAddress").value = "";
+  document.getElementById("partyMasterPhone").value = "";
   document.getElementById("partyMasterAgent").value = "";
   renderSalesManager();
   showSuccessToast("Party saved");
@@ -2325,6 +2369,7 @@ function saveSalesOrder(){
     let qtyPerBale = Number(document.getElementById("salesQtyPerBale").value);
     if(!document.getElementById("salesMtmOrderNo").value.trim()) throw new Error("MTM Order No. is required.");
     if(!document.getElementById("salesPartyName").value.trim()) throw new Error("Party Name is required.");
+    if(!document.getElementById("salesAgentName").value.trim() || !document.getElementById("salesAgentEmail")?.value.trim()) throw new Error("Selected party must have an agent linked.");
     if(!(qtyPerBale > 0)) throw new Error("Qty Per Bale must be greater than 0.");
     if(!document.getElementById("salesAssignStaff").value.trim()) throw new Error("Assign Staff is required.");
     if(colorsList.length === 0) throw new Error("Add at least one color row.");
@@ -2333,15 +2378,20 @@ function saveSalesOrder(){
       id: Date.now().toString(),
       mtmOrderNo: document.getElementById("salesMtmOrderNo").value.trim(),
       partyOrderNo: document.getElementById("salesPartyOrderNo").value.trim(),
+      orderDate: document.getElementById("salesOrderDate")?.value || new Date().toISOString().slice(0,10),
       partyName: document.getElementById("salesPartyName").value.trim(),
       gstNo: document.getElementById("salesGstNo").value.trim(),
       agentName: document.getElementById("salesAgentName").value.trim(),
       agentEmail: document.getElementById("salesAgentEmail")?.value.trim().toLowerCase() || "",
+      partyAddress: document.getElementById("salesPartyAddress")?.value.trim() || "",
+      partyPhone: document.getElementById("salesPartyPhone")?.value.trim() || "",
       station: document.getElementById("salesStation").value.trim(),
       transport: document.getElementById("salesTransport").value,
       packing: document.getElementById("salesPacking").value,
       patta: document.getElementById("salesPatta").value,
       stamping: document.getElementById("salesStamping").value,
+      tracking: document.getElementById("salesTracking")?.value.trim() || "",
+      confirmation: document.getElementById("salesConfirmation")?.value.trim() || "",
       quality: document.getElementById("salesQuality").value.trim(),
       rate: Number(document.getElementById("salesRate").value) || 0,
       paymentStatus: document.getElementById("salesPaymentStatus").value || "Due",
@@ -2367,7 +2417,7 @@ function saveSalesOrder(){
 }
 
 function clearSalesOrderForm(){
-  ["salesMtmOrderNo","salesPartyOrderNo","salesGstNo","salesAgentName","salesAgentEmail","salesStation","salesQuality","salesRate","salesPaidAmount","salesQtyPerBale","salesAssignStaff"].forEach(id => {
+  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesPartyPhone","salesStation","salesTracking","salesConfirmation","salesQuality","salesRate","salesPaidAmount","salesQtyPerBale","salesAssignStaff"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
@@ -2442,6 +2492,15 @@ function getSalesColorSummary(order, mode){
       let qty = mode === "pending" ? Number(c.pendingQty) || 0 : (Number(c.qty) || 0) - (Number(c.pendingQty) || 0);
       return `${c.colorNo}: ${qty}`;
     }).join(", ") || "None";
+}
+
+function getSalesBaleStatusSummary(order){
+  let bales = order.bales || [];
+  if(!bales.length) return "Nothing dispatched yet.";
+  return bales.map(bale => {
+    let date = (bale.createdAt || "").slice(0,10) || "-";
+    return `Bale ${bale.baleNo}: ${bale.totalQty} pcs on ${date}`;
+  }).join("; ");
 }
 
 function acceptSalesOrder(id){
@@ -2519,6 +2578,62 @@ function finishSalesBale(){
   }
 }
 
+function printSalesPackingSlips(orderId, baleNo=null){
+  let order = salesState.orders.find(o => o.id === orderId);
+  if(!order) return alert("Order not found.");
+  let bales = (order.bales || []).filter(b => baleNo ? Number(b.baleNo) === Number(baleNo) : true);
+  if(!bales.length) return alert("No completed bales found for packing slip.");
+  let slipHtml = bales.map((bale, index) => {
+    let rows = (bale.colors || []).map(c => `<tr><td>Color ${salesEscape(c.colorNo)}</td><td>${salesEscape(c.qty)} pcs</td></tr>`).join("");
+    return `<section class="packingSlip">
+      <div class="slipHead">
+        <h2>Packing Slip</h2>
+        <b>Bale ${salesEscape(bale.baleNo)}</b>
+      </div>
+      <div class="slipMeta">
+        <p><b>Party:</b> ${salesEscape(order.partyName)}</p>
+        <p><b>Date:</b> ${salesEscape((bale.createdAt || new Date().toISOString()).slice(0,10))}</p>
+        <p><b>Packing:</b> ${salesEscape(order.packing || "-")}</p>
+        <p><b>Patta:</b> ${salesEscape(order.patta || "-")}</p>
+        <p><b>Stamping:</b> ${salesEscape(order.stamping || "-")}</p>
+        <p><b>Station:</b> ${salesEscape(order.station || "-")}</p>
+        <p><b>Transport:</b> ${salesEscape(order.transport || "-")}</p>
+        <p><b>Staff:</b> ${salesEscape(bale.staff || order.assignedStaff || "-")}</p>
+      </div>
+      <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
+    </section>`;
+  }).join("");
+  let printWindow = window.open("", "_blank");
+  if(!printWindow) return alert("Popup blocked. Please allow popups to print packing slip.");
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>Packing Slip</title>
+    <style>
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:14px;color:#111;background:#fff}
+      .printAction{display:block;margin:0 auto 12px;padding:12px 22px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:800;font-size:16px;box-shadow:0 10px 24px #0f766e33}
+      .sheet{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+      .packingSlip{border:2px solid #111;padding:10px;min-height:385px;break-inside:avoid;page-break-inside:avoid}
+      .slipHead{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #111;margin-bottom:8px;padding-bottom:5px}
+      h2{margin:0;font-size:18px}.slipMeta{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:12px}
+      p{margin:0}table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}th,td{border:1px solid #777;padding:5px;text-align:left}th{background:#dbeafe}
+      @media print{.printAction{display:none!important}body{padding:8px}.packingSlip{min-height:380px}.packingSlip:nth-of-type(4n){page-break-after:always}}
+      @media(max-width:700px){.sheet{grid-template-columns:1fr}.packingSlip{min-height:auto}}
+    </style>
+    <script>
+      function printPackingSlip(){
+        document.querySelectorAll('.printAction').forEach(btn=>btn.style.display='none');
+        setTimeout(function(){
+          if(window.AndroidPrinter && AndroidPrinter.printPage){ AndroidPrinter.printPage(); }
+          else { window.print(); }
+          setTimeout(function(){document.querySelectorAll('.printAction').forEach(btn=>btn.style.display='block');}, 800);
+        }, 80);
+      }
+    <\/script>
+  </head><body>
+    <button class="printAction" onclick="printPackingSlip()">Print / Save PDF</button>
+    <main class="sheet">${slipHtml}</main>
+  </body></html>`);
+  printWindow.document.close();
+}
+
 function renderSalesManager(shouldLoadLocal=true){
   if(shouldLoadLocal && !salesCloudLoaded) loadSalesState();
   refreshSalesDropdowns();
@@ -2548,7 +2663,7 @@ function applySalesRoleUi(){
       allowed = text === "Logout" || el.closest(".salesTabs");
     }
     if(isSalesStaff()){
-      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Finish Bale" || el.classList.contains("salesPackQty") || el.type === "checkbox";
+      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Finish Bale" || text === "Print Packing Slip" || text === "Print All Packing Slips" || el.classList.contains("salesPackQty") || el.type === "checkbox";
     }
     if(!allowed){
       el.disabled = true;
@@ -2560,8 +2675,8 @@ function applySalesRoleUi(){
 function renderSalesParties(){
   let table = document.getElementById("salesPartyTable");
   if(!table) return;
-  table.innerHTML = `<tr><th>Party Name</th><th>GST No.</th><th>Agent Name</th><th>Agent Email</th><th>Action</th></tr>` +
-    salesState.parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.agentName)}</td><td>${salesEscape(p.agentEmail)}</td><td><button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("");
+  table.innerHTML = `<tr><th>Party Name</th><th>GST No.</th><th>Address</th><th>Phone</th><th>Agent Name</th><th>Agent Email</th><th>Action</th></tr>` +
+    salesState.parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.address)}</td><td>${salesEscape(p.phone)}</td><td>${salesEscape(p.agentName)}</td><td>${salesEscape(p.agentEmail)}</td><td><button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("");
 }
 
 function renderSalesAgents(){
@@ -2592,13 +2707,14 @@ function renderSalesOrders(){
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
   if(staffCount) staffCount.textContent = salesProfiles.filter(p => p.role === "staff").length;
-  table.innerHTML = `<tr><th>MTM Order</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff</th><th>Total Qty</th><th>Paid</th><th>Due</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff</th><th>Total Qty</th><th>Paid</th><th>Due</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
+      <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td>${salesEscape(o.assignedStaff)}</td><td>${o.totalQty}</td><td>${getSalesOrderPaid(o)}</td><td>${getSalesOrderDue(o)}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
-      <td><button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
+      <td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
 }
 
@@ -2620,11 +2736,12 @@ function renderSalesAgentPortal(){
     <div class="salesCard"><h3>Sent Qty</h3><b style="font-size:28px">${sentColors}</b></div>
     <div class="salesCard"><h3>Total Value</h3><b style="font-size:28px">${totalAmount}</b></div>
   `;
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Paid</th><th>Due</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Paid</th><th>Due</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.partyName)}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
       <td>${getSalesOrderPaid(o)}</td><td>${getSalesOrderDue(o)}</td>
+      <td>${salesEscape(getSalesBaleStatusSummary(o))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "pending"))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
@@ -2659,17 +2776,28 @@ function renderSalesBaleWorkArea(){
     <label><input type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Take All</label>
     <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Pack Qty" oninput="updateCurrentBaleTotal()">
   </div>`).join("");
-  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><b>Bale ${bale.baleNo}</b> - ${bale.totalQty} qty<br>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}</div>`).join("");
+  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><b>Bale ${bale.baleNo}</b> - ${bale.totalQty} qty<br>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print Packing Slip</button></div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
     <p><b>Qty Per Bale:</b> ${order.qtyPerBale} | <b>Current Bale Total:</b> <span id="salesCurrentBaleTotal">0</span></p>
     ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div id="salesPendingPackRows">${rows}</div><button class="salesSmallBtn green" onclick="finishSalesBale()">Finish Bale</button>`}
-    <h3>Completed Bale History</h3><div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
+    <h3>Completed Bale History</h3>${(order.bales || []).length ? `<button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}')">Print All Packing Slips</button>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
 }
 
 async function importSalesPartyCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
   let rows = parseSalesCsv(await file.text());
+  let errors = [];
+  rows.forEach((row, index) => {
+    let partyName = row.party_name || row.party || row.name;
+    if(!partyName) return;
+    let agentName = row.agent_name || "";
+    let agentEmail = String(row.agent_email || row.email || "").trim().toLowerCase();
+    if(!agentName || !agentEmail){
+      errors.push(`Row ${index + 2}: ${partyName} missing agent_name or agent_email`);
+    }
+  });
+  if(errors.length) return alert("Party import stopped:\n" + errors.join("\n"));
   rows.forEach(row => {
     let partyName = row.party_name || row.party || row.name;
     if(!partyName) return;
@@ -2683,7 +2811,7 @@ async function importSalesPartyCsv(event){
       agentName = foundAgent?.name || "";
     }
     let existing = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
-    let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: row.gst_no || "", agentName, agentEmail};
+    let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: row.gst_no || "", address: row.address || "", phone: row.phone || row.mobile || "", agentName, agentEmail};
     if(existing) Object.assign(existing, payload); else salesState.parties.push(payload);
   });
   saveSalesState(); renderSalesManager(); showSuccessToast("Party CSV imported");
@@ -2728,11 +2856,16 @@ async function importSalesOrderCsv(event){
   rows.forEach(row => {
     if(row.mtm_order_no) document.getElementById("salesMtmOrderNo").value = row.mtm_order_no;
     if(row.party_order_no) document.getElementById("salesPartyOrderNo").value = row.party_order_no;
+    if(row.order_date || row.date) document.getElementById("salesOrderDate").value = row.order_date || row.date;
     if(row.party_name) document.getElementById("salesPartyName").value = row.party_name;
     if(row.gst_no) document.getElementById("salesGstNo").value = row.gst_no;
     if(row.agent_name) document.getElementById("salesAgentName").value = row.agent_name;
     if(row.agent_email) document.getElementById("salesAgentEmail").value = String(row.agent_email).trim().toLowerCase();
+    if(row.address) document.getElementById("salesPartyAddress").value = row.address;
+    if(row.phone || row.mobile) document.getElementById("salesPartyPhone").value = row.phone || row.mobile;
     if(row.station) document.getElementById("salesStation").value = row.station;
+    if(row.tracking || row.lr_no) document.getElementById("salesTracking").value = row.tracking || row.lr_no;
+    if(row.confirmation || row.note) document.getElementById("salesConfirmation").value = row.confirmation || row.note;
     if(row.quality) document.getElementById("salesQuality").value = row.quality;
     if(row.rate) document.getElementById("salesRate").value = row.rate;
     if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
@@ -2742,10 +2875,10 @@ async function importSalesOrderCsv(event){
   showSuccessToast("Order CSV loaded");
 }
 
-function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,agent_name,agent_email\nShree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com\n"); }
+function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,address,phone,agent_name,agent_email\nShree Textiles,24ABCDE1234F1Z5,Pali Rajasthan,9999999999,Agent 1,agent1@example.com\n"); }
 function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
 function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
-function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,party_name,gst_no,agent_name,agent_email,station,quality,rate,qty_per_bale,assign_staff\nMTM-1,PO-1,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali,Cotton,100,50,staff@example.com\n"); }
+function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,phone,station,tracking,confirmation,quality,rate,qty_per_bale,assign_staff\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,9999999999,Pali,LR123,Confirmed,Cotton,100,50,staff@example.com\n"); }
 function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
 function clearMiscCsv(){ let f = document.getElementById("miscCsvFile"); if(f) f.value = ""; showSuccessToast("Misc CSV cleared"); }
 
