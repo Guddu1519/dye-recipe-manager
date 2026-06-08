@@ -183,9 +183,9 @@ th{background:#dbeafe}
 .salesTabs button.active{background:#1d4ed8;color:white}
 .salesPanel{display:none}.salesPanel.active{display:block}
 .staffPortalMode .salesTabs button:not(#salesTabStaff){display:none}
-.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelAgents,.staffPortalMode #salesPanelStaffs,.staffPortalMode #salesPanelMisc{display:none!important}
+.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelPending,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelAgents,.staffPortalMode #salesPanelStaffs,.staffPortalMode #salesPanelMisc{display:none!important}
 .agentPortalMode .salesTabs button:not(#salesTabAgent){display:none}
-.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelStaffs,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
+.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelPending,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelStaffs,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
 .salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
 .salesCard{background:white;border:1px solid #dbeafe;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0f172a0d}
 .salesCard h2,.salesCard h3{margin:0 0 12px;color:#0f172a}
@@ -418,6 +418,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <div class="salesShell">
     <div class="salesTabs">
       <button id="salesTabOrders" class="active" onclick="showSalesTab('orders')">Orders</button>
+      <button id="salesTabPending" onclick="showSalesTab('pending')">Pending Summary</button>
       <button id="salesTabParties" onclick="showSalesTab('parties')">Party Master</button>
       <button id="salesTabAgents" onclick="showSalesTab('agents')">Agent Ledger</button>
       <button id="salesTabStaffs" onclick="showSalesTab('staffs')">Team Member Ledger</button>
@@ -484,17 +485,21 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
       </div>
       <div class="salesCard">
+        <h2>Order History</h2>
+        <div class="salesTableWrap"><table class="salesTable" id="salesOrdersTable"></table></div>
+      </div>
+    </div>
+
+    <div id="salesPanelPending" class="salesPanel">
+      <div class="salesCard">
         <h2>Pending Order Summary</h2>
+        <p class="muted">Admin-only pending view. Color No wise pending quantity is merged from all pending orders.</p>
         <div class="salesGrid">
           <div class="salesCard"><h3>Color No Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingColorTable"></table></div></div>
           <div class="salesCard"><h3>Quality Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingQualityTable"></table></div></div>
           <div class="salesCard"><h3>Agent Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingAgentTable"></table></div></div>
           <div class="salesCard"><h3>Team Member Wise</h3><div class="salesTableWrap"><table class="salesTable" id="salesPendingStaffTable"></table></div></div>
         </div>
-      </div>
-      <div class="salesCard">
-        <h2>Order History</h2>
-        <div class="salesTableWrap"><table class="salesTable" id="salesOrdersTable"></table></div>
       </div>
     </div>
 
@@ -517,6 +522,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Parties</h2>
+          <input id="salesPartySearch" placeholder="Search saved parties..." oninput="renderSalesParties()">
           <div class="salesTableWrap"><table class="salesTable" id="salesPartyTable"></table></div>
         </div>
       </div>
@@ -540,6 +546,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Agents</h2>
+          <input id="salesAgentSearch" placeholder="Search saved agents..." oninput="renderSalesAgents()">
           <div class="salesTableWrap"><table class="salesTable" id="salesAgentsTable"></table></div>
         </div>
       </div>
@@ -2360,7 +2367,7 @@ function showSalesTab(tab, shouldRender=true){
   let previousTab = salesActiveTab;
   if(previousTab && previousTab !== tab) resetSalesScreenState();
   salesActiveTab = tab;
-  ["orders","parties","agents","staffs","misc","agent","staff"].forEach(name => {
+  ["orders","pending","parties","agents","staffs","misc","agent","staff"].forEach(name => {
     document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
     document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
   });
@@ -2922,6 +2929,18 @@ function getVisibleSalesOrders(){
   return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
 }
 
+function getSalesStaffByEmail(email){
+  let key = String(email || "").trim().toLowerCase();
+  if(!key) return null;
+  return (salesState.staffs || []).find(staff => String(staff.email || "").trim().toLowerCase() === key) || null;
+}
+
+function getSalesAssignedTeamMemberName(order){
+  if(!order) return "Not Assigned";
+  let staff = getSalesStaffByEmail(order.assignedStaff);
+  return order.assignedStaffName || staff?.name || order.assignedStaff || "Not Assigned";
+}
+
 function getSalesSentQty(order){
   return (order.colors || []).reduce((sum, c) => sum + ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)), 0);
 }
@@ -3247,18 +3266,28 @@ function applySalesRoleUi(){
 function renderSalesParties(){
   let table = document.getElementById("salesPartyTable");
   if(!table) return;
+  let q = normalizeName(document.getElementById("salesPartySearch")?.value || "");
+  let parties = salesState.parties.filter(p => {
+    if(!q) return true;
+    return [p.partyName, p.gstNo, p.address, p.city, p.phone, p.agentName, p.agentEmail].some(value => normalizeName(value).includes(q));
+  }).sort((a,b)=>String(a.partyName).localeCompare(String(b.partyName)));
   table.innerHTML = `<tr><th>Party Name</th><th>GST No.</th><th>Address</th><th>Phone</th><th>Agent Name</th><th>Agent Email</th><th>Action</th></tr>` +
-    salesState.parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.address)}</td><td>${salesEscape(p.phone)}</td><td>${salesEscape(p.agentName)}</td><td>${salesEscape(p.agentEmail)}</td><td><button class="salesSmallBtn gray" onclick="editSalesParty('${p.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("");
+    (parties.length ? parties.map(p => `<tr><td>${salesEscape(p.partyName)}</td><td>${salesEscape(p.gstNo)}</td><td>${salesEscape(p.address || p.city)}</td><td>${salesEscape(p.phone)}</td><td>${salesEscape(p.agentName)}</td><td>${salesEscape(p.agentEmail)}</td><td><button class="salesSmallBtn gray" onclick="editSalesParty('${p.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesParty('${p.id}')">Delete</button></td></tr>`).join("") : `<tr><td colspan="7" class="muted">No parties found.</td></tr>`);
 }
 
 function renderSalesAgents(){
   let table = document.getElementById("salesAgentsTable");
   if(!table) return;
+  let q = normalizeName(document.getElementById("salesAgentSearch")?.value || "");
+  let agents = salesState.agents.slice().filter(agent => {
+    if(!q) return true;
+    return [agent.name, agent.mobile, agent.email].some(value => normalizeName(value).includes(q));
+  }).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   table.innerHTML = `<tr><th>Agent Name</th><th>Mobile Number</th><th>Agent Login Email</th><th>Assigned Parties</th><th>Action</th></tr>` +
-    salesState.agents.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(agent => {
+    (agents.length ? agents.map(agent => {
       let partyCount = salesState.parties.filter(p => normalizeName(p.agentEmail) === normalizeName(agent.email) || normalizeName(p.agentName) === normalizeName(agent.name)).length;
       return `<tr><td>${salesEscape(agent.name)}</td><td>${salesEscape(agent.mobile)}</td><td>${salesEscape(agent.email)}</td><td>${partyCount}</td><td><button class="salesSmallBtn gray" onclick="editSalesAgent('${agent.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesAgent('${agent.id}')">Delete</button></td></tr>`;
-    }).join("");
+    }).join("") : `<tr><td colspan="5" class="muted">No agents found.</td></tr>`);
 }
 
 function renderSalesStaffLedger(){
@@ -3287,10 +3316,15 @@ function addSalesPendingSummary(map, key, qty, orderId){
   if(orderId) map[key].orderIds.add(orderId);
 }
 
-function renderSalesSummaryTable(tableId, rows, nameLabel){
+function renderSalesSummaryTable(tableId, rows, nameLabel, options={}){
   let table = document.getElementById(tableId);
   if(!table) return;
   let sorted = Object.values(rows).sort((a,b)=>b.qty - a.qty || String(a.name).localeCompare(String(b.name)));
+  if(options.hideOrderCount){
+    table.innerHTML = `<tr><th>${salesEscape(nameLabel)}</th><th>Pending Qty</th></tr>` +
+      (sorted.length ? sorted.map(row => `<tr><td>${salesEscape(row.name)}</td><td><b>${row.qty}</b> pcs</td></tr>`).join("") : `<tr><td colspan="2" class="muted">No pending orders.</td></tr>`);
+    return;
+  }
   table.innerHTML = `<tr><th>${salesEscape(nameLabel)}</th><th>Pending Orders</th><th>Total Pending Qty</th></tr>` +
     (sorted.length ? sorted.map(row => `<tr><td>${salesEscape(row.name)}</td><td>${row.orderIds.size}</td><td><b>${row.qty}</b> pcs</td></tr>`).join("") : `<tr><td colspan="3" class="muted">No pending orders.</td></tr>`);
 }
@@ -3309,10 +3343,10 @@ function renderSalesPendingSummary(){
       addSalesPendingSummary(colorMap, color.colorNo, pending, orderId);
       addSalesPendingSummary(qualityMap, order.quality || "N/A", pending, orderId);
       addSalesPendingSummary(agentMap, order.agentName || "N/A", pending, orderId);
-      addSalesPendingSummary(staffMap, order.assignedStaffName || "Not Assigned Yet", pending, orderId);
+      addSalesPendingSummary(staffMap, getSalesAssignedTeamMemberName(order) || "Not Assigned Yet", pending, orderId);
     });
   });
-  renderSalesSummaryTable("salesPendingColorTable", colorMap, "Color No");
+  renderSalesSummaryTable("salesPendingColorTable", colorMap, "Color No", {hideOrderCount:true});
   renderSalesSummaryTable("salesPendingQualityTable", qualityMap, "Quality");
   renderSalesSummaryTable("salesPendingAgentTable", agentMap, "Agent");
   renderSalesSummaryTable("salesPendingStaffTable", staffMap, "Team Member");
@@ -3336,7 +3370,7 @@ function renderSalesOrders(){
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
-      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(o.assignedStaffName || o.assignedStaff) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
+      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
@@ -3359,10 +3393,10 @@ function renderSalesAgentPortal(){
     <div class="salesCard"><h3>Pending Qty</h3><b style="font-size:28px">${pendingColors}</b></div>
     <div class="salesCard"><h3>Sent Qty</h3><b style="font-size:28px">${sentColors}</b></div>
   `;
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
-      <td>${salesEscape(o.partyName)}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
+      <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.agentName || "-")}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
       <td>${salesEscape(getSalesBaleStatusSummary(o))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "pending"))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
@@ -3374,10 +3408,12 @@ function renderSalesStaffOrders(){
   let table = document.getElementById("salesStaffOrdersTable");
   if(!table) return;
   let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Order Details</th><th>Qty</th><th>Sent</th><th>Pending</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th><th>Assigned To</th><th>Order Details</th><th>Qty</th><th>Sent</th><th>Pending</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo || "")}</span></td>
       <td>${salesEscape(o.partyName)}</td>
+      <td>${salesEscape(o.agentName || "-")}</td>
+      <td>${salesEscape(getSalesAssignedTeamMemberName(o))}</td>
       <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
@@ -3406,7 +3442,7 @@ function renderSalesBaleWorkArea(){
   </div>`).join("");
   let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button></div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
-    <p><b>Assigned Team Member:</b> ${salesEscape(order.assignedStaffName || order.assignedStaff || "-")}</p>
+    <p><b>Assigned Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}</p>
     <div class="salesPackTools">
       <div><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}<br><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</div>
       <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
