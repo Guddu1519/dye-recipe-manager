@@ -14,13 +14,13 @@ create table if not exists public.sales_profiles (
 
 create table if not exists public.sales_state (
   id text primary key default 'main',
-  data jsonb not null default '{"parties":[],"misc":[],"orders":[],"agents":[]}'::jsonb,
+  data jsonb not null default '{"parties":[],"misc":[],"orders":[],"agents":[],"staffs":[]}'::jsonb,
   updated_by uuid references auth.users(id),
   updated_at timestamptz not null default now()
 );
 
 insert into public.sales_state (id, data)
-values ('main', '{"parties":[],"misc":[],"orders":[],"agents":[]}'::jsonb)
+values ('main', '{"parties":[],"misc":[],"orders":[],"agents":[],"staffs":[]}'::jsonb)
 on conflict (id) do nothing;
 
 alter table public.sales_profiles enable row level security;

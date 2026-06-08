@@ -183,9 +183,9 @@ th{background:#dbeafe}
 .salesTabs button.active{background:#1d4ed8;color:white}
 .salesPanel{display:none}.salesPanel.active{display:block}
 .staffPortalMode .salesTabs button:not(#salesTabStaff){display:none}
-.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelAgents,.staffPortalMode #salesPanelMisc{display:none!important}
+.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelAgents,.staffPortalMode #salesPanelStaffs,.staffPortalMode #salesPanelMisc{display:none!important}
 .agentPortalMode .salesTabs button:not(#salesTabAgent){display:none}
-.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
+.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelStaffs,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
 .salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
 .salesCard{background:white;border:1px solid #dbeafe;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0f172a0d}
 .salesCard h2,.salesCard h3{margin:0 0 12px;color:#0f172a}
@@ -356,6 +356,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <button id="salesTabOrders" class="active" onclick="showSalesTab('orders')">Orders</button>
       <button id="salesTabParties" onclick="showSalesTab('parties')">Party Master</button>
       <button id="salesTabAgents" onclick="showSalesTab('agents')">Agent Ledger</button>
+      <button id="salesTabStaffs" onclick="showSalesTab('staffs')">Staff Ledger</button>
       <button id="salesTabMisc" onclick="showSalesTab('misc')">Misc Master</button>
       <button id="salesTabAgent" onclick="showSalesTab('agent')">Agent Portal</button>
       <button id="salesTabStaff" onclick="showSalesTab('staff')">Staff Packing</button>
@@ -380,18 +381,10 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
             <select id="salesPacking"><option value="">Packing</option></select>
             <select id="salesPatta"><option value="">Patta</option></select>
             <select id="salesStamping"><option value="">Stamping</option></select>
-            <input id="salesTracking" placeholder="Tracking / LR No.">
             <input id="salesConfirmation" placeholder="Confirmation / Note">
             <input id="salesQuality" placeholder="Quality">
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
-            <select id="salesPaymentStatus">
-              <option value="Due">Due</option>
-              <option value="Part Paid">Part Paid</option>
-              <option value="Paid">Paid</option>
-            </select>
-            <input id="salesPaidAmount" type="number" step="0.01" placeholder="Paid Amount">
             <input id="salesQtyPerBale" type="number" placeholder="Qty Per Bale">
-            <input id="salesAssignStaff" placeholder="Assign Staff Email">
           </div>
 
           <h3>Color Order Entry</h3>
@@ -419,11 +412,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Ready / Packed:</b> <span id="salesPackedCount">0</span></p>
           <p><b>Agents:</b> <span id="salesAgentCount">0</span></p>
           <p><b>Staff:</b> <span id="salesStaffCount">0</span></p>
-          <p class="muted">Admin sees all orders. Staff sees only assigned orders in Staff Packing.</p>
+          <p class="muted">Create orders first, then push/change assigned staff from Order History.</p>
         </div>
       </div>
       <div class="salesCard">
-        <h2>Created Orders</h2>
+        <h2>Order History</h2>
         <div class="salesTableWrap"><table class="salesTable" id="salesOrdersTable"></table></div>
       </div>
     </div>
@@ -471,6 +464,24 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Agents</h2>
           <div class="salesTableWrap"><table class="salesTable" id="salesAgentsTable"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="salesPanelStaffs" class="salesPanel">
+      <div class="salesGrid">
+        <div class="salesCard">
+          <h2>Staff Ledger</h2>
+          <input id="salesLedgerStaffName" placeholder="Staff Name">
+          <input id="salesLedgerStaffEmail" type="email" placeholder="Staff Login Email">
+          <div class="salesActions">
+            <button id="salesStaffSaveBtn" class="salesSmallBtn green" onclick="addSalesStaff()">Add Staff</button>
+          </div>
+          <p class="muted">Use the same email as the staff login email.</p>
+        </div>
+        <div class="salesCard" style="grid-column:span 2">
+          <h2>Saved Staff</h2>
+          <div class="salesTableWrap"><table class="salesTable" id="salesStaffLedgerTable"></table></div>
         </div>
       </div>
     </div>
@@ -1993,7 +2004,7 @@ async function loginAgentUser(){
 }
 
 const SALES_STORAGE_KEY = "mtm_sales_dispatch_v1";
-let salesState = { parties: [], misc: [], orders: [], agents: [] };
+let salesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 let salesActiveTab = "orders";
 let salesSelectedOrderId = null;
 let salesProfile = null;
@@ -2002,6 +2013,7 @@ let salesProfiles = [];
 let editingSalesPartyId = null;
 let editingSalesAgentId = null;
 let editingSalesMiscId = null;
+let editingSalesStaffId = null;
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -2091,14 +2103,15 @@ function canUseSalesCloud(){
 function loadSalesState(){
   try{
     let raw = localStorage.getItem(SALES_STORAGE_KEY);
-    salesState = raw ? JSON.parse(raw) : { parties: [], misc: [], orders: [], agents: [] };
+    salesState = raw ? JSON.parse(raw) : { parties: [], misc: [], orders: [], agents: [], staffs: [] };
   }catch(err){
-    salesState = { parties: [], misc: [], orders: [], agents: [] };
+    salesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
   }
   salesState.parties ||= [];
   salesState.misc ||= [];
   salesState.orders ||= [];
   salesState.agents ||= [];
+  salesState.staffs ||= [];
 }
 
 async function loadSalesCloudState(){
@@ -2125,6 +2138,7 @@ async function loadSalesCloudState(){
       salesState.misc ||= [];
       salesState.orders ||= [];
       salesState.agents ||= [];
+      salesState.staffs ||= [];
       localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
     }
     salesCloudLoaded = true;
@@ -2172,7 +2186,7 @@ function showSalesTab(tab, shouldRender=true){
   if(currentManagerMode === "staff" && tab !== "staff") tab = "staff";
   if(currentManagerMode === "agent" && tab !== "agent") tab = "agent";
   salesActiveTab = tab;
-  ["orders","parties","agents","misc","agent","staff"].forEach(name => {
+  ["orders","parties","agents","staffs","misc","agent","staff"].forEach(name => {
     document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
     document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
   });
@@ -2359,6 +2373,96 @@ function deleteSalesAgent(id){
   renderSalesManager();
 }
 
+function addSalesStaff(){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can manage Staff Ledger.");
+  let name = document.getElementById("salesLedgerStaffName").value.trim();
+  let email = document.getElementById("salesLedgerStaffEmail").value.trim().toLowerCase();
+  if(!name) return alert("Staff Name is required.");
+  if(!email || !email.includes("@")) return alert("Valid Staff Login Email is required.");
+  let existing = editingSalesStaffId
+    ? salesState.staffs.find(s => s.id === editingSalesStaffId)
+    : salesState.staffs.find(s => normalizeName(s.email) === normalizeName(email) || normalizeName(s.name) === normalizeName(name));
+  if(existing){
+    let oldEmail = existing.email;
+    existing.name = name;
+    existing.email = email;
+    salesState.orders.forEach(o => {
+      if(String(o.assignedStaff || "").toLowerCase() === String(oldEmail || "").toLowerCase()){
+        o.assignedStaff = email;
+        o.assignedStaffName = name;
+      }
+    });
+  }else{
+    salesState.staffs.push({id:Date.now().toString(), name, email});
+  }
+  editingSalesStaffId = null;
+  saveSalesState();
+  clearSalesStaffForm();
+  renderSalesManager();
+  showSuccessToast(existing ? "Staff updated" : "Staff saved");
+}
+
+function editSalesStaff(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can edit staff.");
+  let staff = salesState.staffs.find(s => s.id === id);
+  if(!staff) return;
+  editingSalesStaffId = id;
+  showSalesTab("staffs", false);
+  document.getElementById("salesLedgerStaffName").value = staff.name || "";
+  document.getElementById("salesLedgerStaffEmail").value = staff.email || "";
+  let btn = document.getElementById("salesStaffSaveBtn");
+  if(btn) btn.textContent = "Update Staff";
+  document.getElementById("salesPanelStaffs")?.scrollIntoView({behavior:"smooth", block:"start"});
+  document.getElementById("salesLedgerStaffName")?.focus();
+}
+
+function deleteSalesStaff(id){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete staff.");
+  let staff = salesState.staffs.find(s => s.id === id);
+  if(!staff || !confirm("Delete this staff from ledger? Existing assigned orders will remain assigned by email.")) return;
+  salesState.staffs = salesState.staffs.filter(s => s.id !== id);
+  saveSalesState();
+  renderSalesManager();
+}
+
+function clearSalesStaffForm(){
+  editingSalesStaffId = null;
+  ["salesLedgerStaffName","salesLedgerStaffEmail"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  let btn = document.getElementById("salesStaffSaveBtn");
+  if(btn) btn.textContent = "Add Staff";
+}
+
+function getSalesStaffByEmail(email){
+  return salesState.staffs.find(s => String(s.email || "").toLowerCase() === String(email || "").toLowerCase());
+}
+
+function assignSalesOrderToStaff(orderId){
+  if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can assign orders.");
+  let order = salesState.orders.find(o => o.id === orderId);
+  if(!order) return alert("Order not found.");
+  let select = document.getElementById("assignStaff_" + orderId);
+  let staffEmail = String(select?.value || "").trim().toLowerCase();
+  let staff = getSalesStaffByEmail(staffEmail);
+  if(!staff) return alert("Select staff from Staff Ledger first.");
+  let action = order.assignedStaff ? "change this order to " : "push this order to ";
+  if(!confirm("Are you sure you want to " + action + staff.name + "?")) return;
+  order.assignedStaff = staff.email;
+  order.assignedStaffName = staff.name;
+  order.assignmentStatus = "Assigned";
+  if(order.status === "Not Assigned Yet") order.status = "Assigned";
+  order.assignedAt = new Date().toISOString();
+  saveSalesState();
+  renderSalesManager();
+  showSuccessToast("Order assigned to " + staff.name);
+}
+
 function editSalesParty(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can edit parties.");
@@ -2488,7 +2592,6 @@ function saveSalesOrder(){
     if(!document.getElementById("salesPartyName").value.trim()) throw new Error("Party Name is required.");
     if(!document.getElementById("salesAgentName").value.trim() || !document.getElementById("salesAgentEmail")?.value.trim()) throw new Error("Selected party must have an agent linked.");
     if(!(qtyPerBale > 0)) throw new Error("Qty Per Bale must be greater than 0.");
-    if(!document.getElementById("salesAssignStaff").value.trim()) throw new Error("Assign Staff is required.");
     if(colorsList.length === 0) throw new Error("Add at least one color row.");
 
     let order = {
@@ -2507,18 +2610,17 @@ function saveSalesOrder(){
       packing: document.getElementById("salesPacking").value,
       patta: document.getElementById("salesPatta").value,
       stamping: document.getElementById("salesStamping").value,
-      tracking: document.getElementById("salesTracking")?.value.trim() || "",
       confirmation: document.getElementById("salesConfirmation")?.value.trim() || "",
       quality: document.getElementById("salesQuality").value.trim(),
       rate: Number(document.getElementById("salesRate").value) || 0,
-      paymentStatus: document.getElementById("salesPaymentStatus").value || "Due",
-      paidAmount: Number(document.getElementById("salesPaidAmount").value) || 0,
       qtyPerBale,
-      assignedStaff: document.getElementById("salesAssignStaff").value.trim().toLowerCase(),
+      assignedStaff: "",
+      assignedStaffName: "",
+      assignmentStatus: "Not Assigned Yet",
       colors: colorsList,
       totalQty,
       expectedBales: Math.ceil(totalQty / qtyPerBale),
-      status: "Assigned",
+      status: "Not Assigned Yet",
       bales: [],
       createdBy: getSalesUserEmail(),
       createdAt: new Date().toISOString()
@@ -2534,11 +2636,11 @@ function saveSalesOrder(){
 }
 
 function clearSalesOrderForm(){
-  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesPartyPhone","salesStation","salesTracking","salesConfirmation","salesQuality","salesRate","salesPaidAmount","salesQtyPerBale","salesAssignStaff"].forEach(id => {
+  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesPartyPhone","salesStation","salesConfirmation","salesQuality","salesRate","salesQtyPerBale"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
-  ["salesPartyName","salesTransport","salesPacking","salesPatta","salesStamping","salesPaymentStatus"].forEach(id => {
+  ["salesPartyName","salesTransport","salesPacking","salesPatta","salesStamping"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
@@ -2581,19 +2683,6 @@ function getVisibleSalesOrders(){
   return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
 }
 
-function getSalesOrderAmount(order){
-  return (Number(order.totalQty) || 0) * (Number(order.rate) || 0);
-}
-
-function getSalesOrderPaid(order){
-  if(order.paymentStatus === "Paid") return getSalesOrderAmount(order);
-  return Number(order.paidAmount) || 0;
-}
-
-function getSalesOrderDue(order){
-  return Math.max(0, getSalesOrderAmount(order) - getSalesOrderPaid(order));
-}
-
 function getSalesSentQty(order){
   return (order.colors || []).reduce((sum, c) => sum + ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)), 0);
 }
@@ -2633,6 +2722,7 @@ function startSalesBaleCreation(id){
   if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
+  if(!order.assignedStaff) return alert("This order is not assigned to staff yet.");
   if(order.status === "Assigned") order.status = "Accepted";
   if(order.status === "Accepted") order.status = "In Packing";
   salesSelectedOrderId = id;
@@ -2756,6 +2846,7 @@ function renderSalesManager(shouldLoadLocal=true){
   refreshSalesDropdowns();
   renderSalesParties();
   renderSalesAgents();
+  renderSalesStaffLedger();
   renderSalesMisc();
   renderSalesOrders();
   renderSalesAgentPortal();
@@ -2806,6 +2897,16 @@ function renderSalesAgents(){
     }).join("");
 }
 
+function renderSalesStaffLedger(){
+  let table = document.getElementById("salesStaffLedgerTable");
+  if(!table) return;
+  table.innerHTML = `<tr><th>Staff Name</th><th>Staff Login Email</th><th>Assigned Orders</th><th>Action</th></tr>` +
+    salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => {
+      let orderCount = salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === String(staff.email || "").toLowerCase()).length;
+      return `<tr><td>${salesEscape(staff.name)}</td><td>${salesEscape(staff.email)}</td><td>${orderCount}</td><td><button class="salesSmallBtn gray" onclick="editSalesStaff('${staff.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesStaff('${staff.id}')">Delete</button></td></tr>`;
+    }).join("");
+}
+
 function renderSalesMisc(){
   let table = document.getElementById("salesMiscTable");
   if(!table) return;
@@ -2823,16 +2924,22 @@ function renderSalesOrders(){
   let agentCount = document.getElementById("salesAgentCount");
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
-  if(staffCount) staffCount.textContent = salesProfiles.filter(p => p.role === "staff").length;
-  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff</th><th>Total Qty</th><th>Paid</th><th>Due</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+  if(staffCount) staffCount.textContent = salesState.staffs.length || salesProfiles.filter(p => p.role === "staff").length;
+  let staffOptions = '<option value="">Select Staff</option>' + salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => `<option value="${salesEscape(staff.email)}">${salesEscape(staff.name)} - ${salesEscape(staff.email)}</option>`).join("");
+  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Staff Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
-      <td>${salesEscape(o.assignedStaff)}</td><td>${o.totalQty}</td><td>${getSalesOrderPaid(o)}</td><td>${getSalesOrderDue(o)}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
+      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(o.assignedStaffName || o.assignedStaff) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
+      <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
-      <td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
+      <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Staff" : "Push to Staff"}</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
+  orders.forEach(o => {
+    let select = document.getElementById("assignStaff_" + o.id);
+    if(select) select.value = o.assignedStaff || "";
+  });
 }
 
 function renderSalesAgentPortal(){
@@ -2840,24 +2947,17 @@ function renderSalesAgentPortal(){
   let table = document.getElementById("salesAgentOrdersTable");
   if(!summary || !table) return;
   let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
-  let totalAmount = orders.reduce((sum,o)=>sum + getSalesOrderAmount(o),0);
-  let paid = orders.reduce((sum,o)=>sum + getSalesOrderPaid(o),0);
-  let due = orders.reduce((sum,o)=>sum + getSalesOrderDue(o),0);
   let pendingColors = orders.reduce((sum,o)=>sum + getSalesPendingQty(o),0);
   let sentColors = orders.reduce((sum,o)=>sum + getSalesSentQty(o),0);
   summary.innerHTML = `
     <div class="salesCard"><h3>Total Orders</h3><b style="font-size:28px">${orders.length}</b></div>
-    <div class="salesCard"><h3>Paid Amount</h3><b style="font-size:28px">${paid}</b></div>
-    <div class="salesCard"><h3>Due Amount</h3><b style="font-size:28px">${due}</b></div>
     <div class="salesCard"><h3>Pending Qty</h3><b style="font-size:28px">${pendingColors}</b></div>
     <div class="salesCard"><h3>Sent Qty</h3><b style="font-size:28px">${sentColors}</b></div>
-    <div class="salesCard"><h3>Total Value</h3><b style="font-size:28px">${totalAmount}</b></div>
   `;
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Paid</th><th>Due</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Total Qty</th><th>Sent</th><th>Pending</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.partyName)}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
-      <td>${getSalesOrderPaid(o)}</td><td>${getSalesOrderDue(o)}</td>
       <td>${salesEscape(getSalesBaleStatusSummary(o))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "pending"))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
@@ -2895,6 +2995,7 @@ function renderSalesBaleWorkArea(){
   </div>`).join("");
   let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><b>Bale ${bale.baleNo}</b> - ${bale.totalQty} qty<br>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print Packing Slip</button></div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
+    <p><b>Assigned Staff:</b> ${salesEscape(order.assignedStaffName || order.assignedStaff || "-")}</p>
     <p><b>Qty Per Bale:</b> ${order.qtyPerBale} | <b>Current Bale Total:</b> <span id="salesCurrentBaleTotal">0</span></p>
     ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div id="salesPendingPackRows">${rows}</div><button class="salesSmallBtn green" onclick="finishSalesBale()">Finish Bale</button>`}
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}')">Print All Packing Slips</button>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
@@ -3019,12 +3120,10 @@ async function importSalesOrderCsv(event){
     if(row.address) document.getElementById("salesPartyAddress").value = row.address;
     if(row.phone || row.mobile) document.getElementById("salesPartyPhone").value = row.phone || row.mobile;
     if(row.station) document.getElementById("salesStation").value = row.station;
-    if(row.tracking || row.lr_no) document.getElementById("salesTracking").value = row.tracking || row.lr_no;
     if(row.confirmation || row.note) document.getElementById("salesConfirmation").value = row.confirmation || row.note;
     if(row.quality) document.getElementById("salesQuality").value = row.quality;
     if(row.rate) document.getElementById("salesRate").value = row.rate;
     if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
-    if(row.assign_staff) document.getElementById("salesAssignStaff").value = row.assign_staff;
   });
   updateSalesOrderTotals();
   showSuccessToast("Order CSV loaded");
@@ -3034,7 +3133,7 @@ function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv",
 function downloadSalesAgentSample(){ downloadSalesCsv("agent-ledger-sample.csv", "agent_name,mobile_number,agent_login_email\nAgent 1,9462023854,agent1@example.com\n"); }
 function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
 function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
-function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,phone,station,tracking,confirmation,quality,rate,qty_per_bale,assign_staff\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,9999999999,Pali,LR123,Confirmed,Cotton,100,50,staff@example.com\n"); }
+function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,phone,station,confirmation,quality,rate,qty_per_bale\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,9999999999,Pali,Confirmed,Cotton,100,50\n"); }
 function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
 function clearAgentCsv(){ let f = document.getElementById("agentCsvFile"); if(f) f.value = ""; showSuccessToast("Agent CSV cleared"); }
 function clearMiscCsv(){ let f = document.getElementById("miscCsvFile"); if(f) f.value = ""; showSuccessToast("Misc CSV cleared"); }
