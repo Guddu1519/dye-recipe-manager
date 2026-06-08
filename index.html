@@ -358,10 +358,6 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 </head>
 <body>
 
-<div id="modeSwitchBar" class="modeSwitchBar">
-  <button id="modeSwitchButton" class="modeSwitchBtn" onclick="switchManagerMode()">Switch Mode</button>
-</div>
-
 <div id="managerSelectPage" class="manager-select-page">
   <div class="managerSelectCard">
     <div class="managerSelectHeader">
@@ -1693,11 +1689,7 @@ function hideAllEntryScreens(){
 }
 
 function updateModeSwitchButton(show=true){
-  let bar = document.getElementById("modeSwitchBar");
-  let button = document.getElementById("modeSwitchButton");
-  if(!bar || !button) return;
-  bar.style.display = show ? "block" : "none";
-  button.textContent = "Switch Mode";
+  return;
 }
 
 function showManagerSelect(){
