@@ -197,12 +197,15 @@ th{background:#dbeafe}
 .salesBadge{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px;background:#dbeafe;color:#1e3a8a}
 .salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
 .salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
-.salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:10px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff}
+.salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:12px;border:1px solid #bfdbfe;border-radius:12px;background:#eff6ff}
 .salesBaleTotal{font-size:22px;font-weight:900;color:#1d4ed8}
 .salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;margin-top:10px}
-.salesPackRow{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff}
+.salesPackRow{display:grid;grid-template-columns:70px 1fr;gap:8px;align-items:center;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff;box-shadow:0 8px 18px #0f172a08}
 .salesPackColorNo{grid-row:1 / span 4;font-size:32px;font-weight:900;color:#1d4ed8;text-align:center;border-right:1px solid #e2e8f0;padding-right:8px}
-.salesPackRow label{font-weight:800;display:flex;align-items:center;gap:6px}.salesPackRow input[type="number"]{width:100%;margin:0}
+.salesPackMeta{font-size:14px;color:#334155}.salesPackMeta b{color:#0f172a}
+.salesPackRow label{font-weight:800;display:flex;align-items:center;gap:6px}.salesPackRow input[type="number"]{width:100%;margin:0;font-size:18px;font-weight:800}
+.salesBalePrintTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.salesBaleSelect{display:flex;align-items:center;gap:6px;font-weight:800}
 .salesBaleHistory{display:grid;gap:8px}.salesBaleBox{border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#f8fafc}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
@@ -2868,6 +2871,15 @@ function setSalesUseCustom(input){
   updateCurrentBaleTotal();
 }
 
+function markSalesCustomQty(input){
+  let row = input.closest(".salesPackRow");
+  let takeAll = row?.querySelector(".salesTakeAll");
+  let useCustom = row?.querySelector(".salesUseCustom");
+  if(takeAll) takeAll.checked = false;
+  if(useCustom) useCustom.checked = Number(input.value) > 0;
+  updateCurrentBaleTotal();
+}
+
 function getSalesPackRowQty(row){
   let takeAll = row.querySelector(".salesTakeAll");
   let useCustom = row.querySelector(".salesUseCustom");
@@ -2875,6 +2887,15 @@ function getSalesPackRowQty(row){
   if(takeAll?.checked) return Number(takeAll.dataset.pending) || 0;
   if(useCustom?.checked) return Number(qtyInput?.value) || 0;
   return 0;
+}
+
+function getSalesTeamMemberName(order, bale=null){
+  let raw = String(bale?.staff || order?.assignedStaffName || order?.assignedStaff || "").trim();
+  if(raw.includes("@")){
+    let staff = salesState.staffs.find(s => String(s.email || "").toLowerCase() === raw.toLowerCase());
+    return staff?.name || order?.assignedStaffName || salesProfile?.fullName || raw.split("@")[0];
+  }
+  return raw || order?.assignedStaffName || salesProfile?.fullName || "Team Member";
 }
 
 function updateCurrentBaleTotal(){
@@ -2924,19 +2945,33 @@ async function finishSalesBale(){
   }
 }
 
+function getSelectedSalesBales(){
+  return Array.from(document.querySelectorAll(".salesBalePrintCheck:checked"))
+    .map(input => Number(input.value))
+    .filter(Boolean);
+}
+
+function printSelectedSalesBales(orderId){
+  let selected = getSelectedSalesBales();
+  if(!selected.length) return alert("Select at least one bale to print.");
+  printSalesPackingSlips(orderId, selected);
+}
+
 function printSalesPackingSlips(orderId, baleNo=null){
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
-  let bales = (order.bales || []).filter(b => baleNo ? Number(b.baleNo) === Number(baleNo) : true);
+  let selectedBales = Array.isArray(baleNo) ? baleNo.map(Number) : baleNo ? [Number(baleNo)] : null;
+  let bales = (order.bales || []).filter(b => selectedBales ? selectedBales.includes(Number(b.baleNo)) : true);
   if(!bales.length) return alert("No completed bales found for packing slip.");
-  let slipHtml = bales.map((bale, index) => {
+  let makeSlip = (bale, copyLabel) => {
     let rows = (bale.colors || []).map(c => `<tr><td>Color ${salesEscape(c.colorNo)}</td><td>${salesEscape(c.qty)} pcs</td></tr>`).join("");
     return `<section class="packingSlip">
       <div class="slipHead">
         <h2>Packing Slip</h2>
-        <b>Bale ${salesEscape(bale.baleNo)}</b>
+        <b>${salesEscape(copyLabel)} - Bale ${salesEscape(bale.baleNo)}</b>
       </div>
       <div class="slipMeta">
+        <p><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}</p>
         <p><b>Party:</b> ${salesEscape(order.partyName)}</p>
         <p><b>Date:</b> ${salesEscape((bale.createdAt || new Date().toISOString()).slice(0,10))}</p>
         <p><b>Packing:</b> ${salesEscape(order.packing || "-")}</p>
@@ -2944,23 +2979,24 @@ function printSalesPackingSlips(orderId, baleNo=null){
         <p><b>Stamping:</b> ${salesEscape(order.stamping || "-")}</p>
         <p><b>Address:</b> ${salesEscape(order.partyAddress || "-")}</p>
         <p><b>Transport:</b> ${salesEscape(order.transport || "-")}</p>
-        <p><b>Team Member:</b> ${salesEscape(bale.staff || order.assignedStaffName || "-")}</p>
+        <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
       </div>
       <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
     </section>`;
-  }).join("");
+  };
+  let slipHtml = bales.map(bale => makeSlip(bale, "Office Copy") + makeSlip(bale, "Party Copy")).join("");
   let printWindow = window.open("", "_blank");
   if(!printWindow) return alert("Popup blocked. Please allow popups to print packing slip.");
   printWindow.document.write(`<!DOCTYPE html><html><head><title>Packing Slip</title>
     <style>
       *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:14px;color:#111;background:#fff}
       .printAction{display:block;margin:0 auto 12px;padding:12px 22px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:800;font-size:16px;box-shadow:0 10px 24px #0f766e33}
-      .sheet{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-      .packingSlip{border:2px solid #111;padding:10px;min-height:385px;break-inside:avoid;page-break-inside:avoid}
+      .sheet{display:grid;grid-template-columns:1fr;gap:8px}
+      .packingSlip{border:2px solid #111;padding:10px;min-height:390px;break-inside:avoid;page-break-inside:avoid}
       .slipHead{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #111;margin-bottom:8px;padding-bottom:5px}
       h2{margin:0;font-size:18px}.slipMeta{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;font-size:12px}
       p{margin:0}table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}th,td{border:1px solid #777;padding:5px;text-align:left}th{background:#dbeafe}
-      @media print{.printAction{display:none!important}body{padding:8px}.packingSlip{min-height:380px}.packingSlip:nth-of-type(4n){page-break-after:always}}
+      @media print{.printAction{display:none!important}body{padding:8px}.packingSlip{height:calc(50vh - 12px);min-height:0}.packingSlip:nth-of-type(2n){page-break-after:always}}
       @media(max-width:700px){.sheet{grid-template-columns:1fr}.packingSlip{min-height:auto}}
     </style>
     <script>
@@ -2990,7 +3026,8 @@ function renderSalesManager(shouldLoadLocal=true){
   renderSalesOrders();
   renderSalesAgentPortal();
   renderSalesStaffOrders();
-  renderSalesBaleWorkArea();
+  let activeInBaleWork = document.activeElement && document.getElementById("salesBaleWorkArea")?.contains(document.activeElement);
+  if(!activeInBaleWork) renderSalesBaleWorkArea();
   updateSalesOrderTotals();
   if(document.querySelectorAll("#salesColorRows .salesColorRow").length === 0) addSalesColorRow();
   applySalesRoleUi();
@@ -3010,7 +3047,7 @@ function applySalesRoleUi(){
       allowed = text === "Logout" || el.closest(".salesTabs");
     }
     if(isSalesStaff()){
-      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Finish Bale" || text === "Print Packing Slip" || text === "Print All Packing Slips" || el.classList.contains("salesPackQty") || el.type === "checkbox";
+      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Create Bale" || text === "Print Packing Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Packing Slips" || el.classList.contains("salesPackQty") || el.type === "checkbox";
     }
     if(!allowed){
       el.disabled = true;
@@ -3128,16 +3165,16 @@ function renderSalesBaleWorkArea(){
   let pending = order.colors.filter(c => c.pendingQty > 0);
   let rows = pending.map(c => `<div class="salesPackRow" data-color-no="${c.colorNo}">
     <div class="salesPackColorNo">${salesEscape(c.colorNo)}</div>
-    <div><b>Ordered:</b> ${salesEscape(c.qty)} | <b>Pending:</b> ${salesEscape(c.pendingQty)}</div>
+    <div class="salesPackMeta"><b>Ordered:</b> ${salesEscape(c.qty)} pcs &nbsp; <b>Pending:</b> ${salesEscape(c.pendingQty)} pcs</div>
     <label><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Full qty</label>
-    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Custom qty" oninput="updateCurrentBaleTotal()">
+    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Custom qty" oninput="markSalesCustomQty(this)">
     <label><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)"> Use custom qty</label>
   </div>`).join("");
-  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><b>Bale ${bale.baleNo}</b> - ${bale.totalQty} qty<br>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print Packing Slip</button></div>`).join("");
+  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button></div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
     <p><b>Assigned Team Member:</b> ${salesEscape(order.assignedStaffName || order.assignedStaff || "-")}</p>
     ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackTools"><div><b>Qty Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div><div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>`}
-    <h3>Completed Bale History</h3>${(order.bales || []).length ? `<button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}')">Print All Packing Slips</button>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
+    <h3>Completed Bale History</h3>${(order.bales || []).length ? `<div class="salesBalePrintTools"><button class="salesSmallBtn" onclick="printSelectedSalesBales('${order.id}')">Print Selected Bales</button><button class="salesSmallBtn gray" onclick="printSalesPackingSlips('${order.id}')">Print All Packing Slips</button></div>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
 }
 
 async function importSalesPartyCsv(event){
