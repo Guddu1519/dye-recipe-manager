@@ -2100,6 +2100,13 @@ function canUseSalesCloud(){
   return !!(supabaseClient && currentUser && !isTrialUser() && !currentUser.isSalesLocalAdmin);
 }
 
+function requireSalesCloud(){
+  if(canUseSalesCloud()) return true;
+  if(isTrialUser()) return false;
+  alert("Sales cloud is not connected for this login. Please login with Supabase Sales Admin/Staff/Agent email, not local-only login.");
+  return false;
+}
+
 function loadSalesState(){
   try{
     let raw = localStorage.getItem(SALES_STORAGE_KEY);
@@ -2116,8 +2123,10 @@ function loadSalesState(){
 
 async function loadSalesCloudState(){
   salesCloudLoaded = false;
-  loadSalesState();
-  if(!canUseSalesCloud()) return;
+  if(!canUseSalesCloud()){
+    loadSalesState();
+    return;
+  }
   try{
     let [{ data, error }, { data: profileRows, error: profileError }] = await Promise.all([
       supabaseClient
@@ -2143,22 +2152,32 @@ async function loadSalesCloudState(){
     }
     salesCloudLoaded = true;
   }catch(err){
-    console.warn("Sales cloud load failed. Using local fallback.", err);
+    console.warn("Sales cloud load failed.", err);
+    alert("Sales cloud load failed. Please check Supabase sales_state table/policies. Local cached data will not be used for cloud work.");
   }
 }
 
-function saveSalesState(){
-  localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
-  if(canUseSalesCloud()){
-    supabaseClient.from("sales_state").upsert({
-      id: "main",
-      data: salesState,
-      updated_by: currentUser.id,
-      updated_at: new Date().toISOString()
-    }).then(({error}) => {
-      if(error) console.warn("Sales cloud save failed. Run Sales Manager SQL.", error);
-    });
+async function saveSalesState(){
+  if(!canUseSalesCloud()){
+    if(isTrialUser()){
+      localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+      return;
+    }
+    alert("Sales cloud save blocked. Login with Supabase Sales account.");
+    throw new Error("Sales cloud save blocked. Login with Supabase Sales account.");
   }
+  let { error } = await supabaseClient.from("sales_state").upsert({
+    id: "main",
+    data: salesState,
+    updated_by: currentUser.id,
+    updated_at: new Date().toISOString()
+  });
+  if(error){
+    console.warn("Sales cloud save failed. Run Sales Manager SQL.", error);
+    alert("Sales cloud save failed: " + error.message);
+    throw new Error("Sales cloud save failed: " + error.message);
+  }
+  localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
 }
 
 function parseSalesCsv(text){
@@ -2282,7 +2301,7 @@ function updateSalesOrderTotals(){
   if(expectedEl) expectedEl.textContent = expected;
 }
 
-function addSalesParty(){
+async function addSalesParty(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can manage Party Master.");
   let partyName = document.getElementById("partyMasterName").value.trim();
@@ -2318,13 +2337,13 @@ function addSalesParty(){
     salesState.parties.push({id:Date.now().toString(), partyName, gstNo, address, phone, agentName: agent.name, agentEmail: agent.email || ""});
   }
   editingSalesPartyId = null;
-  saveSalesState();
+  await saveSalesState();
   clearSalesPartyForm();
   renderSalesManager();
   showSuccessToast(existing ? "Party updated" : "Party saved");
 }
 
-function addSalesAgent(){
+async function addSalesAgent(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can manage Agent Ledger.");
   let name = document.getElementById("salesLedgerAgentName").value.trim();
@@ -2357,23 +2376,23 @@ function addSalesAgent(){
     salesState.agents.push({id:Date.now().toString(), name, mobile, email});
   }
   editingSalesAgentId = null;
-  saveSalesState();
+  await saveSalesState();
   clearSalesAgentForm();
   renderSalesManager();
   showSuccessToast(existing ? "Agent updated" : "Agent saved");
 }
 
-function deleteSalesAgent(id){
+async function deleteSalesAgent(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can delete agents.");
   let agent = salesState.agents.find(a => a.id === id);
   if(!agent || !confirm("Delete this agent from ledger? Existing parties/orders will keep their saved agent name.")) return;
   salesState.agents = salesState.agents.filter(a => a.id !== id);
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
-function addSalesStaff(){
+async function addSalesStaff(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can manage Staff Ledger.");
   let name = document.getElementById("salesLedgerStaffName").value.trim();
@@ -2397,7 +2416,7 @@ function addSalesStaff(){
     salesState.staffs.push({id:Date.now().toString(), name, email});
   }
   editingSalesStaffId = null;
-  saveSalesState();
+  await saveSalesState();
   clearSalesStaffForm();
   renderSalesManager();
   showSuccessToast(existing ? "Staff updated" : "Staff saved");
@@ -2418,13 +2437,13 @@ function editSalesStaff(id){
   document.getElementById("salesLedgerStaffName")?.focus();
 }
 
-function deleteSalesStaff(id){
+async function deleteSalesStaff(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can delete staff.");
   let staff = salesState.staffs.find(s => s.id === id);
   if(!staff || !confirm("Delete this staff from ledger? Existing assigned orders will remain assigned by email.")) return;
   salesState.staffs = salesState.staffs.filter(s => s.id !== id);
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
@@ -2442,7 +2461,7 @@ function getSalesStaffByEmail(email){
   return salesState.staffs.find(s => String(s.email || "").toLowerCase() === String(email || "").toLowerCase());
 }
 
-function assignSalesOrderToStaff(orderId){
+async function assignSalesOrderToStaff(orderId){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can assign orders.");
   let order = salesState.orders.find(o => o.id === orderId);
@@ -2458,7 +2477,7 @@ function assignSalesOrderToStaff(orderId){
   order.assignmentStatus = "Assigned";
   if(order.status === "Not Assigned Yet") order.status = "Assigned";
   order.assignedAt = new Date().toISOString();
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
   showSuccessToast("Order assigned to " + staff.name);
 }
@@ -2541,16 +2560,16 @@ function clearSalesMiscForm(){
   if(btn) btn.textContent = "Add Misc";
 }
 
-function deleteSalesParty(id){
+async function deleteSalesParty(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can delete parties.");
   if(!confirm("Delete this party?")) return;
   salesState.parties = salesState.parties.filter(p => p.id !== id);
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
-function addSalesMisc(){
+async function addSalesMisc(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can manage Misc Master.");
   let type = document.getElementById("miscMasterType").value;
@@ -2566,22 +2585,22 @@ function addSalesMisc(){
     salesState.misc.push({id:Date.now().toString(), type, name});
   }
   editingSalesMiscId = null;
-  saveSalesState();
+  await saveSalesState();
   clearSalesMiscForm();
   renderSalesManager();
   showSuccessToast(existing ? "Misc value updated" : "Misc value saved");
 }
 
-function deleteSalesMisc(id){
+async function deleteSalesMisc(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can delete misc values.");
   if(!confirm("Delete this misc value?")) return;
   salesState.misc = salesState.misc.filter(m => m.id !== id);
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
-function saveSalesOrder(){
+async function saveSalesOrder(){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can create orders.");
   try{
@@ -2626,7 +2645,7 @@ function saveSalesOrder(){
       createdAt: new Date().toISOString()
     };
     salesState.orders.push(order);
-    saveSalesState();
+    await saveSalesState();
     clearSalesOrderForm();
     renderSalesManager();
     showSuccessToast("Sales order created");
@@ -2647,23 +2666,23 @@ function clearSalesOrderForm(){
   clearSalesColorRows();
 }
 
-function cancelSalesOrder(id){
+async function cancelSalesOrder(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can cancel orders.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order || !confirm("Cancel this assigned order?")) return;
   order.status = "Cancelled";
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
-function deleteSalesOrder(id){
+async function deleteSalesOrder(id){
   if(isTrialUser()) return alert("Trial login can only view. Add/Edit/Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can delete orders.");
   if(!confirm("Delete this sales order?")) return;
   salesState.orders = salesState.orders.filter(o => o.id !== id);
   if(salesSelectedOrderId === id) salesSelectedOrderId = null;
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
@@ -2709,16 +2728,16 @@ function getSalesBaleStatusSummary(order){
   }).join("; ");
 }
 
-function acceptSalesOrder(id){
+async function acceptSalesOrder(id){
   if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
   order.status = "Accepted";
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
-function startSalesBaleCreation(id){
+async function startSalesBaleCreation(id){
   if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
   if(!order) return;
@@ -2726,7 +2745,7 @@ function startSalesBaleCreation(id){
   if(order.status === "Assigned") order.status = "Accepted";
   if(order.status === "Accepted") order.status = "In Packing";
   salesSelectedOrderId = id;
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
 }
 
@@ -2744,7 +2763,7 @@ function updateCurrentBaleTotal(){
   if(el) el.textContent = total;
 }
 
-function finishSalesBale(){
+async function finishSalesBale(){
   if(isTrialUser()) return alert("Trial login can only view. Staff actions are disabled.");
   try{
     let order = salesState.orders.find(o => o.id === salesSelectedOrderId);
@@ -2777,7 +2796,7 @@ function finishSalesBale(){
     }else{
       order.status = "In Packing";
     }
-    saveSalesState();
+    await saveSalesState();
     renderSalesManager();
     showSuccessToast(order.status === "Packed" ? "Order ready for dispatch" : "Bale finished");
   }catch(err){
@@ -3032,7 +3051,7 @@ async function importSalesPartyCsv(event){
     let payload = {id: existing?.id || (Date.now() + Math.random()).toString(), partyName, gstNo: row.gst_no || "", address: row.address || "", phone: row.phone || row.mobile || "", agentName, agentEmail};
     if(existing) Object.assign(existing, payload); else salesState.parties.push(payload);
   });
-  saveSalesState(); renderSalesManager(); showSuccessToast("Party CSV imported");
+  await saveSalesState(); renderSalesManager(); showSuccessToast("Party CSV imported");
 }
 
 async function importSalesAgentCsv(event){
@@ -3068,7 +3087,7 @@ async function importSalesAgentCsv(event){
       }
     });
   });
-  saveSalesState();
+  await saveSalesState();
   renderSalesManager();
   showSuccessToast("Agents imported successfully");
 }
@@ -3085,7 +3104,7 @@ async function importSalesMiscCsv(event){
       salesState.misc.push({id:(Date.now() + Math.random()).toString(), type, name});
     }
   });
-  saveSalesState(); renderSalesManager(); showSuccessToast("Misc CSV imported");
+  await saveSalesState(); renderSalesManager(); showSuccessToast("Misc CSV imported");
 }
 
 async function importSalesColorCsv(event){
