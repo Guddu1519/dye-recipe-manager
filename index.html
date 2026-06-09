@@ -463,6 +463,19 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
               <option value="ACTIVA">ACTIVA</option>
               <option value="SOFIYA">SOFIYA</option>
             </select>
+            <select id="salesCut">
+              <option value="">Cut</option>
+              <option value="THAN">THAN</option>
+              <option value="1 MTR">1 MTR</option>
+              <option value="2 MTR">2 MTR</option>
+              <option value="80 CM">80 CM</option>
+              <option value="75 CM">75 CM</option>
+              <option value="78 CM">78 CM</option>
+              <option value="77 CM">77 CM</option>
+              <option value="LUMP">LUMP</option>
+              <option value="FULL LUMP">FULL LUMP</option>
+              <option value="L95 THAN">L95 THAN</option>
+            </select>
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
             <input id="salesQtyPerBale" type="number" placeholder="Qty Per Bale">
           </div>
@@ -2433,9 +2446,16 @@ function resetSalesScreenState(){
 function refreshSalesDropdowns(){
   let partySelect = document.getElementById("salesPartyName");
   if(partySelect){
+    let current = partySelect.value;
     partySelect.innerHTML = '<option value="">Select Party</option>' + salesState.parties
       .sort((a,b)=>String(a.partyName).localeCompare(String(b.partyName)))
       .map(p => `<option value="${salesEscape(p.partyName)}">${salesEscape(p.partyName)}</option>`).join("");
+    if(current){
+      if(!Array.from(partySelect.options).some(option => option.value === current)){
+        partySelect.insertAdjacentHTML("beforeend", `<option value="${salesEscape(current)}">${salesEscape(current)}</option>`);
+      }
+      partySelect.value = current;
+    }
   }
   [["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"]].forEach(([id,type]) => {
     let select = document.getElementById(id);
@@ -2863,6 +2883,7 @@ async function saveSalesOrder(){
       stamping,
       stampingName: stamping,
       quality: document.getElementById("salesQuality").value.trim(),
+      cut: document.getElementById("salesCut")?.value.trim() || "",
       rate: Number(document.getElementById("salesRate").value) || 0,
       qtyPerBale,
       assignedStaff: "",
@@ -2887,7 +2908,7 @@ async function saveSalesOrder(){
 }
 
 function clearSalesOrderForm(){
-  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesQuality","salesRate","salesQtyPerBale"].forEach(id => {
+  ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesQuality","salesCut","salesRate","salesQtyPerBale"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
@@ -2896,6 +2917,10 @@ function clearSalesOrderForm(){
     if(el) el.value = "";
   });
   clearSalesColorRows();
+  ["salesColorCsvFile","salesOrderCsvFile"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
 }
 
 async function cancelSalesOrder(id){
@@ -3235,6 +3260,7 @@ function printSalesPackingSlips(orderId, baleNo=null){
         <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}</p>
         <p><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</p>
         <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}</p>
+        <p><b>Cut:</b> ${salesEscape(order.cut || "-")}</p>
         <p><b>Address:</b> ${salesEscape(order.partyAddress || "-")}</p>
         <p><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}</p>
         <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
@@ -3507,7 +3533,7 @@ function renderSalesOrders(){
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
-      <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
+      <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}<br><b>Cut:</b> ${salesEscape(o.cut || "-")}</td>
       <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></td>
@@ -3524,6 +3550,7 @@ function renderSalesOrders(){
       <p><b>Date:</b> ${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</p>
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
       <p><b>Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>
+      <p><b>Cut:</b> ${salesEscape(o.cut || "-")}</p>
       <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
       <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></p>
       <div class="salesActions"><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button><button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button></div>
@@ -3578,7 +3605,7 @@ function renderSalesStaffOrders(){
       <td>${salesEscape(o.partyName)}</td>
       <td>${salesEscape(o.agentName || "-")}</td>
       <td>${salesEscape(getSalesAssignedTeamMemberName(o))}</td>
-      <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
+      <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}<br><b>Cut:</b> ${salesEscape(o.cut || "-")}</td>
       <td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
       <td>${actionHtml(o)}</td>
@@ -3590,6 +3617,7 @@ function renderSalesStaffOrders(){
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
       <p><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>
       <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</p>
+      <p><b>Cut:</b> ${salesEscape(o.cut || "-")}</p>
       <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</p>
       <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
       <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></p>
@@ -3621,7 +3649,7 @@ function renderSalesBaleWorkArea(){
     <p><b>Assigned Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}</p>
     <div class="salesPackTools">
       <div><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}<br><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</div>
-      <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
+      <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Cut:</b> ${salesEscape(order.cut || "-")}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
     </div>
     ${order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackTools"><div><b>Qty Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div><div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>`}
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<div class="salesBalePrintTools"><button class="salesSmallBtn" onclick="printSelectedSalesBales('${order.id}')">Print Selected Bales</button><button class="salesSmallBtn gray" onclick="printSalesPackingSlips('${order.id}')">Print All Packing Slips</button></div>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
@@ -3757,18 +3785,22 @@ async function importSalesMiscCsv(event){
 async function importSalesColorCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
-  let rows = parseSalesCsv(await file.text());
-  let merged = {};
-  rows.forEach(row => {
-    let colorNo = Number(row.color_no || row.color || row.colorno);
-    let qty = Number(row.qty || row.quantity);
-    if(Number.isInteger(colorNo) && colorNo >= 1 && colorNo <= 390 && qty > 0) merged[colorNo] = (merged[colorNo] || 0) + qty;
-  });
-  let wrap = document.getElementById("salesColorRows");
-  if(wrap) wrap.innerHTML = "";
-  Object.keys(merged).sort((a,b)=>Number(a)-Number(b)).forEach(colorNo => addSalesColorRow(colorNo, merged[colorNo]));
-  updateSalesOrderTotals();
-  showSuccessToast("Color CSV imported");
+  try{
+    let rows = parseSalesCsv(await file.text());
+    let merged = {};
+    rows.forEach(row => {
+      let colorNo = Number(row.color_no || row.color || row.colorno);
+      let qty = Number(row.qty || row.quantity);
+      if(Number.isInteger(colorNo) && colorNo >= 1 && colorNo <= 390 && qty > 0) merged[colorNo] = (merged[colorNo] || 0) + qty;
+    });
+    let wrap = document.getElementById("salesColorRows");
+    if(wrap) wrap.innerHTML = "";
+    Object.keys(merged).sort((a,b)=>Number(a)-Number(b)).forEach(colorNo => addSalesColorRow(colorNo, merged[colorNo]));
+    updateSalesOrderTotals();
+    showSuccessToast("Color CSV imported");
+  }finally{
+    event.target.value = "";
+  }
 }
 
 async function importSalesOrderCsv(event){
@@ -3789,10 +3821,13 @@ async function importSalesOrderCsv(event){
     setSalesSelectValue("salesStamping", salesCsvPick(row, ["stamping","stamp","stamping_name"]));
     setSalesSelectValue("salesTransport", salesCsvPick(row, ["transport","transport_name"]));
     if(row.quality) document.getElementById("salesQuality").value = row.quality;
+    let cut = salesCsvPick(row, ["cut","cut_type"]);
+    if(cut) setSalesSelectValue("salesCut", cut);
     if(row.rate) document.getElementById("salesRate").value = row.rate;
     if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
   });
   updateSalesOrderTotals();
+  event.target.value = "";
   showSuccessToast("Order CSV loaded");
 }
 
