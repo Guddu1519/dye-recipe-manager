@@ -210,6 +210,9 @@ th{background:#dbeafe}
 .salesBalePrintTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .salesBaleSelect{display:flex;align-items:center;gap:6px;font-weight:800}
 .salesBaleHistory{display:grid;gap:8px}.salesBaleBox{border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#f8fafc}
+.salesMobileCards{display:none}
+.salesMobileCard{border:1px solid #dbeafe;border-radius:14px;padding:12px;background:#fff;box-shadow:0 8px 18px #0f172a0c;margin-bottom:10px}
+.salesMobileCard h3{margin:0 0 8px;font-size:17px;color:#0f172a}.salesMobileCard p{margin:5px 0;color:#334155}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
 .modeSwitchBtn:hover{background:#1d4ed8}
@@ -242,6 +245,14 @@ th{background:#dbeafe}
   .salesTableWrap{border-radius:12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
   .salesTable{min-width:980px;font-size:13px}
   .salesTable th,.salesTable td{padding:8px;vertical-align:top}
+  .salesDesktopTable{display:none}
+  .salesMobileCards{display:block}
+  .salesEmptyPage{overflow-x:hidden}
+  .salesTop h1{font-size:30px;line-height:1.1}
+  .salesTop p{font-size:15px;line-height:1.35}
+  .salesCard{overflow:hidden}
+  .salesCard .muted{white-space:normal}
+  #salesOrdersTable,#salesStaffOrdersTable,#salesAgentOrdersTable{min-width:0;width:100%}
   .salesBadge{white-space:nowrap}
   .salesColorRow{grid-template-columns:1fr;gap:8px;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff}
   .salesColorRow button{width:100%}
@@ -486,7 +497,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </div>
       <div class="salesCard">
         <h2>Order History</h2>
-        <div class="salesTableWrap"><table class="salesTable" id="salesOrdersTable"></table></div>
+        <div class="salesTableWrap salesDesktopTable"><table class="salesTable" id="salesOrdersTable"></table></div>
+        <div class="salesMobileCards" id="salesOrdersMobileCards"></div>
       </div>
     </div>
 
@@ -604,7 +616,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </div>
       <div class="salesCard">
         <h2>Agent Orders</h2>
-        <div class="salesTableWrap"><table class="salesTable" id="salesAgentOrdersTable"></table></div>
+        <div class="salesTableWrap salesDesktopTable"><table class="salesTable" id="salesAgentOrdersTable"></table></div>
+        <div class="salesMobileCards" id="salesAgentOrdersMobileCards"></div>
       </div>
     </div>
 
@@ -612,11 +625,32 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <div class="salesCard">
         <h2>Team Member Order Workflow</h2>
         <p class="muted">Only orders assigned to the logged-in team member email are shown here.</p>
-        <div class="salesTableWrap"><table class="salesTable" id="salesStaffOrdersTable"></table></div>
+        <div class="salesTableWrap salesDesktopTable"><table class="salesTable" id="salesStaffOrdersTable"></table></div>
+        <div class="salesMobileCards" id="salesStaffOrdersMobileCards"></div>
       </div>
       <div class="salesCard">
         <h2>Bale Creation</h2>
         <div id="salesBaleWorkArea" class="muted">Select an assigned order to start bale creation.</div>
+      </div>
+      <div class="salesCard">
+        <h2>Temporary Packing Slip</h2>
+        <p class="muted">For quick phone printing only. This slip is not saved in cloud.</p>
+        <div class="salesGrid">
+          <input class="salesStaffTempSlipInput" id="tempSlipPartyOrder" placeholder="Party Order / Confirmation No.">
+          <input class="salesStaffTempSlipInput" id="tempSlipParty" placeholder="Party Name">
+          <input class="salesStaffTempSlipInput" id="tempSlipDate" type="date">
+          <input class="salesStaffTempSlipInput" id="tempSlipPacking" placeholder="Packing">
+          <input class="salesStaffTempSlipInput" id="tempSlipPatta" placeholder="Patta">
+          <input class="salesStaffTempSlipInput" id="tempSlipStamping" placeholder="Stamping">
+          <input class="salesStaffTempSlipInput" id="tempSlipAddress" placeholder="Address / City">
+          <input class="salesStaffTempSlipInput" id="tempSlipTransport" placeholder="Transport">
+        </div>
+        <h3>Colors</h3>
+        <div id="tempSlipColorRows" style="display:grid;gap:8px"></div>
+        <div class="salesActions">
+          <button class="salesSmallBtn gray" onclick="addTempSlipColorRow()">Add Color</button>
+          <button class="salesSmallBtn green" onclick="printTemporaryPackingSlip()">Print Temporary Slip</button>
+        </div>
       </div>
     </div>
   </div>
@@ -3158,6 +3192,29 @@ function printSelectedSalesBales(orderId){
   printSalesPackingSlips(orderId, selected);
 }
 
+async function deleteSalesBale(orderId, baleNo){
+  if(isTrialUser()) return alert("Trial login can only view. Delete is disabled.");
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete bales.");
+  let order = salesState.orders.find(o => o.id === orderId);
+  if(!order) return alert("Order not found.");
+  let index = (order.bales || []).findIndex(b => Number(b.baleNo) === Number(baleNo));
+  if(index < 0) return alert("Bale not found.");
+  if(!confirm("Delete Bale " + baleNo + " and restore its quantities to pending?")) return;
+  let bale = order.bales[index];
+  (bale.colors || []).forEach(item => {
+    let color = (order.colors || []).find(c => Number(c.colorNo) === Number(item.colorNo));
+    if(color) color.pendingQty = (Number(color.pendingQty) || 0) + (Number(item.qty) || 0);
+  });
+  order.bales.splice(index, 1);
+  order.bales.forEach((b, i) => b.baleNo = i + 1);
+  order.status = getSalesPendingQty(order) > 0 ? "In Packing" : "Packed";
+  await saveSalesState();
+  renderSalesManager(false);
+  salesSelectedOrderId = orderId;
+  renderSalesBaleWorkArea();
+  showSuccessToast("Bale deleted and quantity restored");
+}
+
 function printSalesPackingSlips(orderId, baleNo=null){
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
@@ -3220,6 +3277,83 @@ function printSalesPackingSlips(orderId, baleNo=null){
   printWindow.document.close();
 }
 
+function addTempSlipColorRow(colorNo="", qty=""){
+  let wrap = document.getElementById("tempSlipColorRows");
+  if(!wrap) return;
+  let row = document.createElement("div");
+  row.className = "salesColorRow";
+  row.innerHTML = `<input class="salesStaffTempSlipInput tempSlipColorNo" placeholder="Color No." value="${salesEscape(colorNo)}">
+    <input class="salesStaffTempSlipInput tempSlipQty" type="number" min="0" placeholder="Qty" value="${salesEscape(qty)}">
+    <button class="salesSmallBtn red" onclick="this.closest('.salesColorRow').remove()">Remove</button>`;
+  wrap.appendChild(row);
+}
+
+function getTempSlipValue(id){
+  return String(document.getElementById(id)?.value || "").trim();
+}
+
+function printTemporaryPackingSlip(){
+  let rows = Array.from(document.querySelectorAll("#tempSlipColorRows .salesColorRow")).map(row => ({
+    colorNo: String(row.querySelector(".tempSlipColorNo")?.value || "").trim(),
+    qty: Number(row.querySelector(".tempSlipQty")?.value) || 0
+  })).filter(row => row.colorNo && row.qty > 0);
+  if(!rows.length) return alert("Add at least one color and quantity.");
+  let slip = {
+    partyOrder: getTempSlipValue("tempSlipPartyOrder"),
+    party: getTempSlipValue("tempSlipParty"),
+    date: getTempSlipValue("tempSlipDate") || new Date().toISOString().slice(0,10),
+    packing: getTempSlipValue("tempSlipPacking"),
+    patta: getTempSlipValue("tempSlipPatta"),
+    stamping: getTempSlipValue("tempSlipStamping"),
+    address: getTempSlipValue("tempSlipAddress"),
+    transport: getTempSlipValue("tempSlipTransport"),
+    by: salesProfile?.fullName || getSalesUserEmail() || "Team Member"
+  };
+  let total = rows.reduce((sum,row)=>sum + row.qty,0);
+  let tableRows = rows.map(row => `<tr><td>Color ${salesEscape(row.colorNo)}</td><td>${salesEscape(row.qty)} pcs</td></tr>`).join("");
+  let makeSlip = (copyLabel) => `<section class="packingSlip">
+    <div class="slipHead"><h2>Packing Slip</h2><b>${copyLabel}</b></div>
+    <div class="slipMeta">
+      <p><b>Party Order No:</b> ${salesEscape(slip.partyOrder || "-")}</p>
+      <p><b>Party:</b> ${salesEscape(slip.party || "-")}</p>
+      <p><b>Date:</b> ${salesEscape(slip.date)}</p>
+      <p><b>Packing:</b> ${salesEscape(slip.packing || "-")}</p>
+      <p><b>Patta:</b> ${salesEscape(slip.patta || "-")}</p>
+      <p><b>Stamping:</b> ${salesEscape(slip.stamping || "-")}</p>
+      <p><b>Address:</b> ${salesEscape(slip.address || "-")}</p>
+      <p><b>Transport:</b> ${salesEscape(slip.transport || "-")}</p>
+      <p><b>By:</b> ${salesEscape(slip.by)}</p>
+    </div>
+    <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${tableRows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(total)} pcs</th></tr></tfoot></table>
+  </section>`;
+  let printWindow = window.open("", "_blank");
+  if(!printWindow) return alert("Popup blocked. Please allow popups to print packing slip.");
+  printWindow.document.write(`<!DOCTYPE html><html><head><title>Temporary Packing Slip</title>
+    <style>
+      @page{size:A5 landscape;margin:6mm}
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:8px;color:#111;background:#fff}
+      .printAction{display:block;margin:0 auto 12px;padding:12px 22px;border:0;border-radius:999px;background:#0f766e;color:white;font-weight:800;font-size:16px;box-shadow:0 10px 24px #0f766e33}
+      .balePrintPage{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+      .packingSlip{border:2px solid #111;padding:8px;height:calc(148mm - 12mm);overflow:hidden}
+      .slipHead{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #111;margin-bottom:8px;padding-bottom:5px}
+      h2{margin:0;font-size:17px}.slipMeta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 8px;font-size:11px}
+      p{margin:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left}th{background:#dbeafe}
+      @media print{.printAction{display:none!important}body{padding:0}}
+    </style>
+    <script>
+      function printPackingSlip(){
+        document.querySelectorAll('.printAction').forEach(btn=>btn.style.display='none');
+        setTimeout(function(){
+          if(window.AndroidPrinter && AndroidPrinter.printPage){ AndroidPrinter.printPage(); }
+          else { window.print(); }
+          setTimeout(function(){document.querySelectorAll('.printAction').forEach(btn=>btn.style.display='block');}, 800);
+        }, 80);
+      }
+    <\/script>
+  </head><body><button class="printAction" onclick="printPackingSlip()">Print / Save PDF</button><main class="balePrintPage">${makeSlip("Office Copy")}${makeSlip("Party Copy")}</main></body></html>`);
+  printWindow.document.close();
+}
+
 function renderSalesManager(shouldLoadLocal=true){
   if(shouldLoadLocal && !salesCloudLoaded) loadSalesState();
   salesState.orders ||= [];
@@ -3237,6 +3371,9 @@ function renderSalesManager(shouldLoadLocal=true){
   if(!activeInBaleWork) renderSalesBaleWorkArea();
   updateSalesOrderTotals();
   if(document.querySelectorAll("#salesColorRows .salesColorRow").length === 0) addSalesColorRow();
+  if(document.getElementById("tempSlipColorRows") && document.querySelectorAll("#tempSlipColorRows .salesColorRow").length === 0) addTempSlipColorRow();
+  let tempDate = document.getElementById("tempSlipDate");
+  if(tempDate && !tempDate.value) tempDate.value = new Date().toISOString().slice(0,10);
   applySalesRoleUi();
 }
 
@@ -3254,7 +3391,7 @@ function applySalesRoleUi(){
       allowed = text === "Logout" || el.closest(".salesTabs");
     }
     if(isSalesStaff()){
-      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "Create Bale" || text === "Print Packing Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Packing Slips" || el.classList.contains("salesPackQty") || el.type === "checkbox";
+      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "Print Packing Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Packing Slips" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
     }
     if(!allowed){
       el.disabled = true;
@@ -3354,6 +3491,7 @@ function renderSalesPendingSummary(){
 
 function renderSalesOrders(){
   let table = document.getElementById("salesOrdersTable");
+  let mobile = document.getElementById("salesOrdersMobileCards");
   if(!table) return;
   let orders = getVisibleSalesOrders().slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   document.getElementById("salesOrderCount").textContent = orders.length;
@@ -3379,11 +3517,24 @@ function renderSalesOrders(){
     let select = document.getElementById("assignStaff_" + o.id);
     if(select) select.value = o.assignedStaff || "";
   });
+  if(mobile){
+    mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard">
+      <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
+      <p><b>Party Order:</b> ${salesEscape(o.partyOrderNo || "-")}</p>
+      <p><b>Date:</b> ${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</p>
+      <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
+      <p><b>Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>
+      <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
+      <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></p>
+      <div class="salesActions"><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Packing Slip</button><button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button></div>
+    </div>`).join("") : `<div class="salesMobileCard muted">No orders found.</div>`;
+  }
 }
 
 function renderSalesAgentPortal(){
   let summary = document.getElementById("salesAgentSummary");
   let table = document.getElementById("salesAgentOrdersTable");
+  let mobile = document.getElementById("salesAgentOrdersMobileCards");
   if(!summary || !table) return;
   let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
   let pendingColors = orders.reduce((sum,o)=>sum + getSalesPendingQty(o),0);
@@ -3402,12 +3553,25 @@ function renderSalesAgentPortal(){
       <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
     </tr>`).join("");
+  if(mobile){
+    mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard">
+      <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
+      <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
+      <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
+      <p><b>Bales:</b> ${salesEscape(getSalesBaleStatusSummary(o))}</p>
+      <p><b>Pending Colors:</b> ${salesEscape(getSalesColorSummary(o, "pending"))}</p>
+      <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></p>
+    </div>`).join("") : `<div class="salesMobileCard muted">No orders found for this agent.</div>`;
+  }
 }
 
 function renderSalesStaffOrders(){
   let table = document.getElementById("salesStaffOrdersTable");
+  let mobile = document.getElementById("salesStaffOrdersMobileCards");
   if(!table) return;
   let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
+  let actionHtml = (o) => `${o.status === "Assigned" ? `<button class="salesSmallBtn green" onclick="acceptSalesOrder('${o.id}')">Accept Order</button>` : ""}
+          ${o.status !== "Packed" ? `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">Start Bale Creation</button>` : `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">View / Print Bales</button>`}`;
   table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th><th>Assigned To</th><th>Order Details</th><th>Qty</th><th>Sent</th><th>Pending</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo || "")}</span></td>
@@ -3417,9 +3581,21 @@ function renderSalesStaffOrders(){
       <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
-      <td>${o.status === "Assigned" ? `<button class="salesSmallBtn green" onclick="acceptSalesOrder('${o.id}')">Accept Order</button>` : ""}
-          ${o.status !== "Packed" ? `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">Start Bale Creation</button>` : "Order ready for dispatch"}</td>
+      <td>${actionHtml(o)}</td>
     </tr>`).join("");
+  if(mobile){
+    mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard">
+      <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
+      <p><b>Party Order:</b> ${salesEscape(o.partyOrderNo || "-")}</p>
+      <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
+      <p><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>
+      <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</p>
+      <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</p>
+      <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
+      <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></p>
+      <div class="salesActions">${actionHtml(o)}</div>
+    </div>`).join("") : `<div class="salesMobileCard muted">No assigned orders.</div>`;
+  }
 }
 
 function renderSalesBaleWorkArea(){
@@ -3440,7 +3616,7 @@ function renderSalesBaleWorkArea(){
     </div>
     <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Enter qty" oninput="markSalesCustomQty(this)">
   </div>`).join("");
-  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button></div>`).join("");
+  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button>${isSalesAdmin() ? ` <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button>` : ""}</div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
     <p><b>Assigned Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}</p>
     <div class="salesPackTools">
