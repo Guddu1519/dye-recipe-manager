@@ -274,7 +274,7 @@ th{background:#dbeafe}
   .salesColorRow{grid-template-columns:1fr;gap:8px;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff}
   .salesColorRow button{width:100%}
   .salesPackTools{align-items:stretch;border-radius:14px}
-  .salesPackTools.sticky{position:sticky;top:8px;z-index:80}
+  .salesPackTools.sticky{position:relative;top:auto;z-index:80}
   .salesPackTools>div{width:100%}
   .salesPackTools .salesSmallBtn{width:100%;font-size:16px}
   .salesPackGrid{grid-template-columns:1fr;gap:10px}
@@ -3925,7 +3925,14 @@ function renderSalesBaleWorkArea(){
   setTimeout(updateSalesPackStickyFallback, 0);
 }
 
+let salesPackStickyFrame = null;
 function updateSalesPackStickyFallback(){
+  if(salesPackStickyFrame) return;
+  salesPackStickyFrame = requestAnimationFrame(applySalesPackStickyFallback);
+}
+
+function applySalesPackStickyFallback(){
+  salesPackStickyFrame = null;
   let bar = document.querySelector("#salesBaleWorkArea .salesPackTools.sticky");
   let spacer = document.querySelector("#salesBaleWorkArea .salesPackStickySpacer");
   let grid = document.getElementById("salesPendingPackRows");
@@ -3950,9 +3957,15 @@ function updateSalesPackStickyFallback(){
     spacer.style.height = "0px";
     return;
   }
-  let markerRect = spacer.getBoundingClientRect();
+  if(!bar.dataset.triggerTop || !bar.classList.contains("mobileFixed")){
+    bar.dataset.triggerTop = String(window.scrollY + spacer.getBoundingClientRect().top);
+  }
+  let triggerTop = Number(bar.dataset.triggerTop) || 0;
   let gridRect = grid.getBoundingClientRect();
-  let shouldFix = markerRect.top <= 8 && gridRect.bottom > (bar.offsetHeight + 14);
+  let isFixed = bar.classList.contains("mobileFixed");
+  let passedTop = isFixed ? window.scrollY + 18 >= triggerTop : window.scrollY + 8 >= triggerTop;
+  let stillInBaleArea = gridRect.bottom > (bar.offsetHeight + 18);
+  let shouldFix = passedTop && stillInBaleArea;
   if(shouldFix){
     spacer.style.height = bar.offsetHeight + "px";
     spacer.classList.add("active");
@@ -3962,6 +3975,7 @@ function updateSalesPackStickyFallback(){
     bar.classList.add("mobileFixed");
   }else{
     bar.classList.remove("mobileFixed");
+    if(window.scrollY + 8 < triggerTop) bar.dataset.triggerTop = "";
     bar.style.left = "";
     bar.style.width = "";
     spacer.classList.remove("active");
