@@ -522,6 +522,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </div>
       <div class="salesCard">
         <h2>Order History</h2>
+        <input id="salesOrderSearch" placeholder="Search order no, party, agent, GST, packing, patta, transport, status..." oninput="renderSalesOrders()">
         <div class="salesTableWrap salesDesktopTable" style="display:none"><table class="salesTable" id="salesOrdersTable"></table></div>
         <div class="salesOrderHistoryCards" id="salesOrdersMobileCards"></div>
       </div>
@@ -3632,7 +3633,33 @@ function renderSalesOrders(){
   let table = document.getElementById("salesOrdersTable");
   let mobile = document.getElementById("salesOrdersMobileCards");
   if(!table) return;
-  let orders = getVisibleSalesOrders().slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+  let search = normalizeName(document.getElementById("salesOrderSearch")?.value || "");
+  let orders = getVisibleSalesOrders().filter(o => {
+    if(!search) return true;
+    let searchable = [
+      o.mtmOrderNo,
+      o.partyOrderNo,
+      o.orderDate,
+      formatSalesDate(o.orderDate || o.createdAt),
+      o.partyName,
+      o.gstNo,
+      o.agentName,
+      o.agentEmail,
+      o.partyAddress,
+      getSalesOrderPacking(o),
+      getSalesOrderPatta(o),
+      getSalesOrderStamping(o),
+      getSalesOrderTransport(o),
+      o.cut,
+      o.quality,
+      o.status,
+      getSalesAssignedTeamMemberName(o),
+      o.totalQty,
+      o.qtyPerBale,
+      calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)
+    ].join(" ");
+    return normalizeName(searchable).includes(search);
+  }).slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   document.getElementById("salesOrderCount").textContent = orders.length;
   document.getElementById("salesOverviewQty").textContent = orders.reduce((sum,o)=>sum + (Number(o.totalQty)||0),0);
   document.getElementById("salesPackedCount").textContent = orders.filter(o=>o.status === "Packed").length;
