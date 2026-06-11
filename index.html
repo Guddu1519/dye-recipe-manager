@@ -277,7 +277,8 @@ th{background:#dbeafe}
   .salesColorRow{grid-template-columns:1fr;gap:8px;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff}
   .salesColorRow button{width:100%}
   .salesPackTools{align-items:stretch;border-radius:14px}
-  .salesPackTools.sticky{position:relative;top:auto;z-index:80}
+  #salesBaleWorkArea .salesPackTools.sticky{position:fixed!important;left:10px!important;right:10px!important;bottom:10px!important;top:auto!important;z-index:50000!important;margin:0!important;box-shadow:0 18px 45px rgba(15,23,42,.28)}
+  #salesBaleWorkArea .salesPackStickySpacer{display:block;height:120px}
   .salesPackTools>div{width:100%}
   .salesPackTools .salesSmallBtn{width:100%;font-size:16px}
   .salesPackGrid{grid-template-columns:1fr;gap:10px}
@@ -3995,26 +3996,12 @@ function applySalesPackStickyFallback(){
     spacer.style.height = "0px";
     return;
   }
-  let spacerRect = spacer.getBoundingClientRect();
-  let gridRect = grid.getBoundingClientRect();
-  let isFixed = bar.classList.contains("mobileFixed");
-  let passedTop = isFixed ? spacerRect.top < 26 : spacerRect.top < -24;
-  let stillInBaleArea = gridRect.bottom > (bar.offsetHeight + 18);
-  let shouldFix = passedTop && stillInBaleArea;
-  if(shouldFix){
-    spacer.style.height = bar.offsetHeight + "px";
-    spacer.classList.add("active");
-    let widthRect = spacer.getBoundingClientRect();
-    bar.style.left = Math.max(8, widthRect.left) + "px";
-    bar.style.width = Math.min(widthRect.width, window.innerWidth - 16) + "px";
-    bar.classList.add("mobileFixed");
-  }else{
-    bar.classList.remove("mobileFixed");
-    bar.style.left = "";
-    bar.style.width = "";
-    spacer.classList.remove("active");
-    spacer.style.height = "0px";
-  }
+  bar.classList.remove("mobileFixed");
+  bar.style.left = "";
+  bar.style.width = "";
+  spacer.classList.remove("active");
+  spacer.style.height = "";
+  return;
 }
 
 window.addEventListener("scroll", updateSalesPackStickyFallback, {passive:true});
