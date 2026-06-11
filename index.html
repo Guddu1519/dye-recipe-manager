@@ -200,10 +200,13 @@ th{background:#dbeafe}
 .salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
 .salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:12px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(135deg,#eff6ff,#fff);box-shadow:0 10px 24px #0f172a0d}
 .salesPackTools.sticky{position:sticky;top:8px;z-index:20}
+.salesPackTools.mobileFixed{position:fixed!important;top:8px!important;margin:0!important;z-index:50000!important}
+.salesPackStickySpacer{display:none;height:0}
+.salesPackStickySpacer.active{display:block}
 .salesBaleTotal{font-size:26px;font-weight:900;color:#1d4ed8}
 .salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:12px;margin-top:10px}
-.salesPackRow{display:grid;grid-template-columns:78px 1fr;grid-template-areas:"meta meta" "color controls" "qty qty";gap:10px;align-items:center;border:1px solid #bfdbfe;border-radius:16px;padding:12px;background:linear-gradient(135deg,#ffffff,#f8fbff);box-shadow:0 10px 24px #0f172a10}
-.salesPackColorNo{grid-area:color;font-size:clamp(22px,4vw,38px);font-weight:900;color:#1d4ed8;text-align:left;border-right:1px solid #dbeafe;padding-right:10px;line-height:.98;min-width:0;overflow-wrap:anywhere;word-break:break-word}
+.salesPackRow{display:grid;grid-template-columns:1fr;grid-template-areas:"meta" "color" "controls" "qty";gap:10px;align-items:center;border:1px solid #bfdbfe;border-radius:16px;padding:12px;background:linear-gradient(135deg,#ffffff,#f8fbff);box-shadow:0 10px 24px #0f172a10}
+.salesPackColorNo{grid-area:color;font-size:clamp(24px,4vw,34px);font-weight:900;color:#1d4ed8;text-align:left;border-bottom:1px solid #dbeafe;padding:0 0 8px;line-height:1.04;min-width:0;overflow-wrap:anywhere;word-break:break-word}
 .salesPackMeta{font-size:15px;color:#334155;line-height:1.35}.salesPackMeta b{color:#0f172a}
 .salesPackMeta{grid-area:meta;white-space:nowrap}.salesPackControl{grid-area:controls;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}
 .salesPackChoice{border:1px solid #dbeafe;border-radius:12px;padding:9px 10px;background:#fff;font-weight:900;display:flex;align-items:center;gap:8px;cursor:pointer;color:#334155}
@@ -3915,9 +3918,57 @@ function renderSalesBaleWorkArea(){
       <div><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}<br><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</div>
       <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Cut:</b> ${salesEscape(order.cut || "-")}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
     </div>
-    ${isSalesOrderLocked(order) ? '<p><span class="salesBadge red">Manually paid by admin. Order is locked.</span></p>' : order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackTools sticky"><div><b>Qty Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div><div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>`}
+    ${isSalesOrderLocked(order) ? '<p><span class="salesBadge red">Manually paid by admin. Order is locked.</span></p>' : order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackStickySpacer"></div><div class="salesPackTools sticky"><div><b>Qty Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div><div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>`}
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<div class="salesBalePrintTools"><button class="salesSmallBtn" onclick="printSelectedSalesBales('${order.id}')">Print Selected Bales</button><button class="salesSmallBtn gray" onclick="printSalesPackingSlips('${order.id}')">Print All Assortment Slips</button></div>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
+  setTimeout(updateSalesPackStickyFallback, 0);
 }
+
+function updateSalesPackStickyFallback(){
+  let bar = document.querySelector("#salesBaleWorkArea .salesPackTools.sticky");
+  let spacer = document.querySelector("#salesBaleWorkArea .salesPackStickySpacer");
+  let grid = document.getElementById("salesPendingPackRows");
+  if(!bar || !spacer || !grid){
+    document.querySelectorAll(".salesPackTools.mobileFixed").forEach(el => {
+      el.classList.remove("mobileFixed");
+      el.style.left = "";
+      el.style.width = "";
+    });
+    document.querySelectorAll(".salesPackStickySpacer.active").forEach(el => {
+      el.classList.remove("active");
+      el.style.height = "0px";
+    });
+    return;
+  }
+  let isSmall = window.matchMedia("(max-width: 900px)").matches;
+  if(!isSmall){
+    bar.classList.remove("mobileFixed");
+    bar.style.left = "";
+    bar.style.width = "";
+    spacer.classList.remove("active");
+    spacer.style.height = "0px";
+    return;
+  }
+  let markerRect = spacer.getBoundingClientRect();
+  let gridRect = grid.getBoundingClientRect();
+  let shouldFix = markerRect.top <= 8 && gridRect.bottom > (bar.offsetHeight + 14);
+  if(shouldFix){
+    spacer.style.height = bar.offsetHeight + "px";
+    spacer.classList.add("active");
+    let widthRect = spacer.getBoundingClientRect();
+    bar.style.left = Math.max(8, widthRect.left) + "px";
+    bar.style.width = Math.min(widthRect.width, window.innerWidth - 16) + "px";
+    bar.classList.add("mobileFixed");
+  }else{
+    bar.classList.remove("mobileFixed");
+    bar.style.left = "";
+    bar.style.width = "";
+    spacer.classList.remove("active");
+    spacer.style.height = "0px";
+  }
+}
+
+window.addEventListener("scroll", updateSalesPackStickyFallback, {passive:true});
+window.addEventListener("resize", updateSalesPackStickyFallback);
 
 async function importSalesPartyCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
