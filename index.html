@@ -217,8 +217,9 @@ th{background:#dbeafe}
 .salesMobileCard h3{margin:0 0 8px;font-size:17px;color:#0f172a}.salesMobileCard p{margin:5px 0;color:#334155}
 .salesOrderHistoryCards{display:grid!important;gap:12px}
 .salesOrderCard{border:1px solid #dbeafe;border-radius:14px;background:#fff;padding:13px;box-shadow:0 8px 18px #0f172a0c;overflow:hidden}
-.salesOrderLine{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:5px 0;color:#334155;line-height:1.35}
-.salesOrderLine b{color:#0f172a}.salesOrderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.salesOrderLine{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:7px 14px;align-items:start;margin:5px 0;color:#334155;line-height:1.35;max-width:100%}
+.salesOrderLine span{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal}
+.salesOrderLine b{color:#0f172a;white-space:nowrap}.salesOrderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px 14px;margin-top:8px;align-items:start}
 .salesOrderDetails span{min-width:0;overflow-wrap:anywhere;word-break:normal}
 .salesOrderDetails b{white-space:nowrap}
