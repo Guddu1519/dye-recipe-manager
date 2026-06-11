@@ -293,9 +293,11 @@ th{background:#dbeafe}
   .salesEmptyPage{padding-left:8px;padding-right:8px}
   .salesTabs{grid-template-columns:1fr}
   .salesTop .salesActions{grid-template-columns:1fr}
-  .salesPackRow{grid-template-columns:58px 1fr}
-  .salesPackColorNo{font-size:30px}
-  .salesPackControl{grid-template-columns:1fr}
+  .salesPackRow{grid-template-columns:1fr;grid-template-areas:"meta" "color" "controls" "qty"}
+  .salesPackColorNo{font-size:clamp(22px,8vw,30px);width:100%;max-width:100%}
+  .salesPackControl{grid-template-columns:1fr 1fr;width:100%}
+  .salesPackChoice{min-width:0}
+  .salesPackRow input[type="number"]{width:100%}
 }
 .auth-page{min-height:100vh;display:none;align-items:center;justify-content:center;padding:20px;background:linear-gradient(135deg,#e0f2fe,#f8fafc)}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
