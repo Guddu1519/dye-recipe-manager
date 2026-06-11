@@ -194,6 +194,7 @@ th{background:#dbeafe}
 .salesSmallBtn.gray{background:#64748b}.salesSmallBtn.green{background:#16a34a}.salesSmallBtn.red{background:#dc2626}
 .salesTableWrap{overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:white}
 .salesTable{min-width:760px}.salesTable th{position:sticky;top:0;z-index:1}
+.salesSmallBtn,.salesBadge{white-space:nowrap}
 .salesBadge{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px;background:#dbeafe;color:#1e3a8a}
 .salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
 .salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
@@ -214,6 +215,13 @@ th{background:#dbeafe}
 .salesMobileCards{display:none}
 .salesMobileCard{border:1px solid #dbeafe;border-radius:14px;padding:12px;background:#fff;box-shadow:0 8px 18px #0f172a0c;margin-bottom:10px}
 .salesMobileCard h3{margin:0 0 8px;font-size:17px;color:#0f172a}.salesMobileCard p{margin:5px 0;color:#334155}
+.salesOrderHistoryCards{display:grid!important;gap:12px}
+.salesOrderCard{border:1px solid #dbeafe;border-radius:14px;background:#fff;padding:13px;box-shadow:0 8px 18px #0f172a0c;overflow:hidden}
+.salesOrderLine{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:5px 0;color:#334155;line-height:1.35}
+.salesOrderLine b{color:#0f172a}.salesOrderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px 12px;margin-top:8px}
+.salesOrderDetails span{white-space:nowrap}
+.salesNoWrap{white-space:nowrap}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
 .modeSwitchBtn:hover{background:#1d4ed8}
@@ -512,8 +520,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </div>
       <div class="salesCard">
         <h2>Order History</h2>
-        <div class="salesTableWrap salesDesktopTable"><table class="salesTable" id="salesOrdersTable"></table></div>
-        <div class="salesMobileCards" id="salesOrdersMobileCards"></div>
+        <div class="salesTableWrap salesDesktopTable" style="display:none"><table class="salesTable" id="salesOrdersTable"></table></div>
+        <div class="salesOrderHistoryCards" id="salesOrdersMobileCards"></div>
       </div>
     </div>
 
@@ -2542,7 +2550,7 @@ function updateSalesOrderTotals(){
   let total = 0;
   document.querySelectorAll("#salesColorRows .salesColorQty").forEach(input => total += Number(input.value) || 0);
   let baleSize = Number(document.getElementById("salesQtyPerBale")?.value) || 0;
-  let expected = baleSize > 0 ? Math.ceil(total / baleSize) : 0;
+  let expected = calculateSalesExpectedBales(total, baleSize);
   let totalEl = document.getElementById("salesTotalQty");
   let expectedEl = document.getElementById("salesExpectedBales");
   if(totalEl) totalEl.textContent = total;
@@ -2896,7 +2904,7 @@ async function saveSalesOrder(){
       assignmentStatus: "Not Assigned Yet",
       colors: colorsList,
       totalQty,
-      expectedBales: Math.ceil(totalQty / qtyPerBale),
+      expectedBales: calculateSalesExpectedBales(totalQty, qtyPerBale),
       status: "Not Assigned Yet",
       bales: [],
       createdBy: getSalesUserEmail(),
@@ -3011,6 +3019,21 @@ function getSalesSentQty(order){
 
 function getSalesPendingQty(order){
   return (order.colors || []).reduce((sum, c) => sum + (Number(c.pendingQty) || 0), 0);
+}
+
+function calculateSalesExpectedBales(totalQty, baleSize){
+  totalQty = Number(totalQty) || 0;
+  baleSize = Number(baleSize) || 0;
+  if(totalQty <= 0 || baleSize <= 0) return 0;
+  return Math.max(1, Math.round(totalQty / baleSize));
+}
+
+function formatSalesDate(value){
+  let raw = String(value || "").slice(0,10);
+  if(!raw) return "-";
+  let parts = raw.split("-");
+  if(parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return raw;
 }
 
 function getSalesColorSummary(order, mode){
@@ -3623,7 +3646,7 @@ function renderSalesOrders(){
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}<br><b>Cut:</b> ${salesEscape(o.cut || "-")}</td>
       <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
-      <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${o.expectedBales}</td>
+      <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button> <button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button> <button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
@@ -3632,16 +3655,23 @@ function renderSalesOrders(){
     if(select) select.value = o.assignedStaff || "";
   });
   if(mobile){
-    mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard">
-      <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
-      <p><b>Party Order:</b> ${salesEscape(o.partyOrderNo || "-")}</p>
-      <p><b>Date:</b> ${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</p>
-      <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
-      <p><b>Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>
-      <p><b>Cut:</b> ${salesEscape(o.cut || "-")}</p>
-      <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
-      <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span> ${isSalesOrderLocked(o) ? '<span class="salesBadge red">Manually paid by admin</span>' : ""}</p>
-      <div class="salesActions"><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button><button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button><button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button><button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button></div>
+    mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesOrderCard">
+      <div class="salesOrderLine"><span><b>MTM Order No:</b> ${salesEscape(o.mtmOrderNo)}</span><span><b>Date:</b> ${salesEscape(formatSalesDate(o.orderDate || o.createdAt))}</span></div>
+      <div class="salesOrderLine"><span><b>Party Name:</b> ${salesEscape(o.partyName || "-")}</span><span><b>GST No:</b> ${salesEscape(o.gstNo || "-")}</span><span><b>Agent:</b> ${salesEscape(o.agentName || "-")}</span></div>
+      <div class="salesOrderLine"><span><b>Order Details:</b> ${salesEscape(o.partyOrderNo || "-")}${o.cut ? " | Cut: " + salesEscape(o.cut) : ""}</span></div>
+      <div class="salesOrderLine"><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span></div>
+      <div class="salesOrderLine"><span><b>Patta No:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
+      <div class="salesOrderDetails">
+        <span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span>
+        <span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span>
+        <span><b>Team Member Status:</b> <span class="salesNoWrap">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span>
+        <span><b>Total Qty:</b> ${salesEscape(o.totalQty)}</span>
+        <span><b>Bale Size:</b> ${salesEscape(o.qtyPerBale)}</span>
+        <span><b>Expected Bales:</b> ${salesEscape(calculateSalesExpectedBales(o.totalQty, o.qtyPerBale))}</span>
+        <span><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></span>
+      </div>
+      ${isSalesOrderLocked(o) ? '<div class="salesOrderLine"><span class="salesBadge red">Manually paid by admin</span></div>' : ""}
+      <div class="salesOrderActions"><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button><button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button><button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button><button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button><button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button><button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></div>
     </div>`).join("") : `<div class="salesMobileCard muted">No orders found.</div>`;
   }
 }
