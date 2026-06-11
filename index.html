@@ -219,8 +219,9 @@ th{background:#dbeafe}
 .salesOrderCard{border:1px solid #dbeafe;border-radius:14px;background:#fff;padding:13px;box-shadow:0 8px 18px #0f172a0c;overflow:hidden}
 .salesOrderLine{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:5px 0;color:#334155;line-height:1.35}
 .salesOrderLine b{color:#0f172a}.salesOrderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-.salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:6px 12px;margin-top:8px}
-.salesOrderDetails span{white-space:nowrap}
+.salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px 14px;margin-top:8px;align-items:start}
+.salesOrderDetails span{min-width:0;overflow-wrap:anywhere;word-break:normal}
+.salesOrderDetails b{white-space:nowrap}
 .salesNoWrap{white-space:nowrap}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
@@ -3661,10 +3662,10 @@ function renderSalesOrders(){
       <div class="salesOrderLine"><span><b>Order Details:</b> ${salesEscape(o.partyOrderNo || "-")}${o.cut ? " | Cut: " + salesEscape(o.cut) : ""}</span></div>
       <div class="salesOrderLine"><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span></div>
       <div class="salesOrderLine"><span><b>Patta No:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
+      <div class="salesOrderLine"><span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span></div>
+      <div class="salesOrderLine"><span><b>Team Member Status:</b> <span class="salesNoWrap">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
       <div class="salesOrderDetails">
         <span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span>
-        <span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span>
-        <span><b>Team Member Status:</b> <span class="salesNoWrap">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span>
         <span><b>Total Qty:</b> ${salesEscape(o.totalQty)}</span>
         <span><b>Bale Size:</b> ${salesEscape(o.qtyPerBale)}</span>
         <span><b>Expected Bales:</b> ${salesEscape(calculateSalesExpectedBales(o.totalQty, o.qtyPerBale))}</span>
