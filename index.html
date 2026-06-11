@@ -3748,13 +3748,13 @@ function renderSalesOrders(){
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
   if(staffCount) staffCount.textContent = salesState.staffs.length || salesProfiles.filter(p => p.role === "staff").length;
-  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Order Details</th><th>Team Member Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Order Details</th><th>Assigned To</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td><span class="salesHighlightField">${salesEscape(o.partyName)}</span></td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
-      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
+      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to : " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button> <button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button> <button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
@@ -3767,7 +3767,7 @@ function renderSalesOrders(){
       <div class="salesOrderLine"><span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span><span><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
       <div class="salesOrderLine"><span><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></span><span><b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span></span></div>
       <div class="salesOrderLine"><span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span></div>
-      <div class="salesOrderLine"><span><b>Team Member Status:</b> <span class="salesHighlightField">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
+      <div class="salesOrderLine"><span><b>Assigned to :</b> <span class="salesHighlightField">${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
       <div class="salesOrderDetails">
         <span><b>Total Qty:</b> ${salesEscape(o.totalQty)}</span>
         <span><b>Bale Size:</b> ${salesEscape(o.qtyPerBale)}</span>
