@@ -2213,6 +2213,42 @@ function normalizeSalesRole(role){
   return ["admin","agent","staff"].includes(role) ? role : "staff";
 }
 
+function normalizeSalesTeamMemberName(name){
+  let clean = String(name || "").trim();
+  return ["NAEIM KHAN","NAEEM KHAN"].includes(clean.toUpperCase()) ? "N.K" : clean;
+}
+
+function normalizeSalesTeamMemberNamesInState(){
+  let changed = false;
+  (salesProfiles || []).forEach(profile => {
+    let next = normalizeSalesTeamMemberName(profile.full_name || profile.fullName);
+    if(next && profile.full_name && next !== profile.full_name) profile.full_name = next;
+    if(next && profile.fullName && next !== profile.fullName) profile.fullName = next;
+  });
+  (salesState.staffs || []).forEach(staff => {
+    let next = normalizeSalesTeamMemberName(staff.name);
+    if(next && next !== staff.name){
+      staff.name = next;
+      changed = true;
+    }
+  });
+  (salesState.orders || []).forEach(order => {
+    let nextAssigned = normalizeSalesTeamMemberName(order.assignedStaffName);
+    if(nextAssigned && nextAssigned !== order.assignedStaffName){
+      order.assignedStaffName = nextAssigned;
+      changed = true;
+    }
+    (order.bales || []).forEach(bale => {
+      let nextStaff = normalizeSalesTeamMemberName(bale.staff);
+      if(nextStaff && nextStaff !== bale.staff){
+        bale.staff = nextStaff;
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+
 async function resolveSalesLoginIdentifier(loginValue){
   let raw = String(loginValue || "").trim();
   if(!raw || raw.includes("@") || !supabaseClient) return raw;
@@ -2257,7 +2293,7 @@ async function loadSalesUserRole(){
         id: data.id,
         username: data.username || "",
         role: normalizeSalesRole(data.role),
-        fullName: data.full_name || "",
+        fullName: normalizeSalesTeamMemberName(data.full_name || ""),
         loginEmail: data.login_email || currentUser.email || ""
       };
       currentRole = salesProfile.role;
@@ -2321,6 +2357,7 @@ async function loadSalesCloudState(options={}){
       salesState.agents ||= [];
       salesState.staffs ||= [];
       salesState.orders.forEach(normalizeSalesOrderDetailFields);
+      normalizeSalesTeamMemberNamesInState();
       localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
     }
     salesCloudLoaded = true;
@@ -2362,6 +2399,7 @@ async function saveSalesState(){
   }
   salesState.orders ||= [];
   salesState.orders.forEach(normalizeSalesOrderDetailFields);
+  normalizeSalesTeamMemberNamesInState();
   let { data, error } = await supabaseClient.from("sales_state").upsert({
     id: "main",
     data: salesState,
