@@ -220,6 +220,7 @@ th{background:#dbeafe}
 .salesOrderLine{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:7px 14px;align-items:start;margin:5px 0;color:#334155;line-height:1.35;max-width:100%}
 .salesOrderLine span{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal}
 .salesOrderLine b{color:#0f172a;white-space:nowrap}.salesOrderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.salesHighlightField{display:inline-block;border-radius:999px;background:#e0f2fe;color:#075985;border:1px solid #7dd3fc;padding:4px 9px;font-weight:900;white-space:nowrap}
 .salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px 14px;margin-top:8px;align-items:start}
 .salesOrderDetails span{min-width:0;overflow-wrap:anywhere;word-break:normal}
 .salesOrderDetails b{white-space:nowrap}
@@ -504,7 +505,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           </div>
           <p><b>Total Order Qty:</b> <span id="salesTotalQty">0</span> | <b>Expected Bales:</b> <span id="salesExpectedBales">0</span></p>
           <div class="salesActions">
-            <button class="salesSmallBtn green" onclick="saveSalesOrder()">Save Order</button>
+            <button id="salesOrderSaveBtn" class="salesSmallBtn green" onclick="saveSalesOrder()">Save Order</button>
             <input id="salesOrderCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesOrderCsv(event)">
             <button class="salesSmallBtn gray" onclick="document.getElementById('salesOrderCsvFile').click()">Import Order CSV</button>
             <button class="salesSmallBtn gray" onclick="downloadSalesOrderSample()">Sample Order CSV</button>
@@ -2171,6 +2172,7 @@ let editingSalesPartyId = null;
 let editingSalesAgentId = null;
 let editingSalesMiscId = null;
 let editingSalesStaffId = null;
+let editingSalesOrderId = null;
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -2452,6 +2454,7 @@ function resetSalesScreenState(){
   editingSalesAgentId = null;
   editingSalesStaffId = null;
   editingSalesMiscId = null;
+  editingSalesOrderId = null;
   salesSelectedOrderId = null;
   clearSalesOrderForm();
   clearSalesPartyForm();
@@ -2758,7 +2761,7 @@ async function assignSalesOrderToStaff(orderId){
     order.assignedStaff = "";
     order.assignedStaffName = "";
     order.assignmentStatus = "Not Assigned Yet";
-    if(order.status === "Assigned" || order.status === "Accepted") order.status = "Not Assigned Yet";
+    if(order.status !== "Packed" && order.status !== "Cancelled") order.status = "Not Assigned Yet";
     await saveSalesState();
     renderSalesManager();
     showSuccessToast("Order moved to Not Assigned Yet");
@@ -2917,8 +2920,8 @@ async function saveSalesOrder(){
     if(!(qtyPerBale > 0)) throw new Error("Qty Per Bale must be greater than 0.");
     if(colorsList.length === 0) throw new Error("Add at least one color row.");
 
-    let order = {
-      id: Date.now().toString(),
+    let existing = editingSalesOrderId ? salesState.orders.find(o => o.id === editingSalesOrderId) : null;
+    let orderData = {
       mtmOrderNo: document.getElementById("salesMtmOrderNo").value.trim(),
       partyOrderNo: document.getElementById("salesPartyOrderNo").value.trim(),
       orderDate: document.getElementById("salesOrderDate")?.value || new Date().toISOString().slice(0,10),
@@ -2939,28 +2942,50 @@ async function saveSalesOrder(){
       cut: document.getElementById("salesCut")?.value.trim() || "",
       rate: Number(document.getElementById("salesRate").value) || 0,
       qtyPerBale,
-      assignedStaff: "",
-      assignedStaffName: "",
-      assignmentStatus: "Not Assigned Yet",
-      colors: colorsList,
+      colors: existing ? rebuildSalesEditedOrderColors(existing, colorsList) : colorsList,
       totalQty,
       expectedBales: calculateSalesExpectedBales(totalQty, qtyPerBale),
-      status: "Not Assigned Yet",
-      bales: [],
-      createdBy: getSalesUserEmail(),
-      createdAt: new Date().toISOString()
+      updatedBy: getSalesUserEmail(),
+      updatedAt: new Date().toISOString()
     };
-    salesState.orders.push(order);
+    if(existing){
+      Object.assign(existing, orderData);
+    }else{
+      salesState.orders.push({
+        id: Date.now().toString(),
+        ...orderData,
+        assignedStaff: "",
+        assignedStaffName: "",
+        assignmentStatus: "Not Assigned Yet",
+        status: "Not Assigned Yet",
+        bales: [],
+        createdBy: getSalesUserEmail(),
+        createdAt: new Date().toISOString()
+      });
+    }
     await saveSalesState();
     clearSalesOrderForm();
     renderSalesManager();
-    showSuccessToast("Sales order created");
+    showSuccessToast(existing ? "Sales order updated" : "Sales order created");
   }catch(err){
     alert(err.message || err);
   }
 }
 
+function rebuildSalesEditedOrderColors(order, colorsList){
+  let packedMap = {};
+  (order.bales || []).forEach(bale => (bale.items || []).forEach(item => {
+    let key = normalizeName(item.colorNo);
+    packedMap[key] = (packedMap[key] || 0) + (Number(item.qty) || 0);
+  }));
+  return colorsList.map(row => {
+    let packed = packedMap[normalizeName(row.colorNo)] || 0;
+    return {...row, pendingQty: row.qty - packed};
+  });
+}
+
 function clearSalesOrderForm(){
+  editingSalesOrderId = null;
   ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesAgentEmail","salesPartyAddress","salesQuality","salesCut","salesRate","salesQtyPerBale"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
@@ -2974,6 +2999,8 @@ function clearSalesOrderForm(){
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
+  let btn = document.getElementById("salesOrderSaveBtn");
+  if(btn) btn.textContent = "Save Order";
 }
 
 async function cancelSalesOrder(id){
@@ -3001,28 +3028,33 @@ async function quickUpdateSalesOrderDetails(orderId){
   if(!isSalesAdmin()) return alert("Only Sales Admin can update order details.");
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
-  let packing = prompt("Packing", getSalesOrderPacking(order) === "-" ? "" : getSalesOrderPacking(order));
-  if(packing === null) return;
-  let patta = prompt("Patta", getSalesOrderPatta(order) === "-" ? "" : getSalesOrderPatta(order));
-  if(patta === null) return;
-  let stamping = prompt("Stamping", getSalesOrderStamping(order) === "-" ? "" : getSalesOrderStamping(order));
-  if(stamping === null) return;
-  let transport = prompt("Transport", getSalesOrderTransport(order) === "-" ? "" : getSalesOrderTransport(order));
-  if(transport === null) return;
-  order.packing = String(packing || "").trim();
-  order.packingName = order.packing;
-  order.patta = String(patta || "").trim();
-  order.pattaName = order.patta;
-  order.stamping = String(stamping || "").trim();
-  order.stampingName = order.stamping;
-  order.transport = String(transport || "").trim();
-  order.transportName = order.transport;
-  if(!order.packing || !order.patta || !order.stamping || !order.transport){
-    return alert("Packing, Patta, Stamping, and Transport are required.");
-  }
-  await saveSalesState();
-  renderSalesManager();
-  showSuccessToast("Order details updated");
+  showSalesTab("orders", false);
+  editingSalesOrderId = orderId;
+  document.getElementById("salesMtmOrderNo").value = order.mtmOrderNo || "";
+  document.getElementById("salesPartyOrderNo").value = order.partyOrderNo || "";
+  document.getElementById("salesOrderDate").value = order.orderDate || "";
+  setSalesSelectValue("salesPartyName", order.partyName || "");
+  document.getElementById("salesGstNo").value = order.gstNo || "";
+  document.getElementById("salesAgentName").value = order.agentName || "";
+  document.getElementById("salesAgentEmail").value = order.agentEmail || "";
+  document.getElementById("salesPartyAddress").value = order.partyAddress || "";
+  setSalesSelectValue("salesTransport", getSalesOrderTransport(order) === "-" ? "" : getSalesOrderTransport(order));
+  setSalesSelectValue("salesPacking", getSalesOrderPacking(order) === "-" ? "" : getSalesOrderPacking(order));
+  setSalesSelectValue("salesPatta", getSalesOrderPatta(order) === "-" ? "" : getSalesOrderPatta(order));
+  setSalesSelectValue("salesStamping", getSalesOrderStamping(order) === "-" ? "" : getSalesOrderStamping(order));
+  setSalesSelectValue("salesQuality", order.quality || "");
+  setSalesSelectValue("salesCut", order.cut || "");
+  document.getElementById("salesRate").value = order.rate || "";
+  document.getElementById("salesQtyPerBale").value = order.qtyPerBale || "";
+  let rows = document.getElementById("salesColorRows");
+  if(rows) rows.innerHTML = "";
+  (order.colors || []).forEach(color => addSalesColorRow(color.colorNo, color.qty));
+  updateSalesOrderTotals();
+  let btn = document.getElementById("salesOrderSaveBtn");
+  if(btn) btn.textContent = "Update Order";
+  document.getElementById("salesPanelOrders")?.scrollIntoView({behavior:"smooth", block:"start"});
+  setTimeout(() => document.getElementById("salesMtmOrderNo")?.focus(), 150);
+  showSuccessToast("Order loaded for editing");
 }
 
 function getVisibleSalesOrders(){
@@ -3239,7 +3271,10 @@ function setSalesSelectValue(id, value){
   let el = document.getElementById(id);
   if(!el) return;
   value = String(value || "").trim();
-  if(!value) return;
+  if(!value){
+    el.value = "";
+    return;
+  }
   if(!Array.from(el.options).some(option => option.value === value)){
     el.insertAdjacentHTML("beforeend", `<option value="${salesEscape(value)}">${salesEscape(value)}</option>`);
   }
@@ -3717,8 +3752,8 @@ function renderSalesOrders(){
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
-      <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
-      <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}<br><b>Cut:</b> ${salesEscape(o.cut || "-")}</td>
+      <td><span class="salesHighlightField">${salesEscape(o.partyName)}</span></td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
+      <td><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
@@ -3727,15 +3762,13 @@ function renderSalesOrders(){
   if(mobile){
     mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesOrderCard">
       <div class="salesOrderLine"><span><b>MTM Order No:</b> ${salesEscape(o.mtmOrderNo)}</span><span><b>Date:</b> ${salesEscape(formatSalesDate(o.orderDate || o.createdAt))}</span></div>
-      <div class="salesOrderLine"><span><b>Party Name:</b> ${salesEscape(o.partyName || "-")}</span><span><b>GST No:</b> ${salesEscape(o.gstNo || "-")}</span><span><b>Agent:</b> ${salesEscape(o.agentName || "-")}</span></div>
-      <div class="salesOrderLine"><span><b>Order Details:</b> ${salesEscape(o.partyOrderNo || "-")}${o.cut ? " | Cut: " + salesEscape(o.cut) : ""}</span></div>
-      <div class="salesOrderLine"><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span></div>
-      <div class="salesOrderLine"><span><b>Patta No:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
+      <div class="salesOrderLine"><span><b>Party Name:</b> <span class="salesHighlightField">${salesEscape(o.partyName || "-")}</span></span><span><b>GST No:</b> ${salesEscape(o.gstNo || "-")}</span><span><b>Agent:</b> ${salesEscape(o.agentName || "-")}</span></div>
+      <div class="salesOrderLine"><span><b>Order Details:</b> ${salesEscape(o.partyOrderNo || "-")}</span></div>
+      <div class="salesOrderLine"><span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span><span><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
+      <div class="salesOrderLine"><span><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></span><span><b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span></span></div>
       <div class="salesOrderLine"><span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span></div>
-      <div class="salesOrderLine"><span><b>Team Member Status:</b> <span class="salesNoWrap">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
-      <div class="salesOrderLine"><span><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></span></div>
+      <div class="salesOrderLine"><span><b>Team Member Status:</b> <span class="salesHighlightField">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
       <div class="salesOrderDetails">
-        <span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span>
         <span><b>Total Qty:</b> ${salesEscape(o.totalQty)}</span>
         <span><b>Bale Size:</b> ${salesEscape(o.qtyPerBale)}</span>
         <span><b>Expected Bales:</b> ${salesEscape(calculateSalesExpectedBales(o.totalQty, o.qtyPerBale))}</span>
