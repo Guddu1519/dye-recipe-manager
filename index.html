@@ -3911,13 +3911,21 @@ function renderSalesBaleWorkArea(){
       if(prev && next) gaps.push((next - prev) / 60000);
     });
     let avgTime = gaps.length ? (gaps.reduce((sum, value)=>sum + value, 0) / gaps.length).toFixed(1) + " min" : "N/A";
-    let rows = bales.map(bale => `<tr><td>Bale ${salesEscape(bale.baleNo)}</td><td>${salesEscape(bale.totalQty)} pcs</td><td>${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</td><td>${salesEscape(getSalesTeamMemberName(order, bale))}</td><td>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</td><td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button> <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></td></tr>`).join("");
+    let rows = bales.map(bale => `<tr><td>Bale ${salesEscape(bale.baleNo)}</td><td>${salesEscape(bale.totalQty)} pcs</td><td>${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</td><td>${salesEscape(getSalesTeamMemberName(order, bale))}</td><td>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</td><td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button> <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button> <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></td></tr>`).join("");
+    let mobileRows = bales.map(bale => `<div class="salesMobileCard">
+      <h3>Bale ${salesEscape(bale.baleNo)} - ${salesEscape(bale.totalQty)} pcs</h3>
+      <p><b>Created:</b> ${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</p>
+      <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
+      <p><b>Colors:</b><br>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</p>
+      <div class="salesActions"><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button><button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button><button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></div>
+    </div>`).join("");
     area.innerHTML = `<h3>Team Member Report - ${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
       <div class="salesPackTools">
         <div><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}<br><b>Total Bales:</b> ${bales.length}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
         <div><b>Average Bales Per Day:</b> ${avgPerDay}<br><b>Average Bale Creating Time:</b> ${avgTime}<br><b>Status:</b> ${salesEscape(order.status)} ${isSalesOrderLocked(order) ? '<span class="salesBadge red">Manually paid by admin</span>' : ""}</div>
       </div>
-      <div class="salesTableWrap"><table class="salesTable"><tr><th>Bale</th><th>QTY</th><th>Created</th><th>By</th><th>Colors</th><th>Action</th></tr>${rows || '<tr><td colspan="6" class="muted">No bales created yet.</td></tr>'}</table></div>`;
+      <div class="salesTableWrap salesDesktopTable"><table class="salesTable"><tr><th>Bale</th><th>QTY</th><th>Created</th><th>By</th><th>Colors</th><th>Action</th></tr>${rows || '<tr><td colspan="6" class="muted">No bales created yet.</td></tr>'}</table></div>
+      <div class="salesMobileCards">${mobileRows || '<div class="salesMobileCard muted">No bales created yet.</div>'}</div>`;
     return;
   }
   let rows = (order.colors || []).map(c => {
