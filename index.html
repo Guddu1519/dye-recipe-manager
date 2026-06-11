@@ -203,7 +203,7 @@ th{background:#dbeafe}
 .salesBaleTotal{font-size:26px;font-weight:900;color:#1d4ed8}
 .salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:12px;margin-top:10px}
 .salesPackRow{display:grid;grid-template-columns:78px 1fr;grid-template-areas:"meta meta" "color controls" "qty qty";gap:10px;align-items:center;border:1px solid #bfdbfe;border-radius:16px;padding:12px;background:linear-gradient(135deg,#ffffff,#f8fbff);box-shadow:0 10px 24px #0f172a10}
-.salesPackColorNo{grid-area:color;font-size:38px;font-weight:900;color:#1d4ed8;text-align:center;border-right:1px solid #dbeafe;padding-right:10px;line-height:1}
+.salesPackColorNo{grid-area:color;font-size:clamp(22px,4vw,38px);font-weight:900;color:#1d4ed8;text-align:left;border-right:1px solid #dbeafe;padding-right:10px;line-height:.98;min-width:0;overflow-wrap:anywhere;word-break:break-word}
 .salesPackMeta{font-size:15px;color:#334155;line-height:1.35}.salesPackMeta b{color:#0f172a}
 .salesPackMeta{grid-area:meta;white-space:nowrap}.salesPackControl{grid-area:controls;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center}
 .salesPackChoice{border:1px solid #dbeafe;border-radius:12px;padding:9px 10px;background:#fff;font-weight:900;display:flex;align-items:center;gap:8px;cursor:pointer;color:#334155}
@@ -275,8 +275,8 @@ th{background:#dbeafe}
   .salesPackTools>div{width:100%}
   .salesPackTools .salesSmallBtn{width:100%;font-size:16px}
   .salesPackGrid{grid-template-columns:1fr;gap:10px}
-  .salesPackRow{grid-template-columns:66px 1fr;padding:10px;border-radius:14px}
-  .salesPackColorNo{font-size:34px;padding-right:8px}
+  .salesPackRow{grid-template-columns:1fr;grid-template-areas:"meta" "color" "controls" "qty";padding:10px;border-radius:14px}
+  .salesPackColorNo{font-size:clamp(24px,9vw,34px);padding:0 0 8px;border-right:0;border-bottom:1px solid #dbeafe}
   .salesPackMeta{font-size:14px}
   .salesPackControl{grid-template-columns:1fr 1fr;gap:7px}
   .salesPackChoice{justify-content:center;padding:10px 8px;font-size:13px}
@@ -3434,9 +3434,9 @@ function printSalesPackingSlips(orderId, baleNo=null){
   let selectedBales = Array.isArray(baleNo) ? baleNo.map(Number) : baleNo ? [Number(baleNo)] : null;
   let bales = (order.bales || []).filter(b => selectedBales ? selectedBales.includes(Number(b.baleNo)) : true);
   if(!bales.length) return alert("No completed bales found for assortment slip.");
-  let printDateTime = new Date().toLocaleString("en-IN");
   let makeSlip = (bale, copyLabel) => {
-    let rows = (bale.colors || []).map(c => `<tr><td>Color ${salesEscape(c.colorNo)}</td><td>${salesEscape(c.qty)} pcs</td></tr>`).join("");
+    let creationDateTime = bale.createdAt ? new Date(bale.createdAt).toLocaleString("en-IN") : "-";
+    let rows = (bale.colors || []).map(c => `<tr><td>${salesEscape(c.colorNo)}</td><td>${salesEscape(c.qty)} pcs</td></tr>`).join("");
     return `<section class="packingSlip">
       <div class="slipHead">
         <h2>Assortment Slip</h2>
@@ -3446,10 +3446,11 @@ function printSalesPackingSlips(orderId, baleNo=null){
         <p><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}</p>
         <p><b>Party:</b> ${salesEscape(order.partyName)}</p>
         <p><b>Date:</b> ${salesEscape((bale.createdAt || new Date().toISOString()).slice(0,10))}</p>
-        <p><b>Print Time:</b> ${salesEscape(printDateTime)}</p>
+        <p><b>Creation Time:</b> ${salesEscape(creationDateTime)}</p>
         <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}</p>
         <p><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</p>
         <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}</p>
+        <p><b>Quality:</b> ${salesEscape(order.quality || "-")}</p>
         <p><b>Cut:</b> ${salesEscape(order.cut || "-")}</p>
         <p><b>Address:</b> ${salesEscape(order.partyAddress || "-")}</p>
         <p><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}</p>
@@ -3472,7 +3473,7 @@ function printSalesPackingSlips(orderId, baleNo=null){
       .packingSlip{border:2px solid #111;padding:8px;height:calc(148mm - 12mm);min-height:0;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
       .slipHead{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #111;margin-bottom:8px;padding-bottom:5px}
       h2{margin:0;font-size:17px}.slipMeta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px 8px;font-size:11px}
-      p{margin:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left}th{background:#dbeafe}
+      p{margin:0}table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left;overflow-wrap:anywhere}th{background:#dbeafe}
       @media print{.printAction{display:none!important}body{padding:0}}
       @media(max-width:700px){.sheet{grid-template-columns:1fr}.packingSlip{min-height:auto}}
     </style>
@@ -3526,7 +3527,7 @@ function printTemporaryPackingSlip(){
     by: salesProfile?.fullName || getSalesUserEmail() || "Team Member"
   };
   let total = rows.reduce((sum,row)=>sum + row.qty,0);
-  let tableRows = rows.map(row => `<tr><td>Color ${salesEscape(row.colorNo)}</td><td>${salesEscape(row.qty)} pcs</td></tr>`).join("");
+  let tableRows = rows.map(row => `<tr><td>${salesEscape(row.colorNo)}</td><td>${salesEscape(row.qty)} pcs</td></tr>`).join("");
   let printDateTime = new Date().toLocaleString("en-IN");
   let makeSlip = (copyLabel) => `<section class="packingSlip">
     <div class="slipHead"><h2>Assortment Slip</h2><b>${copyLabel}</b></div>
