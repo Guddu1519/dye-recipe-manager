@@ -224,6 +224,7 @@ th{background:#dbeafe}
 .salesOrderDetails span{min-width:0;overflow-wrap:anywhere;word-break:normal}
 .salesOrderDetails b{white-space:nowrap}
 .salesNoWrap{white-space:nowrap}
+.salesQualityBadge{display:inline-block;border-radius:999px;background:#fef3c7;color:#92400e;border:1px solid #f59e0b;padding:5px 10px;font-weight:900;white-space:nowrap}
 .modeSwitchBar{position:fixed;top:14px;right:14px;z-index:25000;display:none}
 .modeSwitchBtn{border:0;border-radius:999px;background:#0f172a;color:white;font-weight:800;padding:11px 16px;box-shadow:0 12px 30px #0f172a30;cursor:pointer}
 .modeSwitchBtn:hover{background:#1d4ed8}
@@ -617,6 +618,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
             <option value="patta">Patta</option>
             <option value="stamping">Stamping</option>
             <option value="transport">Transport</option>
+            <option value="quality">Quality</option>
           </select>
           <input id="miscMasterName" placeholder="Name">
           <div class="salesActions">
@@ -629,6 +631,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Misc Values</h2>
+          <input id="salesMiscSearch" placeholder="Search saved misc values..." oninput="renderSalesMisc()">
           <div class="salesTableWrap"><table class="salesTable" id="salesMiscTable"></table></div>
         </div>
       </div>
@@ -2487,6 +2490,22 @@ function refreshSalesDropdowns(){
       select.value = current;
     }
   });
+  let qualitySelect = document.getElementById("salesQuality");
+  if(qualitySelect){
+    let current = qualitySelect.value;
+    let presets = ["HI TECH","SARA INDIA","DULHAN","ACTIVA","SOFIYA"];
+    let qualityValues = salesState.misc
+      .filter(m => m.type === "quality" && String(m.name || "").trim())
+      .map(m => String(m.name).trim());
+    let values = Array.from(new Set([...presets, ...qualityValues])).sort((a,b)=>a.localeCompare(b));
+    qualitySelect.innerHTML = '<option value="">Quality</option>' + values.map(value => `<option value="${salesEscape(value)}">${salesEscape(value)}</option>`).join("");
+    if(current){
+      if(!Array.from(qualitySelect.options).some(option => option.value === current)){
+        qualitySelect.insertAdjacentHTML("beforeend", `<option value="${salesEscape(current)}">${salesEscape(current)}</option>`);
+      }
+      qualitySelect.value = current;
+    }
+  }
   let agentSelect = document.getElementById("partyMasterAgent");
   if(agentSelect){
     let current = agentSelect.value;
@@ -2518,7 +2537,7 @@ function addSalesColorRow(colorNo="", qty=""){
   let row = document.createElement("div");
   row.className = "salesColorRow";
   row.innerHTML = `
-    <input class="salesColorNo" type="number" min="1" max="390" placeholder="Color No." value="${salesEscape(colorNo)}" oninput="updateSalesOrderTotals()">
+    <input class="salesColorNo" placeholder="Color No. / Color Name" value="${salesEscape(colorNo)}" oninput="updateSalesOrderTotals()">
     <input class="salesColorQty" type="number" min="0" step="1" placeholder="Qty" value="${salesEscape(qty)}" oninput="updateSalesOrderTotals()">
     <button class="salesSmallBtn red" onclick="this.closest('.salesColorRow').remove();updateSalesOrderTotals()">Delete</button>
   `;
@@ -2535,18 +2554,22 @@ function clearSalesColorRows(){
 function collectSalesColorRows(){
   let merged = {};
   document.querySelectorAll("#salesColorRows .salesColorRow").forEach(row => {
-    let colorNo = Number(row.querySelector(".salesColorNo")?.value);
+    let colorNo = String(row.querySelector(".salesColorNo")?.value || "").trim();
     let qty = Number(row.querySelector(".salesColorQty")?.value);
     if(!colorNo && !qty) return;
-    if(!Number.isInteger(colorNo) || colorNo < 1 || colorNo > 390) throw new Error("Color No. must be 1 to 390.");
+    if(!colorNo) throw new Error("Color No. / Color Name is required.");
+    let numericColor = Number(colorNo);
+    if(/^\d+$/.test(colorNo) && (!Number.isInteger(numericColor) || numericColor < 1 || numericColor > 390)) throw new Error("Color No. must be 1 to 390.");
     if(!(qty > 0)) throw new Error("Qty must be greater than 0 for Color No. " + colorNo);
-    merged[colorNo] = (merged[colorNo] || 0) + qty;
+    let key = normalizeName(colorNo);
+    if(!merged[key]) merged[key] = {colorNo, qty:0};
+    merged[key].qty += qty;
   });
-  return Object.keys(merged).sort((a,b)=>Number(a)-Number(b)).map(colorNo => ({
-    colorNo: Number(colorNo),
-    qty: merged[colorNo],
-    pendingQty: merged[colorNo]
-  }));
+  return Object.values(merged).sort((a,b)=>{
+    let an = Number(a.colorNo), bn = Number(b.colorNo);
+    if(Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+    return String(a.colorNo).localeCompare(String(b.colorNo), undefined, {numeric:true});
+  }).map(row => ({colorNo: row.colorNo, qty: row.qty, pendingQty: row.qty}));
 }
 
 function updateSalesOrderTotals(){
@@ -2727,9 +2750,20 @@ async function assignSalesOrderToStaff(orderId){
   if(!order) return alert("Order not found.");
   let staffList = salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   if(!staffList.length) return alert("No team members found. First add team members in Team Member Ledger.");
-  let message = "Select team member number:\n\n" + staffList.map((staff, index) => `${index + 1}. ${staff.name} (${staff.email})`).join("\n");
+  let message = "Select team member number:\n\n0. Not Assigned Yet\n" + staffList.map((staff, index) => `${index + 1}. ${staff.name} (${staff.email})`).join("\n");
   let selected = prompt(message, order.assignedStaff ? String(Math.max(1, staffList.findIndex(staff => String(staff.email).toLowerCase() === String(order.assignedStaff).toLowerCase()) + 1)) : "1");
   if(selected === null) return;
+  if(String(selected).trim() === "0"){
+    if(!confirm("Take this order back to Not Assigned Yet?")) return;
+    order.assignedStaff = "";
+    order.assignedStaffName = "";
+    order.assignmentStatus = "Not Assigned Yet";
+    if(order.status === "Assigned" || order.status === "Accepted") order.status = "Not Assigned Yet";
+    await saveSalesState();
+    renderSalesManager();
+    showSuccessToast("Order moved to Not Assigned Yet");
+    return;
+  }
   let staff = staffList[Number(selected) - 1];
   if(!staff) return alert("Invalid team member number.");
   let action = order.assignedStaff ? "change this order to " : "push this order to ";
@@ -3019,6 +3053,10 @@ function getSalesAssignedTeamMemberName(order){
   return order.assignedStaffName || staff?.name || order.assignedStaff || "Not Assigned";
 }
 
+function sameSalesColor(a, b){
+  return normalizeName(a) === normalizeName(b);
+}
+
 function getSalesSentQty(order){
   return (order.colors || []).reduce((sum, c) => sum + ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)), 0);
 }
@@ -3224,9 +3262,9 @@ async function finishSalesBale(){
     let overPacked = [];
     let total = 0;
     document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => {
-      let colorNo = Number(row.dataset.colorNo);
+      let colorNo = row.dataset.colorNo;
       let qty = getSalesPackRowQty(row);
-      let color = order.colors.find(c => c.colorNo === colorNo);
+      let color = order.colors.find(c => sameSalesColor(c.colorNo, colorNo));
       if(qty > 0){
         if(qty > (Number(color.pendingQty) || 0)) overPacked.push(`Color No. ${colorNo}: pending ${color.pendingQty}, saving ${qty}`);
         packed.push({colorNo, qty});
@@ -3241,7 +3279,7 @@ async function finishSalesBale(){
       if(!confirm("Ordered quantity was " + order.qtyPerBale + " per bale, but you are saving " + total + ". Are you sure you want to save?")) return;
     }
     packed.forEach(p => {
-      let color = order.colors.find(c => c.colorNo === p.colorNo);
+      let color = order.colors.find(c => sameSalesColor(c.colorNo, p.colorNo));
       color.pendingQty -= p.qty;
     });
     order.bales.push({baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: order.assignedStaffName || getSalesUserEmail()});
@@ -3281,7 +3319,7 @@ async function deleteSalesBale(orderId, baleNo){
   if(!confirm("Delete Bale " + baleNo + " and restore its quantities to pending?")) return;
   let bale = order.bales[index];
   (bale.colors || []).forEach(item => {
-    let color = (order.colors || []).find(c => Number(c.colorNo) === Number(item.colorNo));
+    let color = (order.colors || []).find(c => sameSalesColor(c.colorNo, item.colorNo));
     if(color) color.pendingQty = (Number(color.pendingQty) || 0) + (Number(item.qty) || 0);
   });
   order.bales.splice(index, 1);
@@ -3306,7 +3344,7 @@ async function editSalesBale(orderId, baleNo){
     if(next === null) return;
     next = Number(next);
     if(!(next >= 0)) return alert("Qty must be 0 or more.");
-    let color = (order.colors || []).find(c => Number(c.colorNo) === Number(item.colorNo));
+    let color = (order.colors || []).find(c => sameSalesColor(c.colorNo, item.colorNo));
     let diff = next - (Number(item.qty) || 0);
     item.qty = next;
     if(color) color.pendingQty = (Number(color.pendingQty) || 0) - diff;
@@ -3583,8 +3621,13 @@ function renderSalesStaffLedger(){
 function renderSalesMisc(){
   let table = document.getElementById("salesMiscTable");
   if(!table) return;
+  let q = normalizeName(document.getElementById("salesMiscSearch")?.value || "");
+  let miscRows = salesState.misc.filter(m => {
+    if(!q) return true;
+    return [m.type, m.name].some(value => normalizeName(value).includes(q));
+  });
   table.innerHTML = `<tr><th>Type</th><th>Name</th><th>Action</th></tr>` +
-    salesState.misc.map(m => `<tr><td>${salesEscape(m.type)}</td><td>${salesEscape(m.name)}</td><td><button class="salesSmallBtn gray" onclick="editSalesMisc('${m.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesMisc('${m.id}')">Delete</button></td></tr>`).join("");
+    (miscRows.length ? miscRows.map(m => `<tr><td>${salesEscape(m.type)}</td><td>${salesEscape(m.name)}</td><td><button class="salesSmallBtn gray" onclick="editSalesMisc('${m.id}')">Edit</button> <button class="salesSmallBtn red" onclick="deleteSalesMisc('${m.id}')">Delete</button></td></tr>`).join("") : `<tr><td colspan="3" class="muted">No misc values found.</td></tr>`);
 }
 
 function addSalesPendingSummary(map, key, qty, orderId){
@@ -3690,6 +3733,7 @@ function renderSalesOrders(){
       <div class="salesOrderLine"><span><b>Patta No:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
       <div class="salesOrderLine"><span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span></div>
       <div class="salesOrderLine"><span><b>Team Member Status:</b> <span class="salesNoWrap">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
+      <div class="salesOrderLine"><span><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></span></div>
       <div class="salesOrderDetails">
         <span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span>
         <span><b>Total Qty:</b> ${salesEscape(o.totalQty)}</span>
@@ -3742,18 +3786,20 @@ function renderSalesStaffOrders(){
   let mobile = document.getElementById("salesStaffOrdersMobileCards");
   if(!table) return;
   let orders = getVisibleSalesOrders().filter(o => o.status !== "Cancelled");
+  let adminView = isSalesAdmin();
   let actionHtml = (o) => {
     if(isSalesAdmin()) return `<button class="salesSmallBtn" onclick="viewSalesOrderTeamReport('${o.id}')">Get Details</button>`;
     if(isSalesOrderLocked(o)) return `<span class="salesBadge red">Manually paid by admin</span> <button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">View / Print Bales</button>`;
     return `${o.status === "Assigned" ? `<button class="salesSmallBtn green" onclick="acceptSalesOrder('${o.id}')">Accept Order</button>` : ""}
           ${o.status !== "Packed" ? `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">Start Bale Creation</button>` : `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">View / Print Bales</button>`}`;
   };
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th><th>Assigned To</th><th>Order Details</th><th>Qty</th><th>Sent</th><th>Pending</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th>${adminView ? "<th>Assigned To</th>" : ""}<th>Quality</th><th>Order Details</th><th>Qty</th><th>Sent</th><th>Pending</th><th>Bale Size</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo || "")}</span></td>
       <td>${salesEscape(o.partyName)}</td>
       <td>${salesEscape(o.agentName || "-")}</td>
-      <td>${salesEscape(getSalesAssignedTeamMemberName(o))}</td>
+      ${adminView ? `<td>${salesEscape(getSalesAssignedTeamMemberName(o))}</td>` : ""}
+      <td><span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></td>
       <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}<br><b>Cut:</b> ${salesEscape(o.cut || "-")}</td>
       <td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
@@ -3764,7 +3810,8 @@ function renderSalesStaffOrders(){
       <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
       <p><b>Party Order:</b> ${salesEscape(o.partyOrderNo || "-")}</p>
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
-      <p><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>
+      ${adminView ? `<p><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>` : ""}
+      <p><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></p>
       <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</p>
       <p><b>Cut:</b> ${salesEscape(o.cut || "-")}</p>
       <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</p>
@@ -3815,18 +3862,19 @@ function renderSalesBaleWorkArea(){
     return;
   }
   let pending = order.colors.filter(c => c.pendingQty > 0);
-  let rows = pending.map(c => `<div class="salesPackRow" data-color-no="${c.colorNo}">
+  let rows = pending.map(c => `<div class="salesPackRow" data-color-no="${salesEscape(c.colorNo)}">
     <div class="salesPackColorNo">${salesEscape(c.colorNo)}</div>
     <div class="salesPackMeta"><b>Ordered:</b> ${salesEscape(c.qty)} pcs &nbsp; <b>Pending:</b> ${salesEscape(c.pendingQty)} pcs</div>
     <div class="salesPackControl">
-      <label class="salesPackChoice"><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this, ${c.colorNo})"> Full qty</label>
+      <label class="salesPackChoice"><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this)"> Full qty</label>
       <label class="salesPackChoice"><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)"> Custom</label>
     </div>
     <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Enter qty" oninput="markSalesCustomQty(this)">
   </div>`).join("");
-  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${c.colorNo}: ${c.qty}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button>${!isSalesOrderLocked(order) ? ` <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button>` : ""}</div>`).join("");
+  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} qty</label>${bale.colors.map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button>${!isSalesOrderLocked(order) ? ` <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button>` : ""}</div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
-    <p><b>Assigned Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}</p>
+    ${isSalesAdmin() ? `<p><b>Assigned Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}</p>` : ""}
+    <p><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(order.quality || "N/A")}</span></p>
     <div class="salesPackTools">
       <div><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}<br><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</div>
       <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Cut:</b> ${salesEscape(order.cut || "-")}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
@@ -3954,7 +4002,7 @@ async function importSalesMiscCsv(event){
   rows.forEach(row => {
     let type = String(row.type || "").toLowerCase();
     let name = row.name || "";
-    if(!["packing","patta","stamping","transport"].includes(type) || !name) return;
+    if(!["packing","patta","stamping","transport","quality"].includes(type) || !name) return;
     if(!salesState.misc.find(m => m.type === type && normalizeName(m.name) === normalizeName(name))){
       salesState.misc.push({id:(Date.now() + Math.random()).toString(), type, name});
     }
@@ -3969,13 +4017,17 @@ async function importSalesColorCsv(event){
     let rows = parseSalesCsv(await file.text());
     let merged = {};
     rows.forEach(row => {
-      let colorNo = Number(row.color_no || row.color || row.colorno);
+      let colorNo = String(row.color_no || row.color || row.colorno || row.color_name || row.name || "").trim();
       let qty = Number(row.qty || row.quantity);
-      if(Number.isInteger(colorNo) && colorNo >= 1 && colorNo <= 390 && qty > 0) merged[colorNo] = (merged[colorNo] || 0) + qty;
+      if(colorNo && qty > 0){
+        let key = normalizeName(colorNo);
+        if(!merged[key]) merged[key] = {colorNo, qty:0};
+        merged[key].qty += qty;
+      }
     });
     let wrap = document.getElementById("salesColorRows");
     if(wrap) wrap.innerHTML = "";
-    Object.keys(merged).sort((a,b)=>Number(a)-Number(b)).forEach(colorNo => addSalesColorRow(colorNo, merged[colorNo]));
+    Object.values(merged).sort((a,b)=>String(a.colorNo).localeCompare(String(b.colorNo), undefined, {numeric:true})).forEach(row => addSalesColorRow(row.colorNo, row.qty));
     updateSalesOrderTotals();
     showSuccessToast("Color CSV imported");
   }finally{
@@ -4000,7 +4052,7 @@ async function importSalesOrderCsv(event){
     setSalesSelectValue("salesPatta", salesCsvPick(row, ["patta","patta_name"]));
     setSalesSelectValue("salesStamping", salesCsvPick(row, ["stamping","stamp","stamping_name"]));
     setSalesSelectValue("salesTransport", salesCsvPick(row, ["transport","transport_name"]));
-    if(row.quality) document.getElementById("salesQuality").value = row.quality;
+    if(row.quality) setSalesSelectValue("salesQuality", row.quality);
     let cut = salesCsvPick(row, ["cut","cut_type"]);
     if(cut) setSalesSelectValue("salesCut", cut);
     if(row.rate) document.getElementById("salesRate").value = row.rate;
@@ -4013,8 +4065,8 @@ async function importSalesOrderCsv(event){
 
 function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,city,agent_name\nShree Textiles,24ABCDE1234F1Z5,Pali,Agent 1\n"); }
 function downloadSalesAgentSample(){ downloadSalesCsv("agent-ledger-sample.csv", "agent_name,mobile_number,agent_login_email\nAgent 1,9462023854,agent1@example.com\n"); }
-function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\n"); }
-function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\n2,20\n3,20\n"); }
+function downloadSalesMiscSample(){ downloadSalesCsv("misc-master-sample.csv", "type,name\npacking,Box Packing\npatta,Single Patta\nstamping,MTM Stamp\ntransport,VRL\nquality,HI TECH\n"); }
+function downloadSalesColorSample(){ downloadSalesCsv("color-order-sample.csv", "color_no,qty\n1,20\nBLACK,50\n3,20\n"); }
 function downloadSalesOrderSample(){ downloadSalesCsv("sales-order-sample.csv", "mtm_order_no,party_order_no,order_date,party_name,gst_no,agent_name,agent_email,address,packing,patta,stamping,transport,quality,rate,qty_per_bale\nMTM-1,PO-1,2026-06-08,Shree Textiles,24ABCDE1234F1Z5,Agent 1,agent1@example.com,Pali Rajasthan,Box Packing,Single Patta,MTM Stamp,VRL,Cotton,100,50\n"); }
 function clearPartyCsv(){ let f = document.getElementById("partyCsvFile"); if(f) f.value = ""; showSuccessToast("Party CSV cleared"); }
 function clearAgentCsv(){ let f = document.getElementById("agentCsvFile"); if(f) f.value = ""; showSuccessToast("Agent CSV cleared"); }
