@@ -2725,10 +2725,13 @@ async function assignSalesOrderToStaff(orderId){
   if(!isSalesAdmin()) return alert("Only Sales Admin can assign orders.");
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
-  let select = document.getElementById("assignStaff_" + orderId);
-  let staffEmail = String(select?.value || "").trim().toLowerCase();
-  let staff = getSalesStaffByEmail(staffEmail);
-  if(!staff) return alert("Select team member from Team Member Ledger first.");
+  let staffList = salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  if(!staffList.length) return alert("No team members found. First add team members in Team Member Ledger.");
+  let message = "Select team member number:\n\n" + staffList.map((staff, index) => `${index + 1}. ${staff.name} (${staff.email})`).join("\n");
+  let selected = prompt(message, order.assignedStaff ? String(Math.max(1, staffList.findIndex(staff => String(staff.email).toLowerCase() === String(order.assignedStaff).toLowerCase()) + 1)) : "1");
+  if(selected === null) return;
+  let staff = staffList[Number(selected) - 1];
+  if(!staff) return alert("Invalid team member number.");
   let action = order.assignedStaff ? "change this order to " : "push this order to ";
   if(!confirm("Are you sure you want to " + action + staff.name + "?")) return;
   order.assignedStaff = staff.email;
@@ -3667,22 +3670,17 @@ function renderSalesOrders(){
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
   if(staffCount) staffCount.textContent = salesState.staffs.length || salesProfiles.filter(p => p.role === "staff").length;
-  let staffOptions = '<option value="">Select Team Member</option>' + salesState.staffs.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).map(staff => `<option value="${salesEscape(staff.email)}">${salesEscape(staff.name)} - ${salesEscape(staff.email)}</option>`).join("");
   table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Order Details</th><th>Team Member Status</th><th>Total Qty</th><th>Bale Size</th><th>Expected Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}<br><b>Cut:</b> ${salesEscape(o.cut || "-")}</td>
-      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span><br><select id="assignStaff_${salesEscape(o.id)}">${staffOptions}</select></td>
+      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button> <button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button> <button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
-  orders.forEach(o => {
-    let select = document.getElementById("assignStaff_" + o.id);
-    if(select) select.value = o.assignedStaff || "";
-  });
   if(mobile){
     mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesOrderCard">
       <div class="salesOrderLine"><span><b>MTM Order No:</b> ${salesEscape(o.mtmOrderNo)}</span><span><b>Date:</b> ${salesEscape(formatSalesDate(o.orderDate || o.createdAt))}</span></div>
