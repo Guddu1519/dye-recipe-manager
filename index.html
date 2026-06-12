@@ -203,6 +203,7 @@ th{background:#dbeafe}
 .salesPackTools.mobileFixed{position:fixed!important;top:8px!important;margin:0!important;z-index:50000!important}
 .salesPackStickySpacer{display:block;height:104px}
 .salesPackStickySpacer.active{display:block}
+.salesBaleWorkFloating{padding-bottom:150px}
 .salesBaleTotal{font-size:26px;font-weight:900;color:#1d4ed8}
 .salesPackGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:12px;margin-top:10px}
 .salesPackRow{display:grid;grid-template-columns:1fr;grid-template-areas:"meta" "color" "controls" "qty";gap:10px;align-items:center;border:1px solid #bfdbfe;border-radius:16px;padding:12px;background:linear-gradient(135deg,#ffffff,#f8fbff);box-shadow:0 10px 24px #0f172a10}
@@ -280,6 +281,7 @@ th{background:#dbeafe}
   .salesPackTools{align-items:stretch;border-radius:14px}
   #salesBaleWorkArea .salesPackTools.sticky{position:fixed!important;left:10px!important;right:10px!important;bottom:10px!important;top:auto!important;transform:none!important;width:auto!important;z-index:50000!important;margin:0!important;box-shadow:0 18px 45px rgba(15,23,42,.28)}
   #salesBaleWorkArea .salesPackStickySpacer{display:block!important;height:126px!important}
+  #salesBaleWorkArea.salesBaleWorkFloating{padding-bottom:190px!important}
   .salesPackTools>div{width:100%}
   .salesPackTools .salesSmallBtn{width:100%;font-size:16px}
   .salesPackGrid{grid-template-columns:1fr;gap:10px}
@@ -2193,6 +2195,7 @@ let editingSalesMiscId = null;
 let editingSalesStaffId = null;
 let editingSalesOrderId = null;
 const SALES_BALE_DRAFT_KEY = "mtm_sales_bale_drafts_v1";
+const SALES_ACTIVE_BALE_ORDER_KEY = "mtm_sales_active_bale_order_v1";
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -3220,6 +3223,7 @@ async function startSalesBaleCreation(id){
     if(order.status === "Accepted") order.status = "In Packing";
   }
   salesSelectedOrderId = id;
+  localStorage.setItem(SALES_ACTIVE_BALE_ORDER_KEY, id);
   await saveSalesState();
   renderSalesManager();
   document.getElementById("salesBaleWorkArea")?.scrollIntoView({behavior:"smooth", block:"start"});
@@ -3247,6 +3251,7 @@ function saveSalesBaleDraft(){
     };
   });
   drafts[salesSelectedOrderId] = {savedAt:new Date().toISOString(), rows};
+  localStorage.setItem(SALES_ACTIVE_BALE_ORDER_KEY, salesSelectedOrderId);
   localStorage.setItem(SALES_BALE_DRAFT_KEY, JSON.stringify(drafts));
 }
 
@@ -3270,6 +3275,7 @@ function clearSalesBaleDraft(orderId){
   let drafts = getSalesBaleDrafts();
   delete drafts[orderId];
   localStorage.setItem(SALES_BALE_DRAFT_KEY, JSON.stringify(drafts));
+  if(localStorage.getItem(SALES_ACTIVE_BALE_ORDER_KEY) === String(orderId)) localStorage.removeItem(SALES_ACTIVE_BALE_ORDER_KEY);
 }
 
 function setSalesTakeAll(input, colorNo){
@@ -3720,6 +3726,7 @@ function renderSalesManager(shouldLoadLocal=true){
   renderSalesStaffOrders();
   let activeInBaleWork = document.activeElement && document.getElementById("salesBaleWorkArea")?.contains(document.activeElement);
   if(!activeInBaleWork) renderSalesBaleWorkArea();
+  restoreActiveSalesBaleDraftIfNeeded();
   updateSalesOrderTotals();
   if(document.querySelectorAll("#salesColorRows .salesColorRow").length === 0) addSalesColorRow();
   if(document.getElementById("tempSlipColorRows") && document.querySelectorAll("#tempSlipColorRows .salesColorRow").length === 0) addTempSlipColorRow();
@@ -4039,6 +4046,7 @@ function renderSalesBaleWorkArea(){
     return;
   }
   if(isSalesAdmin()){
+    area.classList.remove("salesBaleWorkFloating");
     let bales = order.bales || [];
     let days = {};
     bales.forEach(bale => {
@@ -4071,6 +4079,8 @@ function renderSalesBaleWorkArea(){
       <div class="salesMobileCards">${mobileRows || '<div class="salesMobileCard muted">No bales created yet.</div>'}</div>`;
     return;
   }
+  let hasFloatingCreateBar = !isSalesOrderLocked(order) && order.status !== "Packed";
+  area.classList.toggle("salesBaleWorkFloating", hasFloatingCreateBar);
   let rows = (order.colors || []).map(c => {
     let pendingQty = Number(c.pendingQty) || 0;
     let takenSummary = getSalesColorBaleSummary(order, c.colorNo);
@@ -4124,6 +4134,25 @@ function applySalesPackStickyFallback(){
 
 window.addEventListener("scroll", updateSalesPackStickyFallback, {passive:true});
 window.addEventListener("resize", updateSalesPackStickyFallback);
+
+
+function restoreActiveSalesBaleDraftIfNeeded(){
+  if(currentManagerMode !== "staff") return;
+  if(salesSelectedOrderId) return;
+  let activeOrderId = localStorage.getItem(SALES_ACTIVE_BALE_ORDER_KEY);
+  if(!activeOrderId) return;
+  let draft = getSalesBaleDrafts()[activeOrderId];
+  if(!draft) return;
+  let order = salesState.orders.find(o => String(o.id) === String(activeOrderId));
+  if(!order || isSalesOrderLocked(order) || order.status === "Packed" || order.status === "Cancelled") return;
+  salesSelectedOrderId = activeOrderId;
+  renderSalesBaleWorkArea();
+}
+
+window.addEventListener("visibilitychange", () => {
+  if(document.hidden) saveSalesBaleDraft();
+});
+window.addEventListener("pagehide", saveSalesBaleDraft);
 
 function salesExcelSheetToRows(workbook, sheetName){
   let sheet = workbook.Sheets[sheetName];
@@ -9379,4 +9408,8 @@ initAuth();
 </script>
 </body>
 </html>
+
+
+
+
 
