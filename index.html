@@ -3762,7 +3762,7 @@ function applySalesRoleUi(){
       allowed = text === "Logout" || el.closest(".salesTabs");
     }
     if(isSalesStaff()){
-      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
+      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
     }
     if(!allowed){
       el.disabled = true;
@@ -9421,6 +9421,7 @@ initAuth();
 </script>
 </body>
 </html>
+
 
 
 
