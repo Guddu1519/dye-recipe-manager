@@ -3500,18 +3500,22 @@ function printSalesPackingSlips(orderId, baleNo=null){
         <h2>Bale ${salesEscape(bale.baleNo)}</h2>
       </div>
       <div class="slipMeta">
-        <p><b>Party:</b> ${salesEscape(order.partyName)}</p>
-        <p><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}</p>
-        <p><b>Quality:</b> ${salesEscape(order.quality || "-")}</p>
-        <p><b>Cut:</b> ${salesEscape(order.cut || "-")}</p>
-        <p><b>Station :</b> ${salesEscape(order.partyAddress || "-")}</p>
-        <p><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}</p>
-        <p><b>Creation Time:</b> ${salesEscape(creationDateTime)}</p>
-        <p><b>MTM Order No:</b> ${salesEscape(order.mtmOrderNo || "-")}</p>
-        <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}</p>
-        <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}</p>
-        <p><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</p>
-        <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
+        <div class="slipMetaCol">
+          <p><b>Party:</b> ${salesEscape(order.partyName)}</p>
+          <p><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}</p>
+          <p><b>Quality:</b> ${salesEscape(order.quality || "-")}</p>
+          <p><b>Cut:</b> ${salesEscape(order.cut || "-")}</p>
+          <p><b>Station :</b> ${salesEscape(order.partyAddress || "-")}</p>
+          <p><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}</p>
+        </div>
+        <div class="slipMetaCol">
+          <p><b>Creation Time:</b> ${salesEscape(creationDateTime)}</p>
+          <p><b>MTM Order No:</b> ${salesEscape(order.mtmOrderNo || "-")}</p>
+          <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}</p>
+          <p><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}</p>
+          <p><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</p>
+          <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
+        </div>
       </div>
       <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
     </section><div class="slipFooter">Monica Textile Mills, Pali</div></div>`;
@@ -3528,14 +3532,15 @@ function printSalesPackingSlips(orderId, baleNo=null){
       .balePrintPage{display:grid;grid-template-columns:1fr 1fr;gap:6px;break-after:page;page-break-after:always}
       .balePrintPage:last-child{break-after:auto;page-break-after:auto}
       .slipCopy{break-inside:avoid;page-break-inside:avoid}
-      .slipCopyLabel{text-align:right;font-size:14px;font-weight:700;margin:0 0 3px;line-height:1}
+      .slipCopyLabel{text-align:right;font-size:15px;font-weight:500;margin:0 0 3px;line-height:1;text-transform:uppercase}
       .packingSlip{border:2px solid #111;height:calc(148mm - 22mm);min-height:0;overflow:hidden}
       .slipFooter{text-align:center;font-size:11px;font-weight:700;margin-top:3px}
-      .slipHead{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;gap:8px;border-bottom:1px solid #111;padding:7px 8px}
+      .slipHead{display:grid;grid-template-columns:1.15fr 1fr .75fr;align-items:center;gap:8px;border-bottom:1px solid #111;padding:9px 12px}
       .slipHead h2:nth-child(2){text-align:center}.slipHead h2:last-child{text-align:right}
-      .baleBlank{display:inline-block;width:34mm;border-bottom:2px solid #111;vertical-align:middle}
-      h2{margin:0;font-size:16px}.slipMeta{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:11px;padding:7px 10px}
-      p{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}table{width:calc(100% - 20px);margin:5px 10px 0;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left;overflow-wrap:anywhere}th{background:#dbeafe}
+      .baleBlank{display:inline-block;width:27mm;border-bottom:2px solid #111;vertical-align:middle}
+      h2{margin:0;font-size:18px}.slipMeta{display:grid;grid-template-columns:1fr 1.1fr;gap:8px 18px;font-size:13px;padding:6px 16px 8px}
+      .slipMetaCol{display:grid;gap:4px;min-width:0}
+      p{margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.18}table{width:calc(100% - 20px);margin:5px 10px 0;border-collapse:collapse;font-size:12px}th,td{border:1px solid #777;padding:4px;text-align:left;overflow-wrap:anywhere}th{background:#dbeafe}
       @media print{.printAction{display:none!important}body{padding:0}}
       @media(max-width:700px){.sheet{grid-template-columns:1fr}.packingSlip{min-height:auto}}
     </style>
