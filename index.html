@@ -199,7 +199,7 @@ th{background:#dbeafe}
 .salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
 .salesColorRow{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center}
 .salesPackTools{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:12px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(135deg,#eff6ff,#fff);box-shadow:0 10px 24px #0f172a0d}
-.salesPackTools.sticky{position:sticky;top:8px;z-index:20}
+.salesPackTools.sticky{position:sticky;top:8px;z-index:5000}
 .salesPackTools.mobileFixed{position:fixed!important;top:8px!important;margin:0!important;z-index:50000!important}
 .salesPackStickySpacer{display:none;height:0}
 .salesPackStickySpacer.active{display:block}
@@ -227,6 +227,7 @@ th{background:#dbeafe}
 .salesOrderLine span{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:normal}
 .salesOrderLine b{color:#0f172a;white-space:nowrap}.salesOrderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .salesHighlightField{display:inline-block;border-radius:999px;background:#e0f2fe;color:#075985;border:1px solid #7dd3fc;padding:4px 9px;font-weight:900;white-space:nowrap}
+.salesHighlightField.red{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px 14px;margin-top:8px;align-items:start}
 .salesOrderDetails span{min-width:0;overflow-wrap:anywhere;word-break:normal}
 .salesOrderDetails b{white-space:nowrap}
@@ -277,8 +278,8 @@ th{background:#dbeafe}
   .salesColorRow{grid-template-columns:1fr;gap:8px;border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#fff}
   .salesColorRow button{width:100%}
   .salesPackTools{align-items:stretch;border-radius:14px}
-  #salesBaleWorkArea .salesPackTools.sticky{position:fixed!important;left:10px!important;right:10px!important;bottom:10px!important;top:auto!important;z-index:50000!important;margin:0!important;box-shadow:0 18px 45px rgba(15,23,42,.28)}
-  #salesBaleWorkArea .salesPackStickySpacer{display:block;height:120px}
+  #salesBaleWorkArea .salesPackTools.sticky{position:sticky!important;top:8px!important;left:auto!important;right:auto!important;bottom:auto!important;z-index:50000!important;margin:10px 0!important;box-shadow:0 18px 45px rgba(15,23,42,.18)}
+  #salesBaleWorkArea .salesPackStickySpacer{display:none!important;height:0!important}
   .salesPackTools>div{width:100%}
   .salesPackTools .salesSmallBtn{width:100%;font-size:16px}
   .salesPackGrid{grid-template-columns:1fr;gap:10px}
@@ -532,12 +533,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Agents:</b> <span id="salesAgentCount">0</span></p>
           <p><b>Team Members:</b> <span id="salesStaffCount">0</span></p>
           <div class="salesActions">
-            <button class="salesSmallBtn green" onclick="exportMajorWebsiteBackup()">MAJOR A-Z EXPORT BACKUP</button>
+            <button class="salesSmallBtn green" onclick="exportMajorWebsiteBackup()">Complete Website Backup Export</button>
             <input id="majorWebsiteBackupFile" type="file" accept=".json" style="display:none" onchange="importMajorWebsiteBackup(event)">
-            <button class="salesSmallBtn gray" onclick="document.getElementById('majorWebsiteBackupFile').click()">MAJOR A-Z IMPORT BACKUP</button>
-            <button class="salesSmallBtn green" onclick="exportSalesFullBackupExcel()">Export Full Sales Excel</button>
-            <input id="salesFullImportFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="importSalesFullBackupExcel(event)">
-            <button class="salesSmallBtn gray" onclick="document.getElementById('salesFullImportFile').click()">Import Full Sales Excel</button>
+            <button class="salesSmallBtn gray" onclick="document.getElementById('majorWebsiteBackupFile').click()">Complete Website Backup Import</button>
           </div>
           <p class="muted">Create orders first, then push/change assigned team member from Order History.</p>
         </div>
@@ -2194,6 +2192,7 @@ let editingSalesAgentId = null;
 let editingSalesMiscId = null;
 let editingSalesStaffId = null;
 let editingSalesOrderId = null;
+const SALES_BALE_DRAFT_KEY = "mtm_sales_bale_drafts_v1";
 
 function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -3139,9 +3138,9 @@ function getSalesStaffByEmail(email){
 }
 
 function getSalesAssignedTeamMemberName(order){
-  if(!order) return "Not Assigned";
+  if(!order) return "Not Assigned Yet";
   let staff = getSalesStaffByEmail(order.assignedStaff);
-  return order.assignedStaffName || staff?.name || order.assignedStaff || "Not Assigned";
+  return order.assignedStaffName || staff?.name || order.assignedStaff || "Not Assigned Yet";
 }
 
 function sameSalesColor(a, b){
@@ -3226,6 +3225,53 @@ async function startSalesBaleCreation(id){
   document.getElementById("salesBaleWorkArea")?.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
+function getSalesBaleDrafts(){
+  try{
+    return JSON.parse(localStorage.getItem(SALES_BALE_DRAFT_KEY) || "{}");
+  }catch{
+    return {};
+  }
+}
+
+function saveSalesBaleDraft(){
+  if(!salesSelectedOrderId) return;
+  let drafts = getSalesBaleDrafts();
+  let rows = {};
+  document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => {
+    let colorNo = row.dataset.colorNo;
+    if(!colorNo) return;
+    rows[colorNo] = {
+      qty: row.querySelector(".salesPackQty")?.value || "",
+      takeAll: !!row.querySelector(".salesTakeAll")?.checked,
+      custom: !!row.querySelector(".salesUseCustom")?.checked
+    };
+  });
+  drafts[salesSelectedOrderId] = {savedAt:new Date().toISOString(), rows};
+  localStorage.setItem(SALES_BALE_DRAFT_KEY, JSON.stringify(drafts));
+}
+
+function restoreSalesBaleDraft(orderId){
+  let draft = getSalesBaleDrafts()[orderId];
+  if(!draft?.rows) return;
+  document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => {
+    let saved = draft.rows[row.dataset.colorNo];
+    if(!saved) return;
+    let qtyInput = row.querySelector(".salesPackQty");
+    let takeAll = row.querySelector(".salesTakeAll");
+    let custom = row.querySelector(".salesUseCustom");
+    if(qtyInput) qtyInput.value = saved.qty || "";
+    if(takeAll) takeAll.checked = !!saved.takeAll;
+    if(custom) custom.checked = !!saved.custom;
+  });
+  updateCurrentBaleTotal();
+}
+
+function clearSalesBaleDraft(orderId){
+  let drafts = getSalesBaleDrafts();
+  delete drafts[orderId];
+  localStorage.setItem(SALES_BALE_DRAFT_KEY, JSON.stringify(drafts));
+}
+
 function setSalesTakeAll(input, colorNo){
   let row = input.closest(".salesPackRow");
   let qtyInput = row?.querySelector(".salesPackQty");
@@ -3233,6 +3279,7 @@ function setSalesTakeAll(input, colorNo){
   if(qtyInput) qtyInput.value = input.checked ? input.dataset.pending : "";
   if(customCheck && input.checked) customCheck.checked = false;
   updateCurrentBaleTotal();
+  saveSalesBaleDraft();
 }
 
 function setSalesUseCustom(input){
@@ -3242,6 +3289,7 @@ function setSalesUseCustom(input){
   if(takeAll && input.checked) takeAll.checked = false;
   if(qtyInput && input.checked) qtyInput.focus();
   updateCurrentBaleTotal();
+  saveSalesBaleDraft();
 }
 
 function markSalesCustomQty(input){
@@ -3251,6 +3299,7 @@ function markSalesCustomQty(input){
   if(takeAll) takeAll.checked = false;
   if(useCustom) useCustom.checked = Number(input.value) > 0;
   updateCurrentBaleTotal();
+  saveSalesBaleDraft();
 }
 
 function getSalesPackRowQty(row){
@@ -3383,6 +3432,7 @@ async function finishSalesBale(){
       order.status = "In Packing";
     }
     await saveSalesState();
+    clearSalesBaleDraft(order.id);
     renderSalesManager(false);
     renderSalesBaleWorkArea();
     showSuccessToast(order.status === "Packed" ? "Order ready for dispatch" : "Bale finished");
@@ -3828,7 +3878,7 @@ function renderSalesOrders(){
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td><span class="salesHighlightField">${salesEscape(o.partyName)}</span></td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}<br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
-      <td><span class="salesBadge ${o.assignedStaff ? "green" : "amber"}">${o.assignedStaff ? "Assigned to : " + salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
+      <td><span class="${o.assignedStaff ? "salesHighlightField" : "salesHighlightField red"}">Assigned to : ${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
       <td>${o.totalQty}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button> <button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button> <button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
@@ -3841,7 +3891,7 @@ function renderSalesOrders(){
       <div class="salesOrderLine"><span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span><span><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</span></div>
       <div class="salesOrderLine"><span><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></span><span><b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span></span></div>
       <div class="salesOrderLine"><span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span></div>
-      <div class="salesOrderLine"><span><b>Assigned to :</b> <span class="salesHighlightField">${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
+      <div class="salesOrderLine"><span><b>Assigned to :</b> <span class="${o.assignedStaff ? "salesHighlightField" : "salesHighlightField red"}">${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></span></div>
       <div class="salesOrderDetails">
         <span><b>Total QTY:</b> ${salesEscape(o.totalQty)}</span>
         <span><b>Bale Size:</b> ${salesEscape(o.qtyPerBale)}</span>
@@ -4042,6 +4092,7 @@ function renderSalesBaleWorkArea(){
     ${isSalesOrderLocked(order) ? '<p><span class="salesBadge red">Manually paid by admin. Order is locked.</span></p>' : order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackStickySpacer"></div><div class="salesPackTools sticky"><div><b>QTY Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div>`}
     <div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<div class="salesBalePrintTools"><button class="salesSmallBtn" onclick="printSelectedSalesBales('${order.id}')">Print Selected Bales</button><button class="salesSmallBtn gray" onclick="printSalesPackingSlips('${order.id}')">Print All Assortment Slips</button></div>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
+  restoreSalesBaleDraft(order.id);
   setTimeout(updateSalesPackStickyFallback, 0);
 }
 
@@ -4157,7 +4208,7 @@ async function exportMajorWebsiteBackup(){
   if(!isAdmin()) return alert("Only Admin can export complete website backup.");
   await loadDataFromJson();
   if(canUseSalesCloud()) await loadSalesCloudState({silent:true});
-  downloadJsonFile(`mtm-major-a-z-backup-${new Date().toISOString().slice(0,10)}.json`, getMajorWebsiteBackupPayload());
+  downloadJsonFile(`mtm-complete-website-backup-${new Date().toISOString().slice(0,10)}.json`, getMajorWebsiteBackupPayload());
 }
 
 function mergeMajorBackupIntoCurrent(backup){
@@ -4293,7 +4344,7 @@ async function importMajorWebsiteBackup(event){
   try{
     let backup = JSON.parse(await file.text());
     if(backup?.backupType !== "MTM_WEBSITE_A_Z_BACKUP") throw new Error("This is not a valid MTM A-Z backup file.");
-    if(!confirm("Import MAJOR A-Z backup? Existing matching records will be updated. Duplicate data will be skipped/merged.")) return;
+    if(!confirm("Import complete website backup? Existing matching records will be updated. Duplicate data will be skipped/merged.")) return;
     await loadDataFromJson();
     if(canUseSalesCloud()) await loadSalesCloudState({silent:true});
     mergeMajorBackupIntoCurrent(backup);
@@ -4302,10 +4353,10 @@ async function importMajorWebsiteBackup(event){
     if(canUseSalesCloud()) await refreshSalesCloudData({silent:true});
     renderAll();
     renderSalesManager(false);
-    showSuccessToast("Major A-Z backup imported successfully");
-    alert("Major A-Z backup imported successfully. Duplicate matching records were merged, not added again.");
+    showSuccessToast("Complete website backup imported successfully");
+    alert("Complete website backup imported successfully. Duplicate matching records were merged, not added again.");
   }catch(err){
-    alert("Major A-Z import failed: " + (err.message || err));
+    alert("Complete website backup import failed: " + (err.message || err));
   }finally{
     event.target.value = "";
   }
