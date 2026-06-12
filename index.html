@@ -532,6 +532,9 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Agents:</b> <span id="salesAgentCount">0</span></p>
           <p><b>Team Members:</b> <span id="salesStaffCount">0</span></p>
           <div class="salesActions">
+            <button class="salesSmallBtn green" onclick="exportMajorWebsiteBackup()">MAJOR A-Z EXPORT BACKUP</button>
+            <input id="majorWebsiteBackupFile" type="file" accept=".json" style="display:none" onchange="importMajorWebsiteBackup(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('majorWebsiteBackupFile').click()">MAJOR A-Z IMPORT BACKUP</button>
             <button class="salesSmallBtn green" onclick="exportSalesFullBackupExcel()">Export Full Sales Excel</button>
             <input id="salesFullImportFile" type="file" accept=".xlsx,.xls" style="display:none" onchange="importSalesFullBackupExcel(event)">
             <button class="salesSmallBtn gray" onclick="document.getElementById('salesFullImportFile').click()">Import Full Sales Excel</button>
@@ -4101,6 +4104,211 @@ function salesExcelNumber(row, keys){
   let value = salesExcelPick(row, keys);
   let number = Number(value);
   return Number.isFinite(number) ? number : 0;
+}
+
+function downloadJsonFile(filename, data){
+  let blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  let url = URL.createObjectURL(blob);
+  let link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function mergeObjectsByKey(current, incoming, keyFn){
+  let map = new Map();
+  (current || []).forEach(item => {
+    let key = keyFn(item);
+    if(key) map.set(key, item);
+  });
+  (incoming || []).forEach(item => {
+    let key = keyFn(item);
+    if(!key) key = "id:" + (item?.id || Date.now() + Math.random());
+    map.set(key, {...(map.get(key) || {}), ...item});
+  });
+  return Array.from(map.values());
+}
+
+function getMajorWebsiteBackupPayload(){
+  normalizeSalesTeamMemberNamesInState();
+  return {
+    backupType: "MTM_WEBSITE_A_Z_BACKUP",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    exportedBy: currentUser?.email || "",
+    dyeing: {
+      colors,
+      recipes,
+      programs,
+      processHouses,
+      stockPurchases,
+      stockLedger,
+      programStockUsage,
+      auditLogs,
+      priceChangeLogs,
+      recipeVersions
+    },
+    sales: salesState
+  };
+}
+
+async function exportMajorWebsiteBackup(){
+  if(!isAdmin()) return alert("Only Admin can export complete website backup.");
+  await loadDataFromJson();
+  if(canUseSalesCloud()) await loadSalesCloudState({silent:true});
+  downloadJsonFile(`mtm-major-a-z-backup-${new Date().toISOString().slice(0,10)}.json`, getMajorWebsiteBackupPayload());
+}
+
+function mergeMajorBackupIntoCurrent(backup){
+  let dyeing = backup?.dyeing || {};
+  colors = mergeObjectsByKey(colors, dyeing.colors || [], item => normalizeName(item.name));
+  recipes = mergeObjectsByKey(recipes, dyeing.recipes || [], item => normalizeName(item.recipeNo || item.recipe_no));
+  programs = mergeObjectsByKey(programs, dyeing.programs || [], item => String(item.programNo || item.program_no || item.id || ""));
+  processHouses = mergeObjectsByKey(processHouses, dyeing.processHouses || [], item => normalizeName(item.name));
+  stockPurchases = mergeObjectsByKey(stockPurchases, dyeing.stockPurchases || [], item => String(item.id || [item.chemical_name, item.purchase_date, item.purchased_qty_grams, item.supplier].join("|")));
+  stockLedger = mergeObjectsByKey(stockLedger, dyeing.stockLedger || [], item => String(item.id || [item.chemical_name || item.chemicalName, item.entry_type || item.entryType, item.qty_delta_grams || item.qtyDeltaGrams, item.created_at, item.note].join("|")));
+  programStockUsage = mergeObjectsByKey(programStockUsage, dyeing.programStockUsage || [], item => String(item.id || [item.program_no, item.program_name, item.chemical_name, item.qty_used_grams, item.created_at].join("|")));
+  auditLogs = mergeAuditLogs(dyeing.auditLogs || [], auditLogs || []);
+  priceChangeLogs = mergePriceChangeLogs(dyeing.priceChangeLogs || [], priceChangeLogs || []);
+  recipeVersions = mergeObjectsByKey(recipeVersions, dyeing.recipeVersions || [], item => String(item.id || [item.recipe_id, item.recipe_no, item.action_type, item.created_at].join("|")));
+
+  if(backup?.sales){
+    salesState.parties = mergeObjectsByKey(salesState.parties || [], backup.sales.parties || [], item => normalizeName(item.partyName || item.party_name));
+    salesState.misc = mergeObjectsByKey(salesState.misc || [], backup.sales.misc || [], item => [item.type, normalizeName(item.name)].join("|"));
+    salesState.agents = mergeObjectsByKey(salesState.agents || [], backup.sales.agents || [], item => normalizeName(item.email || item.name));
+    salesState.staffs = mergeObjectsByKey(salesState.staffs || [], backup.sales.staffs || [], item => normalizeName(item.email || item.name));
+    salesState.orders = mergeObjectsByKey(salesState.orders || [], backup.sales.orders || [], item => String(item.id || [item.mtmOrderNo, item.partyOrderNo, item.partyName].join("|")));
+    normalizeSalesTeamMemberNamesInState();
+  }
+  sortRecipesInPlace();
+}
+
+async function upsertBackupRows(table, rows, mapRow, matchFields){
+  if(!rows?.length) return;
+  for(let row of rows){
+    let payload = mapRow(row);
+    if(!payload) continue;
+    let updated = false;
+    if(payload.id){
+      let { data, error } = await supabaseClient.from(table).update(payload).eq("id", payload.id).select("id").maybeSingle();
+      if(error) throw new Error(`${table} update failed: ${error.message}`);
+      if(!error && data?.id) updated = true;
+    }
+    if(!updated && matchFields?.length){
+      let query = supabaseClient.from(table).select("id").limit(1);
+      matchFields.forEach(field => query = query.eq(field, payload[field]));
+      let { data } = await query.maybeSingle();
+      if(data?.id){
+        payload.id = data.id;
+        let { error } = await supabaseClient.from(table).update(payload).eq("id", data.id);
+        if(error) throw new Error(`${table} update failed: ${error.message}`);
+        if(!error) updated = true;
+      }
+    }
+    if(!updated){
+      let insertPayload = {...payload};
+      if(!insertPayload.id) delete insertPayload.id;
+      let { error } = await supabaseClient.from(table).insert(insertPayload);
+      if(error) throw new Error(`${table} insert failed: ${error.message}`);
+    }
+  }
+}
+
+async function saveMajorBackupToCloud(){
+  if(!supabaseClient || !isLoggedIn() || !isAdmin()) throw new Error("Login as Admin before importing backup.");
+  await upsertBackupRows("colors", colors, c => ({
+    id:c.id,
+    name:normalizeName(c.name),
+    rate:Number(c.rate) || 0,
+    color_type:c.colorType || c.color_type || getColorType(c.name, c.colorType || c.color_type)
+  }), ["name"]);
+  await upsertBackupRows("recipes", recipes, r => ({
+    id:r.id,
+    recipe_no:r.recipeNo || r.recipe_no || "",
+    color_name:r.colorName || r.color_name || "",
+    recipe_master_name:r.recipeMasterName || r.recipe_master_name || "",
+    than_count:Number(r.recipeThans || r.than_count) || null,
+    hex_code:r.hexCode || r.hex_code || "N/A",
+    dyes:r.dyes || [],
+    created_at:r.createdAt || r.created_at || new Date().toISOString()
+  }), ["recipe_no"]);
+  await upsertBackupRows("programs", programs, p => ({
+    id:p.id,
+    program_no:p.programNo || p.program_no,
+    program_name:p.programName || p.program_name || "",
+    status:p.status || "Pending",
+    program_date:p.programDate || p.program_date || null,
+    required_thans:Number(p.requiredThans || p.required_thans) || null,
+    stock_deducted:!!(p.stockDeducted || p.stock_deducted),
+    selected_recipe_numbers:p.selectedRecipeNumbers || p.selected_recipe_numbers || [],
+    recipe_snapshot:p.recipeSnapshot || p.recipe_snapshot || [],
+    created_at:p.createdAt || p.created_at || new Date().toISOString()
+  }), ["program_no"]);
+  await upsertBackupRows("process_houses", processHouses, h => ({
+    id:h.id,
+    name:h.name || "",
+    phone:h.phone || "",
+    gst:h.gst || "",
+    rate:h.rate || "",
+    address:h.address || ""
+  }), ["name"]);
+  await upsertBackupRows("chemical_stock_purchases", stockPurchases, p => ({
+    id:p.id,
+    chemical_name:normalizeName(p.chemical_name || p.chemicalName),
+    purchased_qty_grams:Number(p.purchased_qty_grams || p.purchasedQtyGrams) || 0,
+    unit:p.unit || "grams",
+    purchase_date:p.purchase_date || p.purchaseDate || new Date().toISOString().slice(0,10),
+    supplier:p.supplier || "",
+    rate_per_kg:Number(p.rate_per_kg || p.ratePerKg) || 0,
+    notes:p.notes || p.note || ""
+  }), ["chemical_name","purchase_date","purchased_qty_grams"]);
+  await upsertBackupRows("chemical_stock_ledger", stockLedger, l => ({
+    id:l.id,
+    chemical_name:normalizeName(l.chemical_name || l.chemicalName),
+    entry_type:l.entry_type || l.entryType || "adjustment",
+    qty_delta_grams:Number(l.qty_delta_grams || l.qtyDeltaGrams) || 0,
+    note:l.note || "",
+    created_at:l.created_at || l.createdAt || new Date().toISOString()
+  }), ["chemical_name","entry_type","qty_delta_grams","created_at"]);
+  await upsertBackupRows("program_stock_usage", programStockUsage, u => ({
+    id:u.id,
+    program_no:u.program_no || u.programNo || "",
+    program_name:u.program_name || u.programName || "",
+    program_date:u.program_date || u.programDate || null,
+    chemical_name:normalizeName(u.chemical_name || u.chemicalName),
+    qty_used_grams:Number(u.qty_used_grams || u.qtyUsedGrams) || 0,
+    before_stock_grams:Number(u.before_stock_grams || u.beforeStockGrams) || 0,
+    after_stock_grams:Number(u.after_stock_grams || u.afterStockGrams) || 0,
+    created_at:u.created_at || u.createdAt || new Date().toISOString()
+  }), ["program_no","chemical_name","qty_used_grams","created_at"]);
+  if(canUseSalesCloud()) await saveSalesState();
+  localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+}
+
+async function importMajorWebsiteBackup(event){
+  if(!isAdmin()) return alert("Only Admin can import complete website backup.");
+  let file = event.target.files?.[0];
+  if(!file) return;
+  try{
+    let backup = JSON.parse(await file.text());
+    if(backup?.backupType !== "MTM_WEBSITE_A_Z_BACKUP") throw new Error("This is not a valid MTM A-Z backup file.");
+    if(!confirm("Import MAJOR A-Z backup? Existing matching records will be updated. Duplicate data will be skipped/merged.")) return;
+    await loadDataFromJson();
+    if(canUseSalesCloud()) await loadSalesCloudState({silent:true});
+    mergeMajorBackupIntoCurrent(backup);
+    await saveMajorBackupToCloud();
+    await loadDataFromJson();
+    if(canUseSalesCloud()) await refreshSalesCloudData({silent:true});
+    renderAll();
+    renderSalesManager(false);
+    showSuccessToast("Major A-Z backup imported successfully");
+    alert("Major A-Z backup imported successfully. Duplicate matching records were merged, not added again.");
+  }catch(err){
+    alert("Major A-Z import failed: " + (err.message || err));
+  }finally{
+    event.target.value = "";
+  }
 }
 
 function exportSalesFullBackupExcel(){
