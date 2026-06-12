@@ -3543,7 +3543,18 @@ function printSalesPackingSlips(orderId, baleNo=null){
   if(!bales.length) return alert("No completed bales found for assortment slip.");
   let makeSlip = (bale, copyLabel) => {
     let creationDateTime = bale.createdAt ? new Date(bale.createdAt).toLocaleString("en-IN") : "-";
-    let rows = (bale.colors || []).map(c => `<tr><td>${salesEscape(c.colorNo)}</td><td>${salesEscape(c.qty)} pcs</td></tr>`).join("");
+    let colorItems = bale.colors || [];
+    let pairCount = colorItems.length > 24 ? 3 : colorItems.length > 12 ? 2 : 1;
+    let rowsPerPair = Math.ceil(colorItems.length / pairCount) || 1;
+    let headerCells = Array.from({length:pairCount}, () => `<th>Color No.</th><th>Pieces</th>`).join("");
+    let rows = Array.from({length:rowsPerPair}, (_, rowIndex) => {
+      let cells = [];
+      for(let pairIndex = 0; pairIndex < pairCount; pairIndex++){
+        let item = colorItems[(pairIndex * rowsPerPair) + rowIndex];
+        cells.push(item ? `<td>${salesEscape(item.colorNo)}</td><td>${salesEscape(item.qty)} pcs</td>` : `<td></td><td></td>`);
+      }
+      return `<tr>${cells.join("")}</tr>`;
+    }).join("");
     return `<div class="slipCopy">
     <div class="slipCopyLabel">${salesEscape(copyLabel).toUpperCase()}</div>
     <section class="packingSlip">
@@ -3570,7 +3581,7 @@ function printSalesPackingSlips(orderId, baleNo=null){
           <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
         </div>
       </div>
-      <table><thead><tr><th>Color No.</th><th>Pieces</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><th>Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
+      <table><thead><tr>${headerCells}</tr></thead><tbody>${rows}</tbody><tfoot><tr><th colspan="${(pairCount * 2) - 1}">Grand Total</th><th>${salesEscape(bale.totalQty)} pcs</th></tr></tfoot></table>
     </section><div class="slipFooter">Monica Textile Mills, Pali</div></div>`;
   };
   let slipHtml = bales.map(bale => `<div class="balePrintPage">${makeSlip(bale, "Office Copy")}${makeSlip(bale, "Party Copy")}</div>`).join("");
