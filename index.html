@@ -2537,13 +2537,25 @@ function resetSalesScreenState(){
   editingSalesMiscId = null;
   editingSalesOrderId = null;
   salesSelectedOrderId = null;
+  localStorage.removeItem(SALES_ACTIVE_BALE_ORDER_KEY);
+  localStorage.removeItem(SALES_BALE_DRAFT_KEY);
+  document.querySelectorAll(".salesPackTools.sticky,.salesPackTools.mobileFixed").forEach(el => {
+    el.classList.remove("sticky", "mobileFixed");
+    el.style.left = "";
+    el.style.width = "";
+  });
+  let total = document.getElementById("salesCurrentBaleTotal");
+  if(total) total.textContent = "0";
+  let bale = document.getElementById("salesBaleWorkArea");
+  if(bale){
+    bale.classList.remove("salesBaleWorkFloating");
+    bale.innerHTML = "Select an assigned order to start bale creation.";
+  }
   clearSalesOrderForm();
   clearSalesPartyForm();
   clearSalesAgentForm();
   clearSalesStaffForm();
   clearSalesMiscForm();
-  let bale = document.getElementById("salesBaleWorkArea");
-  if(bale) bale.innerHTML = "Select an assigned order to start bale creation.";
 }
 
 function refreshSalesDropdowns(){
