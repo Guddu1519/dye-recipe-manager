@@ -449,7 +449,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <p id="salesWorkspaceSubtitle">Orders, party master, dispatch planning, and team member bale packing.</p>
     </div>
     <div class="salesActions">
-      <button class="btn" onclick="refreshSalesCloudData()">Refresh Sales Cloud</button>
+      <button class="btn" onclick="resetAndRefreshSalesPage()">Refresh</button>
       <button class="btn danger" onclick="logoutUser()">Logout</button>
     </div>
   </div>
@@ -1882,6 +1882,9 @@ async function switchManagerMode(){
   if(supabaseClient){
     await supabaseClient.auth.signOut();
   }
+
+  clearSalesSearchFields();
+  resetSalesScreenState();
   currentUser = null;
   currentRole = "viewer";
   trialLoginActive = false;
@@ -2504,6 +2507,22 @@ function showSalesTab(tab, shouldRender=true){
   resetSalesPagePosition();
 }
 
+
+function clearSalesSearchFields(){
+  ["salesOrderSearch","salesPartySearch","salesAgentSearch","salesMiscSearch","salesStaffOrderSearch"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+}
+
+async function resetAndRefreshSalesPage(options={}){
+  clearSalesSearchFields();
+  resetSalesScreenState();
+  await refreshSalesCloudData({silent: !!options.silent});
+  renderSalesManager(false);
+  resetSalesPagePosition();
+  if(!options.silent) showSuccessToast("Page refreshed");
+}
 function resetSalesPagePosition(){
   window.scrollTo({top:0, left:0, behavior:"auto"});
   let sales = document.getElementById("salesEmptyPage");
@@ -2511,6 +2530,7 @@ function resetSalesPagePosition(){
 }
 
 function resetSalesScreenState(){
+  clearSalesSearchFields();
   editingSalesPartyId = null;
   editingSalesAgentId = null;
   editingSalesStaffId = null;
@@ -3757,9 +3777,9 @@ function applySalesRoleUi(){
   if(!readonly) return;
   document.querySelectorAll("#salesEmptyPage input, #salesEmptyPage select, #salesEmptyPage button").forEach(el => {
     let text = (el.textContent || "").trim();
-    let allowed = text === "Logout" || el.closest(".salesTabs");
+    let allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "salesPartySearch" || el.id === "salesAgentSearch" || el.id === "salesMiscSearch";
     if(isSalesAgent()){
-      allowed = text === "Logout" || el.closest(".salesTabs");
+      allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch";
     }
     if(isSalesStaff()){
       allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
@@ -4816,6 +4836,9 @@ async function logoutUser(auto=false){
     await supabaseClient.auth.signOut();
   }
 
+
+  clearSalesSearchFields();
+  resetSalesScreenState();
   currentUser = null;
   currentRole = "viewer";
   trialLoginActive = false;
@@ -9421,6 +9444,7 @@ initAuth();
 </script>
 </body>
 </html>
+
 
 
 
