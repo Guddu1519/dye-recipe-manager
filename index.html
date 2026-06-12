@@ -3544,7 +3544,7 @@ function printSalesPackingSlips(orderId, baleNo=null){
   let makeSlip = (bale, copyLabel) => {
     let creationDateTime = bale.createdAt ? new Date(bale.createdAt).toLocaleString("en-IN") : "-";
     let colorItems = bale.colors || [];
-    let pairCount = colorItems.length > 24 ? 3 : colorItems.length > 12 ? 2 : 1;
+    let pairCount = colorItems.length > 18 ? 3 : colorItems.length > 9 ? 2 : 1;
     let rowsPerPair = Math.ceil(colorItems.length / pairCount) || 1;
     let headerCells = Array.from({length:pairCount}, () => `<th>Color No.</th><th>Pieces</th>`).join("");
     let rows = Array.from({length:rowsPerPair}, (_, rowIndex) => {
