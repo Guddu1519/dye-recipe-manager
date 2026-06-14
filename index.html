@@ -3376,6 +3376,38 @@ function isSalesOrderLocked(order){
   return !!(order?.adminPaidLocked || order?.manualPaidByAdmin);
 }
 
+function getSalesOrderDisplayStatus(order){
+  if(isSalesOrderLocked(order)) return "Completed";
+  return order?.status || "Not Assigned Yet";
+}
+
+function getSalesOrderStatusClass(order){
+  let status = getSalesOrderDisplayStatus(order);
+  if(status === "Completed" || status === "Packed") return "green";
+  if(status === "Cancelled") return "red";
+  return "amber";
+}
+
+function getSalesUserNameByEmail(email){
+  let key = String(email || "").trim().toLowerCase();
+  if(!key) return "";
+  let profile = (salesProfiles || []).find(p => String(p.login_email || p.loginEmail || p.email || "").trim().toLowerCase() === key);
+  let agent = (salesState.agents || []).find(a => String(a.email || "").trim().toLowerCase() === key);
+  let staff = (salesState.staffs || []).find(s => String(s.email || "").trim().toLowerCase() === key);
+  return profile?.full_name || profile?.fullName || profile?.username || agent?.name || staff?.name || key;
+}
+
+function getSalesManualPaidText(order){
+  if(!isSalesOrderLocked(order)) return "";
+  let adminName = getSalesUserNameByEmail(order.manualPaidBy) || order.manualPaidBy || "Admin";
+  return `Paid manually by admin: ${adminName}`;
+}
+
+function getSalesManualPaidBadge(order){
+  let text = getSalesManualPaidText(order);
+  return text ? `<span class="salesBadge green">${salesEscape(text)}</span>` : "";
+}
+
 async function acceptSalesOrder(id){
   if(isTrialUser()) return alert("Trial login can only view. Team member actions are disabled.");
   let order = salesState.orders.find(o => o.id === id);
@@ -4084,7 +4116,7 @@ function renderSalesOrders(){
   }).slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));
   document.getElementById("salesOrderCount").textContent = orders.length;
   document.getElementById("salesOverviewQty").textContent = orders.reduce((sum,o)=>sum + (Number(o.totalQty)||0),0);
-  document.getElementById("salesPackedCount").textContent = orders.filter(o=>o.status === "Packed").length;
+  document.getElementById("salesPackedCount").textContent = orders.filter(o=>getSalesOrderDisplayStatus(o) === "Packed" || getSalesOrderDisplayStatus(o) === "Completed").length;
   let agentCount = document.getElementById("salesAgentCount");
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
@@ -4097,7 +4129,7 @@ function renderSalesOrders(){
       <td><b>${salesEscape(getSalesOrderConfLine(o))}</b><br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td><span class="${o.assignedStaff ? "salesHighlightField" : "salesHighlightField red"}">Assigned to : ${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
       <td>${o.totalQty}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td><td>${(o.bales || []).length}</td><td>${getSalesPendingBales(o)}</td>
-      <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
+      <td><span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span>${isSalesOrderLocked(o) ? '<br>' + getSalesManualPaidBadge(o) : ""}</td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button> <button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button> <button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
   if(mobile){
@@ -4116,9 +4148,9 @@ function renderSalesOrders(){
         <span><b>Expected Bales:</b> ${salesEscape(calculateSalesExpectedBales(o.totalQty, o.qtyPerBale))}</span>
         <span><b>Created Bales:</b> ${salesEscape((o.bales || []).length)}</span>
         <span><b>Pending Bales:</b> ${salesEscape(getSalesPendingBales(o))}</span>
-        <span><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></span>
+        <span><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></span>
       </div>
-      ${isSalesOrderLocked(o) ? '<div class="salesOrderLine"><span class="salesBadge red">Manually paid by admin</span></div>' : ""}
+      ${isSalesOrderLocked(o) ? `<div class="salesOrderLine">${getSalesManualPaidBadge(o)}</div>` : ""}
       <div class="salesOrderActions"><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button><button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button><button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button><button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button><button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button><button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button><button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></div>
     </div>`).join("") : `<div class="salesMobileCard muted">No orders found.</div>`;
   }
@@ -4144,7 +4176,7 @@ function renderSalesAgentPortal(){
       <td>${getSalesBaleStatusHtml(o)}</td>
       <td>${salesEscape(getSalesColorSummary(o, "pending"))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
-      <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
+      <td><span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span>${isSalesOrderLocked(o) ? '<br>' + getSalesManualPaidBadge(o) : ""}</td>
     </tr>`).join("");
   if(mobile){
     mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard">
@@ -4153,7 +4185,8 @@ function renderSalesAgentPortal(){
       <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
       <p><b>Bales:</b><br>${getSalesBaleStatusHtml(o)}</p>
       <p><b>Pending Colors:</b> ${salesEscape(getSalesColorSummary(o, "pending"))}</p>
-      <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></p>
+      <p><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></p>
+      ${isSalesOrderLocked(o) ? `<p>${getSalesManualPaidBadge(o)}</p>` : ""}
     </div>`).join("") : `<div class="salesMobileCard muted">No orders found for this agent.</div>`;
   }
 }
@@ -4198,7 +4231,7 @@ function renderSalesStaffOrders(){
   let adminView = isSalesAdmin();
   let actionHtml = (o) => {
     if(isSalesAdmin()) return `<button class="salesSmallBtn" onclick="viewSalesOrderTeamReport('${o.id}')">Get Details</button>`;
-    if(isSalesOrderLocked(o)) return `<span class="salesBadge red">Manually paid by admin</span> <button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">View / Print Bales</button>`;
+    if(isSalesOrderLocked(o)) return `${getSalesManualPaidBadge(o)} <button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">View / Print Bales</button>`;
     return `${o.status === "Assigned" ? `<button class="salesSmallBtn green" onclick="acceptSalesOrder('${o.id}')">Accept Order</button>` : ""}
           ${o.status !== "Packed" ? `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">Start Bale Creation</button>` : `<button class="salesSmallBtn" onclick="startSalesBaleCreation('${o.id}')">View / Print Bales</button>`}`;
   };
@@ -4211,7 +4244,7 @@ function renderSalesStaffOrders(){
       <td><span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></td>
       <td><b>${salesEscape(getSalesOrderConfLine(o))}</b><br><b>Quality:</b> ${salesEscape(o.quality || "N/A")} | <b>Cut:</b> ${salesEscape(o.cut || "-")}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td>
-      <td><span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></td>
+      <td><span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span>${isSalesOrderLocked(o) ? '<br>' + getSalesManualPaidBadge(o) : ""}</td>
       <td>${actionHtml(o)}</td>
     </tr>`).join("");
   if(mobile){
@@ -4224,7 +4257,8 @@ function renderSalesStaffOrders(){
       <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</p>
       <p><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</p>
       <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
-      <p><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : "amber"}">${salesEscape(o.status)}</span></p>
+      <p><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></p>
+      ${isSalesOrderLocked(o) ? `<p>${getSalesManualPaidBadge(o)}</p>` : ""}
       <div class="salesActions">${actionHtml(o)}</div>
     </div>`).join("") : `<div class="salesMobileCard muted">No assigned orders.</div>`;
   }
@@ -4284,7 +4318,7 @@ function renderSalesBaleWorkArea(){
     area.innerHTML = `<h3>Team Member Report - ${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
       <div class="salesPackTools">
         <div><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}<br><b>Total Bales:</b> ${bales.length}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
-        <div><b>Average Bales Per Day:</b> ${avgPerDay}<br><b>Average Bale Creating Time:</b> ${avgTime}<br><b>Status:</b> ${salesEscape(order.status)} ${isSalesOrderLocked(order) ? '<span class="salesBadge red">Manually paid by admin</span>' : ""}</div>
+        <div><b>Average Bales Per Day:</b> ${avgPerDay}<br><b>Average Bale Creating Time:</b> ${avgTime}<br><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(order)}">${salesEscape(getSalesOrderDisplayStatus(order))}</span> ${isSalesOrderLocked(order) ? getSalesManualPaidBadge(order) : ""}</div>
       </div>
       <div class="salesTableWrap salesDesktopTable"><table class="salesTable"><tr><th>Bale</th><th>QTY</th><th>Created</th><th>By</th><th>Colors</th><th>Action</th></tr>${rows || '<tr><td colspan="6" class="muted">No bales created yet.</td></tr>'}</table></div>
       <div class="salesMobileCards">${mobileRows || '<div class="salesMobileCard muted">No bales created yet.</div>'}</div>`;
@@ -4321,7 +4355,7 @@ function renderSalesBaleWorkArea(){
       <div><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}<br><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</div>
       <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Cut:</b> ${salesEscape(order.cut || "-")}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
     </div>
-    ${isSalesOrderLocked(order) ? '<p><span class="salesBadge red">Manually paid by admin. Order is locked.</span></p>' : order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackStickySpacer"></div><div class="salesPackTools sticky"><div><b>QTY Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><div class="salesPackActionStack"><button class="salesSmallBtn clearQtyBtn" onclick="clearSalesCurrentBaleQty()">CLEAR QTY</button><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div></div>`}
+    ${isSalesOrderLocked(order) ? `<p>${getSalesManualPaidBadge(order)} <span class="salesBadge green">Order completed and locked</span></p>` : order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackStickySpacer"></div><div class="salesPackTools sticky"><div><b>QTY Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><div class="salesPackActionStack"><button class="salesSmallBtn clearQtyBtn" onclick="clearSalesCurrentBaleQty()">CLEAR QTY</button><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div></div>`}
     <div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<div class="salesBalePrintTools"><button class="salesSmallBtn" onclick="printSelectedSalesBales('${order.id}')">Print Selected Bales</button><button class="salesSmallBtn gray" onclick="printSalesPackingSlips('${order.id}')">Print All Assortment Slips</button></div>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
   restoreSalesBaleDraft(order.id);
@@ -9622,6 +9656,7 @@ initAuth();
 </script>
 </body>
 </html>
+
 
 
 

@@ -58,6 +58,12 @@ function isOrderLocked(order) {
   return !!(order?.adminPaidLocked || order?.manualPaidByAdmin);
 }
 
+function manualPaidText(order) {
+  if (!isOrderLocked(order)) return "";
+  const admin = String(order?.manualPaidBy || "Admin").trim();
+  return `Paid manually by admin: ${admin || "Admin"}`;
+}
+
 function orderStation(order) {
   return order?.partyAddress || order?.address || order?.station || "-";
 }
@@ -643,7 +649,7 @@ export default function App() {
                 <Text style={styles.metaStrong}>Status: </Text>
                 <Text style={[styles.status, locked && styles.statusLocked]}>{status}</Text>
               </View>
-              {locked && <Text style={styles.lockNote}>Manually paid by admin. Counted as completed.</Text>}
+              {locked && <Text style={styles.lockNote}>{manualPaidText(item)}</Text>}
               <View style={styles.rowActions}>
                 {locked ? (
                   <AppButton title="View / Print Bales" onPress={() => setSelectedOrderId(String(item.id))} />
@@ -667,7 +673,7 @@ export default function App() {
               <Text style={styles.sheetTitle}>Bale Creation</Text>
             </View>
             <Text style={styles.sheetSub}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
-            {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>Manually paid by admin. Order is locked. Printing is available.</Text>}
+            {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>{manualPaidText(selectedOrder)}. Order completed and locked. Printing is available.</Text>}
             {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((row) => {
               const alreadyTaken = getTakenDetails(selectedOrder, row.colorNo);
               const completed = row.pending <= 0;
@@ -769,7 +775,7 @@ const styles = StyleSheet.create({
   orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   orderNo: { fontSize: 22, fontWeight: "900", color: "#0f172a" },
   status: { color: "#92400e", backgroundColor: "#fef3c7", overflow: "hidden", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, fontWeight: "900" },
-  statusLocked: { color: "#991b1b", backgroundColor: "#fee2e2" },
+  statusLocked: { color: "#166534", backgroundColor: "#dcfce7" },
   statusLine: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 4 },
   qualityLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, flexWrap: "wrap" },
   qualityBadge: { color: "#92400e", backgroundColor: "#fef3c7", borderColor: "#f59e0b", borderWidth: 1, overflow: "hidden", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, fontWeight: "900" },
@@ -777,7 +783,7 @@ const styles = StyleSheet.create({
   meta: { color: "#475569", fontWeight: "600", marginTop: 5 },
   metaStrong: { color: "#0f172a", fontWeight: "900", marginTop: 8 },
   metaValue: { color: "#475569", fontWeight: "700" },
-  lockNote: { color: "#991b1b", backgroundColor: "#fee2e2", borderRadius: 12, padding: 10, fontWeight: "900", marginTop: 10 },
+  lockNote: { color: "#166534", backgroundColor: "#dcfce7", borderRadius: 12, padding: 10, fontWeight: "900", marginTop: 10 },
   rowActions: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 12 },
   button: { backgroundColor: "#16a34a", borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
   buttonDanger: { backgroundColor: "#dc2626" },
