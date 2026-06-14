@@ -611,23 +611,35 @@ export default function App() {
           const total = getOrderTotal(item);
           const sent = getBaleSent(item);
           const locked = isOrderLocked(item);
+          const status = item.status || "Assigned";
           return (
             <Pressable onPress={() => setSelectedOrderId(String(item.id))} style={[styles.orderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
               <View style={styles.orderTop}>
-                <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"}</Text>
-                <Text style={[styles.status, locked && styles.statusLocked]}>{locked ? "Manually Paid" : item.status || "Assigned"}</Text>
+                <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"} - {item.partyName || "-"}</Text>
               </View>
-              <Text style={styles.party}>{item.partyName || "-"}</Text>
-              <Text style={styles.meta}>Quality: {item.quality || "-"} | Cut: {item.cut || "-"}</Text>
+              <Text style={styles.metaStrong}>Party Order: <Text style={styles.metaValue}>{item.partyOrderNo || "-"}</Text></Text>
+              <Text style={styles.metaStrong}>Agent: <Text style={styles.metaValue}>{item.agentName || "-"}</Text></Text>
+              <View style={styles.qualityLine}>
+                <Text style={styles.metaStrong}>Quality: </Text>
+                <Text style={styles.qualityBadge}>{item.quality || "-"}</Text>
+              </View>
               <Text style={styles.meta}>Packing: {item.packing || "-"} | Patta: {item.patta || "-"}</Text>
-              <Text style={styles.meta}>Transport: {item.transport || "-"} | Station: {orderStation(item)}</Text>
+              <Text style={styles.metaStrong}>Cut: <Text style={styles.metaValue}>{item.cut || "-"}</Text></Text>
+              <Text style={styles.meta}>Stamping: {item.stamping || "-"} | Transport: {item.transport || "-"}</Text>
               <Text style={styles.metaStrong}>Total / Sent / Pending: {total} / {sent} / {total - sent}</Text>
-              {locked && <Text style={styles.lockNote}>Locked by admin. Existing bales can be viewed/printed.</Text>}
+              <View style={styles.statusLine}>
+                <Text style={styles.metaStrong}>Status: </Text>
+                <Text style={[styles.status, locked && styles.statusLocked]}>{status}</Text>
+              </View>
+              {locked && <Text style={styles.lockNote}>Manually paid by admin</Text>}
               <View style={styles.rowActions}>
-                {!locked && <AppButton title="Accept" onPress={() => updateOrderStatus(item.id, "Accepted")} tone="ghost" />}
-                {!locked && <AppButton title="In Process" onPress={() => updateOrderStatus(item.id, "In Packing")} tone="ghost" />}
-                <AppButton title="Open Work" onPress={() => setSelectedOrderId(String(item.id))} />
-                {(item.bales || []).length > 0 && <AppButton title="Print Bales" onPress={() => printBales(item)} tone="ghost" />}
+                {locked ? (
+                  <AppButton title="View / Print Bales" onPress={() => setSelectedOrderId(String(item.id))} />
+                ) : status === "Assigned" ? (
+                  <AppButton title="Accept Order" onPress={() => updateOrderStatus(item.id, "Accepted")} />
+                ) : (
+                  <AppButton title="Start Bale Creation" onPress={() => setSelectedOrderId(String(item.id))} />
+                )}
               </View>
             </Pressable>
           );
@@ -750,9 +762,13 @@ const styles = StyleSheet.create({
   orderNo: { fontSize: 22, fontWeight: "900", color: "#0f172a" },
   status: { color: "#92400e", backgroundColor: "#fef3c7", overflow: "hidden", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, fontWeight: "900" },
   statusLocked: { color: "#991b1b", backgroundColor: "#fee2e2" },
+  statusLine: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 4 },
+  qualityLine: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 8, flexWrap: "wrap" },
+  qualityBadge: { color: "#92400e", backgroundColor: "#fef3c7", borderColor: "#f59e0b", borderWidth: 1, overflow: "hidden", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, fontWeight: "900" },
   party: { fontSize: 18, color: "#0f172a", fontWeight: "900", marginTop: 8 },
   meta: { color: "#475569", fontWeight: "600", marginTop: 5 },
   metaStrong: { color: "#0f172a", fontWeight: "900", marginTop: 8 },
+  metaValue: { color: "#475569", fontWeight: "700" },
   lockNote: { color: "#991b1b", backgroundColor: "#fee2e2", borderRadius: 12, padding: 10, fontWeight: "900", marginTop: 10 },
   rowActions: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 12 },
   button: { backgroundColor: "#16a34a", borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
