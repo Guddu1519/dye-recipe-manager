@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "MTM - Agents",
+    "owner": "guddu1519",
     "slug": "mtm-agents",
     "version": "1.0.0",
     "orientation": "portrait",
