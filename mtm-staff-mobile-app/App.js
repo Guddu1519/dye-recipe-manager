@@ -722,14 +722,9 @@ export default function App() {
             </View>
             <AppButton title="Clear QTY" onPress={() => setPackingQty({})} tone="ghost" />
             {!isOrderLocked(selectedOrder) && <AppButton title="Create Bale" onPress={createBale} />}
-            <AppButton title="Close" onPress={() => setSelectedOrderId(null)} tone="danger" />
           </View>
         </View>
       )}
-
-      <View style={styles.footerActions}>
-        <AppButton title="Logout" onPress={handleLogout} tone="danger" />
-      </View>
     </SafeAreaView>
   );
 }
