@@ -1,0 +1,11 @@
+node_modules/
+.expo/
+dist/
+build/
+android/
+ios/
+*.apk
+*.aab
+*.jks
+*.keystore
+.env

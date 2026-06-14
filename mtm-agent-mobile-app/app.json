@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "MTM - Agents",
+    "slug": "mtm-agents",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#eff6ff"
+    },
+    "android": {
+      "package": "com.monicatxt.mtmagents",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": []
+    },
+    "extra": {
+      "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
+      "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
+  }
+}
