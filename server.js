@@ -28,7 +28,7 @@ app.post("/api/verify-delete-pin", (req, res) => {
 });
 
 app.use(express.static(__dirname));
-app.get("/", (req, res) => {
+function sendIndex(req, res) {
   const html1 = path.join(__dirname, "index.html");
   const html2 = path.join(__dirname, "index.HTML");
 
@@ -39,7 +39,9 @@ app.get("/", (req, res) => {
   } else {
     res.send("index file not found");
   }
-});
+}
+
+app.get(["/", "/admin", "/team", "/agent"], sendIndex);
 
 app.use("/api", (req, res) => {
   res.status(404).json({

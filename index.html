@@ -1846,6 +1846,23 @@ function openAgentPortal(){
   setTimeout(() => document.getElementById("agentLoginEmail")?.focus(), 80);
 }
 
+function openSalesRouteFromPath(){
+  let path = String(window.location.pathname || "/").replace(/\/+$/, "").toLowerCase() || "/";
+  if(path === "/admin"){
+    openSalesAdminPortal();
+    return true;
+  }
+  if(path === "/team"){
+    openStaffPortal();
+    return true;
+  }
+  if(path === "/agent"){
+    openAgentPortal();
+    return true;
+  }
+  return false;
+}
+
 async function showSalesWorkspace(portalMode=currentManagerMode){
   hideAllEntryScreens();
   let sales = document.getElementById("salesEmptyPage");
@@ -5279,7 +5296,7 @@ async function initAuth(){
   await supabaseClient.auth.signOut();
   currentUser = null;
   currentRole = "viewer";
-  showManagerSelect();
+  if(!openSalesRouteFromPath()) showManagerSelect();
   startInactivityWatch();
 
   supabaseClient.auth.onAuthStateChange(async function(event, session){
@@ -5294,7 +5311,7 @@ async function initAuth(){
     } else if(event === "SIGNED_OUT"){
       currentUser = null;
       currentRole = "viewer";
-      if(!switchingManagerMode) showManagerSelect();
+      if(!switchingManagerMode && !openSalesRouteFromPath()) showManagerSelect();
     }
   });
 }
