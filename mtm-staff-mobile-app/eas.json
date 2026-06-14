@@ -1,0 +1,25 @@
+{
+  "cli": {
+    "version": ">= 16.8.0"
+  },
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dgxrkymrestwrcwgntdu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://dgxrkymrestwrcwgntdu.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil"
+      }
+    }
+  }
+}

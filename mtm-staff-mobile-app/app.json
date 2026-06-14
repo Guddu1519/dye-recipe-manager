@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "MTM Staff",
+    "slug": "mtm-staff",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#eff6ff"
+    },
+    "android": {
+      "package": "com.monicatxt.mtmstaff",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": [
+        "NOTIFICATIONS"
+      ]
+    },
+    "extra": {
+      "supabaseUrl": "$EXPO_PUBLIC_SUPABASE_URL",
+      "supabaseAnonKey": "$EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
