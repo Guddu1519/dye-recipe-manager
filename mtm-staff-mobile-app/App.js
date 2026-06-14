@@ -167,11 +167,11 @@ export default function App() {
   const loadSalesState = useCallback(async () => {
     const { data, error } = await supabase
       .from("sales_state")
-      .select("state")
+      .select("data")
       .eq("id", "main")
       .maybeSingle();
     if (error) throw error;
-    const nextState = data?.state || emptySalesState;
+    const nextState = data?.data || emptySalesState;
     nextState.orders ||= [];
     nextState.parties ||= [];
     nextState.misc ||= [];
@@ -184,7 +184,7 @@ export default function App() {
   const saveSalesState = useCallback(async (nextState) => {
     const { error } = await supabase
       .from("sales_state")
-      .upsert({ id: "main", state: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      .upsert({ id: "main", data: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" });
     if (error) throw error;
     setSalesState(nextState);
   }, []);
