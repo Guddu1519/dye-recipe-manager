@@ -3950,14 +3950,14 @@ function renderSalesOrders(){
   let staffCount = document.getElementById("salesStaffCount");
   if(agentCount) agentCount.textContent = salesState.agents.length || salesProfiles.filter(p => p.role === "agent").length;
   if(staffCount) staffCount.textContent = salesState.staffs.length || salesProfiles.filter(p => p.role === "staff").length;
-  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Order Details</th><th>Assigned To</th><th>Total QTY</th><th>Pending PCS</th><th>Bale Size</th><th>Expected Bales</th><th>Pending Bales</th><th>Status</th><th>Action</th></tr>` +
+  table.innerHTML = `<tr><th>MTM Order</th><th>Date</th><th>Party</th><th>GST</th><th>Agent</th><th>Order Details</th><th>Assigned To</th><th>Total QTY</th><th>Pending PCS</th><th>Bale Size</th><th>Expected Bales</th><th>Created Bales</th><th>Pending Bales</th><th>Status</th><th>Action</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td><span class="salesHighlightField">${salesEscape(o.partyName)}</span></td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
       <td><b>${salesEscape(getSalesOrderConfLine(o))}</b><br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td><span class="${o.assignedStaff ? "salesHighlightField" : "salesHighlightField red"}">Assigned to : ${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
-      <td>${o.totalQty}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td><td>${getSalesPendingBales(o)}</td>
+      <td>${o.totalQty}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td><td>${(o.bales || []).length}</td><td>${getSalesPendingBales(o)}</td>
       <td><span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span>${isSalesOrderLocked(o) ? '<br><span class="salesBadge red">Manually paid by admin</span>' : ""}</td>
       <td><button class="salesSmallBtn green" onclick="assignSalesOrderToStaff('${o.id}')">${o.assignedStaff ? "Change Team Member" : "Push to Team Member"}</button> <button class="salesSmallBtn gray" onclick="quickUpdateSalesOrderDetails('${o.id}')">Fix Details</button> <button class="salesSmallBtn" onclick="printSalesPackingSlips('${o.id}')">Assortment Slip</button> <button class="salesSmallBtn" onclick="printSalesOrderPendingReport('${o.id}')">Pending Report</button> <button class="salesSmallBtn gray" onclick="toggleSalesOrderPaidLock('${o.id}')">${isSalesOrderLocked(o) ? "Unpaid Order" : "Paid Order"}</button> <button class="salesSmallBtn gray" onclick="cancelSalesOrder('${o.id}')">Cancel</button> <button class="salesSmallBtn red" onclick="deleteSalesOrder('${o.id}')">Delete</button></td>
     </tr>`).join("");
@@ -3975,6 +3975,7 @@ function renderSalesOrders(){
         <span><b>Pending PCS:</b> ${salesEscape(getSalesPendingQty(o))}</span>
         <span><b>Bale Size:</b> ${salesEscape(o.qtyPerBale)}</span>
         <span><b>Expected Bales:</b> ${salesEscape(calculateSalesExpectedBales(o.totalQty, o.qtyPerBale))}</span>
+        <span><b>Created Bales:</b> ${salesEscape((o.bales || []).length)}</span>
         <span><b>Pending Bales:</b> ${salesEscape(getSalesPendingBales(o))}</span>
         <span><b>Status:</b> <span class="salesBadge ${o.status === "Packed" ? "green" : o.status === "Cancelled" ? "red" : "amber"}">${salesEscape(o.status)}</span></span>
       </div>
