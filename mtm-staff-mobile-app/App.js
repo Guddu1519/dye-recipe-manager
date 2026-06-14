@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import * as Print from "expo-print";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -52,6 +53,30 @@ function getBaleSent(order) {
   return (order.bales || []).reduce((sum, bale) => sum + Number(bale.totalQty || 0), 0);
 }
 
+function isOrderLocked(order) {
+  return !!(order?.adminPaidLocked || order?.manualPaidByAdmin);
+}
+
+function orderStation(order) {
+  return order?.partyAddress || order?.address || order?.station || "-";
+}
+
+function orderTeamName(order, bale, profile) {
+  return String(bale?.staff || order?.assignedStaffName || profile?.full_name || profile?.username || order?.assignedStaff || "Team Member")
+    .replace(/@.*/, "")
+    .trim();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  })[ch]);
+}
+
 function getPendingRows(order) {
   const usedByColor = {};
   (order.bales || []).forEach((bale) => {
@@ -71,6 +96,96 @@ function getPendingRows(order) {
       pending: ordered - sent
     };
   });
+}
+
+function makeSlipCopyHtml(order, bale, copyLabel, profile) {
+  const items = bale.colors || [];
+  const pairCount = items.length > 18 ? 3 : items.length > 9 ? 2 : 1;
+  const rowsPerPair = Math.ceil(items.length / pairCount) || 1;
+  const headerCells = Array.from({ length: pairCount }, () => "<th>Color No.</th><th>Pieces</th>").join("");
+  const rows = Array.from({ length: rowsPerPair }, (_, rowIndex) => {
+    const cells = [];
+    for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
+      const item = items[(pairIndex * rowsPerPair) + rowIndex];
+      cells.push(item ? `<td>${escapeHtml(item.colorNo)}</td><td>${escapeHtml(item.qty)} pcs</td>` : "<td></td><td></td>");
+    }
+    return `<tr>${cells.join("")}</tr>`;
+  }).join("");
+
+  return `
+    <div class="slipCopy">
+      <div class="copyLabel">${escapeHtml(copyLabel).toUpperCase()}</div>
+      <section class="packingSlip">
+        <div class="slipHead">
+          <h2>Assortment Slip</h2>
+          <h2>Bale No :</h2>
+          <h2>Bale ${escapeHtml(bale.baleNo)}</h2>
+        </div>
+        <div class="slipMeta">
+          <p class="party"><b>Party:</b> ${escapeHtml(order.partyName || "-")}</p>
+          <div class="metaCol">
+            <p><b>Party Order No:</b> ${escapeHtml(order.partyOrderNo || "-")}</p>
+            <p><b>Quality:</b> ${escapeHtml(order.quality || "-")}</p>
+            <p><b>Cut:</b> ${escapeHtml(order.cut || "-")}</p>
+            <p><b>Station :</b> ${escapeHtml(orderStation(order))}</p>
+            <p><b>Transport:</b> ${escapeHtml(order.transport || "-")}</p>
+          </div>
+          <div class="metaCol">
+            <p><b>Creation Time:</b> ${escapeHtml(displayDate(bale.createdAt))}</p>
+            <p><b>MTM Order No:</b> ${escapeHtml(order.mtmOrderNo || "-")}</p>
+            <p><b>Stamping:</b> ${escapeHtml(order.stamping || "-")}</p>
+            <p><b>Packing:</b> ${escapeHtml(order.packing || "-")}</p>
+            <p><b>Patta:</b> ${escapeHtml(order.patta || "-")}</p>
+            <p><b>By:</b> ${escapeHtml(orderTeamName(order, bale, profile))}</p>
+          </div>
+        </div>
+        <table>
+          <thead><tr>${headerCells}</tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><th colspan="${(pairCount * 2) - 1}">Grand Total</th><th>${escapeHtml(bale.totalQty)} pcs</th></tr></tfoot>
+        </table>
+      </section>
+      <div class="slipFooter">Monica Textile Mills, Pali</div>
+    </div>
+  `;
+}
+
+function makeSlipHtml(order, bales, profile) {
+  const pages = bales.map((bale) => `
+    <div class="page">
+      ${makeSlipCopyHtml(order, bale, "Office Copy", profile)}
+      ${makeSlipCopyHtml(order, bale, "Party Copy", profile)}
+    </div>
+  `).join("");
+
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        @page{size:A5 landscape;margin:6mm}
+        *{box-sizing:border-box}
+        body{font-family:Arial,sans-serif;margin:0;color:#111}
+        .page{display:grid;grid-template-columns:1fr 1fr;gap:4mm;page-break-after:always}
+        .slipCopy{position:relative}
+        .copyLabel{text-align:right;font-size:11px;margin-bottom:2px}
+        .packingSlip{border:1px solid #111}
+        .slipHead{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;border-bottom:1px solid #111;padding:5px 8px}
+        h2{margin:0;font-size:15px;white-space:nowrap}
+        h2:nth-child(2){text-align:center}
+        h2:nth-child(3){text-align:right}
+        .slipMeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px 8px;font-size:11px}
+        .party{grid-column:1 / -1;font-size:12px;font-weight:700;margin:0}
+        p{margin:2px 0;line-height:1.12}
+        table{width:calc(100% - 12px);margin:5px 6px;border-collapse:collapse;font-size:10.5px}
+        th,td{border:1px solid #888;padding:2px 4px;text-align:left}
+        th{background:#dbeafe}
+        tfoot th{background:#fff}
+        .slipFooter{text-align:center;font-weight:700;font-size:10px;margin-top:2px}
+      </style>
+    </head>
+    <body>${pages}</body>
+  </html>`;
 }
 
 function AppButton({ title, onPress, tone = "primary", disabled = false }) {
@@ -323,6 +438,11 @@ export default function App() {
   }
 
   async function updateOrderStatus(orderId, status) {
+    const order = salesState.orders.find((item) => String(item.id) === String(orderId));
+    if (isOrderLocked(order)) {
+      Alert.alert("Order Locked", "This order is manually paid by admin. You can view and print bales only.");
+      return;
+    }
     const nextState = {
       ...salesState,
       orders: (salesState.orders || []).map((order) =>
@@ -336,6 +456,10 @@ export default function App() {
 
   async function createBale() {
     if (!selectedOrder) return;
+    if (isOrderLocked(selectedOrder)) {
+      Alert.alert("Order Locked", "This order is manually paid by admin. You can view and print bales only.");
+      return;
+    }
     const packed = Object.entries(packingQty)
       .map(([colorNo, qty]) => ({ colorNo, qty: Number(qty || 0) }))
       .filter((row) => row.qty > 0);
@@ -372,6 +496,22 @@ export default function App() {
       Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`);
     } catch (error) {
       Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
+    }
+  }
+
+  async function printBales(order, baleNo = null) {
+    const bales = (order?.bales || []).filter((bale) => (baleNo ? Number(bale.baleNo) === Number(baleNo) : true));
+    if (!bales.length) {
+      Alert.alert("No Bales", "No completed bales found for assortment slip.");
+      return;
+    }
+    try {
+      await Print.printAsync({
+        html: makeSlipHtml(order, bales, profile),
+        orientation: Print.Orientation.landscape
+      });
+    } catch (error) {
+      Alert.alert("Print Failed", error.message || "Could not open print/save PDF.");
     }
   }
 
@@ -445,21 +585,24 @@ export default function App() {
         renderItem={({ item }) => {
           const total = getOrderTotal(item);
           const sent = getBaleSent(item);
+          const locked = isOrderLocked(item);
           return (
             <Pressable onPress={() => setSelectedOrderId(String(item.id))} style={[styles.orderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
               <View style={styles.orderTop}>
                 <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"}</Text>
-                <Text style={styles.status}>{item.status || "Assigned"}</Text>
+                <Text style={[styles.status, locked && styles.statusLocked]}>{locked ? "Manually Paid" : item.status || "Assigned"}</Text>
               </View>
               <Text style={styles.party}>{item.partyName || "-"}</Text>
               <Text style={styles.meta}>Quality: {item.quality || "-"} | Cut: {item.cut || "-"}</Text>
               <Text style={styles.meta}>Packing: {item.packing || "-"} | Patta: {item.patta || "-"}</Text>
-              <Text style={styles.meta}>Transport: {item.transport || "-"} | Station: {item.address || "-"}</Text>
+              <Text style={styles.meta}>Transport: {item.transport || "-"} | Station: {orderStation(item)}</Text>
               <Text style={styles.metaStrong}>Total / Sent / Pending: {total} / {sent} / {total - sent}</Text>
+              {locked && <Text style={styles.lockNote}>Locked by admin. Existing bales can be viewed/printed.</Text>}
               <View style={styles.rowActions}>
-                <AppButton title="Accept" onPress={() => updateOrderStatus(item.id, "Accepted")} tone="ghost" />
-                <AppButton title="In Process" onPress={() => updateOrderStatus(item.id, "In Packing")} tone="ghost" />
+                {!locked && <AppButton title="Accept" onPress={() => updateOrderStatus(item.id, "Accepted")} tone="ghost" />}
+                {!locked && <AppButton title="In Process" onPress={() => updateOrderStatus(item.id, "In Packing")} tone="ghost" />}
                 <AppButton title="Open Work" onPress={() => setSelectedOrderId(String(item.id))} />
+                {(item.bales || []).length > 0 && <AppButton title="Print Bales" onPress={() => printBales(item)} tone="ghost" />}
               </View>
             </Pressable>
           );
@@ -472,8 +615,9 @@ export default function App() {
             <Text style={styles.sheetTitle}>Bale Creation</Text>
             <Text style={styles.sheetSub}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
             <Text style={styles.metaStrong}>QTY Per Bale: {selectedOrder.qtyPerBale || "-"}</Text>
+            {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>Manually paid by admin. Order is locked. Printing is available.</Text>}
             <Text style={styles.selectedTotal}>Selected Total: {selectedTotal}</Text>
-            {getPendingRows(selectedOrder).map((row) => (
+            {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((row) => (
               <View key={row.colorNo} style={styles.colorRow}>
                 <View>
                   <Text style={styles.colorNo}>{row.colorNo}</Text>
@@ -496,17 +640,21 @@ export default function App() {
             {(selectedOrder.bales || []).length > 0 && (
               <View style={styles.baleHistory}>
                 <Text style={styles.sheetTitle}>Bales</Text>
+                <AppButton title="Print All Bales" onPress={() => printBales(selectedOrder)} tone="ghost" />
                 {(selectedOrder.bales || []).map((bale) => (
-                  <Text key={bale.baleNo} style={styles.meta}>
-                    Bale {bale.baleNo}: {bale.totalQty} pcs on {displayDate(bale.createdAt)}
-                  </Text>
+                  <View key={bale.baleNo} style={styles.baleCard}>
+                    <Text style={styles.metaStrong}>Bale {bale.baleNo}: {bale.totalQty} pcs</Text>
+                    <Text style={styles.meta}>Created: {displayDate(bale.createdAt)}</Text>
+                    <Text style={styles.meta}>{(bale.colors || []).map((row) => `${row.colorNo}: ${row.qty}`).join(", ")}</Text>
+                    <AppButton title="Print This Bale" onPress={() => printBales(selectedOrder, bale.baleNo)} tone="ghost" />
+                  </View>
                 ))}
               </View>
             )}
           </ScrollView>
           <View style={styles.fixedActions}>
             <AppButton title="Clear QTY" onPress={() => setPackingQty({})} tone="ghost" />
-            <AppButton title="Create Bale" onPress={createBale} />
+            {!isOrderLocked(selectedOrder) && <AppButton title="Create Bale" onPress={createBale} />}
             <AppButton title="Close" onPress={() => setSelectedOrderId(null)} tone="danger" />
           </View>
         </View>
@@ -546,9 +694,11 @@ const styles = StyleSheet.create({
   orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   orderNo: { fontSize: 22, fontWeight: "900", color: "#0f172a" },
   status: { color: "#92400e", backgroundColor: "#fef3c7", overflow: "hidden", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, fontWeight: "900" },
+  statusLocked: { color: "#991b1b", backgroundColor: "#fee2e2" },
   party: { fontSize: 18, color: "#0f172a", fontWeight: "900", marginTop: 8 },
   meta: { color: "#475569", fontWeight: "600", marginTop: 5 },
   metaStrong: { color: "#0f172a", fontWeight: "900", marginTop: 8 },
+  lockNote: { color: "#991b1b", backgroundColor: "#fee2e2", borderRadius: 12, padding: 10, fontWeight: "900", marginTop: 10 },
   rowActions: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 12 },
   button: { backgroundColor: "#16a34a", borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
   buttonDanger: { backgroundColor: "#dc2626" },
@@ -565,6 +715,7 @@ const styles = StyleSheet.create({
   colorNo: { color: "#1d4ed8", fontSize: 34, fontWeight: "900" },
   qtyInput: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 12, fontSize: 20, fontWeight: "900", backgroundColor: "#fff" },
   baleHistory: { padding: 16, paddingBottom: 140 },
+  baleCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, marginTop: 10, gap: 8 },
   fixedActions: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, gap: 8, shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 10 },
   footerActions: { position: "absolute", left: 16, right: 16, bottom: 12 }
 });
