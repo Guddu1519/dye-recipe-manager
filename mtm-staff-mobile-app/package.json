@@ -14,7 +14,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.50.0",
     "expo": "~54.0.0",
-    "expo-clipboard": "^56.0.4",
+    "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.13",
     "expo-notifications": "~0.32.17",
     "expo-print": "~15.0.8",
@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "babel-preset-expo": "^56.0.15",
+    "babel-preset-expo": "~54.0.10",
     "eas-cli": "^16.8.0"
   }
 }
