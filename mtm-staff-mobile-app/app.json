@@ -1,9 +1,10 @@
 {
   "expo": {
-    "name": "MTM Staff",
+    "name": "MTM - Team",
     "slug": "mtm-staff",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -12,6 +13,7 @@
     "android": {
       "package": "com.monicatxt.mtmstaff",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0f172a"
       },
       "permissions": [
@@ -22,7 +24,7 @@
       "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
       "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil",
       "eas": {
-        "projectId": ""
+        "projectId": "1d506480-849c-4a88-bc07-57496abd6fa3"
       }
     },
     "plugins": [
