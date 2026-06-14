@@ -31,9 +31,18 @@ Notifications.setNotificationHandler({
 
 const emptySalesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "1.0.0";
+const CLOUD_TIMEOUT_MS = 12000;
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function withTimeout(promise, message = "Cloud request timed out. Please check internet and try again.") {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), CLOUD_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 function displayDate(value) {
@@ -299,7 +308,7 @@ export default function App() {
     if (error) throw error;
     if (!data || data.role !== "staff") {
       await supabase.auth.signOut();
-      throw new Error("Only team member accounts can use this Staff app.");
+      throw new Error("Only team member accounts can use this Team app.");
     }
     setProfile(data);
     return data;
@@ -349,7 +358,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
-      await loadSalesState();
+      await withTimeout(loadSalesState(), "Refresh is taking too long. Please check internet and try again.");
     } catch (error) {
       Alert.alert("Cloud Load Failed", error.message || "Could not load assigned orders.");
     } finally {
@@ -361,13 +370,13 @@ export default function App() {
     let mounted = true;
     async function boot() {
       try {
-        await Notifications.requestPermissionsAsync();
-        const { data } = await supabase.auth.getSession();
+        Notifications.requestPermissionsAsync().catch(() => {});
+        const { data } = await withTimeout(supabase.auth.getSession(), "Login check is taking too long. Please reopen and try again.");
         if (!mounted) return;
         setSession(data.session || null);
         if (data.session?.user?.email) {
-          await loadProfile(data.session.user.email);
-          await loadSalesState();
+          await withTimeout(loadProfile(data.session.user.email), "Profile load is taking too long. Please check internet.");
+          await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
         }
       } catch (error) {
         Alert.alert("Login Check Failed", error.message || "Please login again.");
@@ -380,8 +389,8 @@ export default function App() {
       setSession(nextSession);
       if (nextSession?.user?.email) {
         try {
-          await loadProfile(nextSession.user.email);
-          await loadSalesState();
+          await withTimeout(loadProfile(nextSession.user.email), "Profile load is taking too long. Please check internet.");
+          await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
         } catch (error) {
           Alert.alert("Access Blocked", error.message);
         }
@@ -458,8 +467,8 @@ export default function App() {
         password
       });
       if (error) throw error;
-      await loadProfile(data.user.email);
-      await loadSalesState();
+      await withTimeout(loadProfile(data.user.email), "Profile load is taking too long. Please check internet.");
+      await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
     } catch (error) {
       Alert.alert("Login Failed", error.message || "Could not login.");
     } finally {
@@ -583,7 +592,7 @@ export default function App() {
     return (
       <SafeAreaView style={styles.center}>
         <ActivityIndicator size="large" color="#1d4ed8" />
-        <Text style={styles.loadingText}>Loading MTM Staff...</Text>
+        <Text style={styles.loadingText}>Loading MTM Team...</Text>
       </SafeAreaView>
     );
   }
@@ -593,7 +602,7 @@ export default function App() {
       <SafeAreaView style={styles.loginScreen}>
         <StatusBar style="dark" />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginCard}>
-          <Text style={styles.loginTitle}>MTM Staff</Text>
+          <Text style={styles.loginTitle}>MTM Team</Text>
           <Text style={styles.loginSub}>Login once. Your session stays active until logout.</Text>
           <TextInput
             value={email}
@@ -601,6 +610,7 @@ export default function App() {
             autoCapitalize="none"
             keyboardType="email-address"
             placeholder="Team member email"
+            placeholderTextColor="#64748b"
             style={styles.input}
           />
           <TextInput
@@ -608,6 +618,7 @@ export default function App() {
             onChangeText={setPassword}
             secureTextEntry
             placeholder="Password"
+            placeholderTextColor="#64748b"
             style={styles.input}
           />
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
@@ -626,7 +637,7 @@ export default function App() {
         </View>
         <View style={styles.headerActions}>
           <Pressable style={styles.menuButton} onPress={() => setMenuOpen((value) => !value)}>
-            <Text style={styles.menuDots}>⋮</Text>
+            <Text style={styles.menuDots}>...</Text>
           </Pressable>
           {menuOpen && (
             <View style={styles.menuPanel}>
@@ -648,7 +659,7 @@ export default function App() {
       </View>
 
       <View style={styles.toolbar}>
-        <TextInput value={query} onChangeText={setQuery} placeholder="Search order, party, agent, quality..." style={styles.search} />
+        <TextInput value={query} onChangeText={setQuery} placeholder="Search order, party, agent, quality..." placeholderTextColor="#64748b" style={styles.search} />
         <AppButton title="Refresh" onPress={refresh} tone="ghost" />
       </View>
 
@@ -745,6 +756,7 @@ export default function App() {
                       onChangeText={(value) => setPackingQty((current) => ({ ...current, [row.colorNo]: value.replace(/[^0-9.]/g, "") }))}
                       keyboardType="numeric"
                       placeholder="Enter QTY"
+                      placeholderTextColor="#64748b"
                       style={styles.qtyInput}
                     />
                   </>
@@ -788,7 +800,7 @@ const styles = StyleSheet.create({
   loginCard: { width: "100%", borderRadius: 24, backgroundColor: "#fff", padding: 22, shadowColor: "#0f172a", shadowOpacity: 0.15, shadowRadius: 25, elevation: 6 },
   loginTitle: { fontSize: 30, fontWeight: "900", color: "#0f172a" },
   loginSub: { marginTop: 6, marginBottom: 18, color: "#64748b", fontWeight: "600" },
-  input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: "#fff", fontSize: 16 },
+  input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: "#fff", color: "#0f172a", fontSize: 16 },
   header: { padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 28, fontWeight: "900", color: "#0f172a" },
   subTitle: { color: "#64748b", fontWeight: "700", marginTop: 4 },
@@ -806,7 +818,7 @@ const styles = StyleSheet.create({
   statCard: { flex: 1, backgroundColor: "#fff", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#dbeafe" },
   statNo: { color: "#1d4ed8", fontWeight: "900", fontSize: 28 },
   toolbar: { padding: 16, gap: 10 },
-  search: { borderWidth: 1, borderColor: "#bfdbfe", backgroundColor: "#fff", borderRadius: 16, padding: 13, fontSize: 16 },
+  search: { borderWidth: 1, borderColor: "#bfdbfe", backgroundColor: "#fff", color: "#0f172a", borderRadius: 16, padding: 13, fontSize: 16 },
   list: { padding: 16, paddingBottom: 110 },
   empty: { textAlign: "center", color: "#64748b", padding: 25, fontWeight: "700" },
   orderCard: { backgroundColor: "#fff", borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: "#dbeafe" },
@@ -850,7 +862,7 @@ const styles = StyleSheet.create({
   fakeCheck: { width: 24, height: 24, borderRadius: 4, borderWidth: 1.5, borderColor: "#64748b", backgroundColor: "#fff" },
   fakeCheckOn: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
   choiceText: { fontWeight: "900", color: "#1f2937", fontSize: 16 },
-  qtyInput: { borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 14, padding: 14, fontSize: 24, fontWeight: "900", backgroundColor: "#fff" },
+  qtyInput: { borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 14, padding: 14, color: "#0f172a", fontSize: 24, fontWeight: "900", backgroundColor: "#fff" },
   baleHistory: { padding: 16, paddingBottom: 140 },
   baleCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, marginTop: 10, gap: 8 },
   fixedActions: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, gap: 8, shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 10 },
@@ -859,3 +871,5 @@ const styles = StyleSheet.create({
   floatingTotalNo: { color: "#1d4ed8", fontSize: 26, fontWeight: "900" },
   footerActions: { position: "absolute", left: 16, right: 16, bottom: 12 }
 });
+
+
