@@ -3394,7 +3394,8 @@ function getSalesUserNameByEmail(email){
   let profile = (salesProfiles || []).find(p => String(p.login_email || p.loginEmail || p.email || "").trim().toLowerCase() === key);
   let agent = (salesState.agents || []).find(a => String(a.email || "").trim().toLowerCase() === key);
   let staff = (salesState.staffs || []).find(s => String(s.email || "").trim().toLowerCase() === key);
-  return profile?.full_name || profile?.fullName || profile?.username || agent?.name || staff?.name || key;
+  let name = profile?.full_name || profile?.fullName || profile?.username || agent?.name || staff?.name || (key.includes("@") ? key.split("@")[0] : key);
+  return String(name || "Admin").toUpperCase();
 }
 
 function getSalesManualPaidText(order){
@@ -3748,14 +3749,16 @@ async function toggleSalesOrderPaidLock(orderId){
 function printSalesOrderPendingReport(orderId){
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
-  let pendingRows = (order.colors || []).filter(c => Number(c.pendingQty) !== 0).map(c => `<tr><td>${salesEscape(c.colorNo)}</td><td>${salesEscape(c.pendingQty)} pcs</td></tr>`).join("");
+  let pendingList = (order.colors || []).filter(c => Number(c.pendingQty) !== 0);
+  let pendingRows = pendingList.map(c => `<tr><td>${salesEscape(c.colorNo)}</td><td>${salesEscape(c.pendingQty)} pcs</td></tr>`).join("");
+  let pendingCopyText = pendingList.length ? pendingList.map(c => `${c.colorNo}: ${c.pendingQty} pcs`).join("\n") : "No pending colors.";
   if(!pendingRows) pendingRows = `<tr><td colspan="2">No pending colors.</td></tr>`;
   let printWindow = window.open("", "_blank");
   if(!printWindow) return alert("Popup blocked. Please allow popups to print pending report.");
   printWindow.document.write(`<!DOCTYPE html><html><head><title>Pending Colors Report</title>
-    <style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;color:#111}h1,h2{margin:0 0 8px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #555;padding:8px;text-align:left}th{background:#dbeafe}.printAction{padding:11px 18px;border:0;border-radius:999px;background:#0f766e;color:#fff;font-weight:800}@media print{.printAction{display:none}}</style>
-    <script>function printReport(){document.querySelector('.printAction').style.display='none';setTimeout(function(){if(window.AndroidPrinter&&AndroidPrinter.printPage){AndroidPrinter.printPage();}else{window.print();}},80)}<\/script>
-  </head><body><button class="printAction" onclick="printReport()">Print / Save PDF</button>
+    <style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;color:#111}h1,h2{margin:0 0 8px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #555;padding:8px;text-align:left}th{background:#dbeafe}.reportActions{display:flex;gap:10px;margin-bottom:14px}.printAction,.copyAction{padding:11px 18px;border:0;border-radius:999px;background:#0f766e;color:#fff;font-weight:800}.copyAction{background:#2563eb}@media print{.reportActions{display:none}}</style>
+    <script>const pendingCopyText=${JSON.stringify(pendingCopyText)};function copyPendingReport(){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(pendingCopyText).then(function(){alert('Pending report copied.');});return;}var t=document.createElement('textarea');t.value=pendingCopyText;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();alert('Pending report copied.')}function printReport(){document.querySelector('.reportActions').style.display='none';setTimeout(function(){if(window.AndroidPrinter&&AndroidPrinter.printPage){AndroidPrinter.printPage();}else{window.print();}},80)}<\/script>
+  </head><body><div class="reportActions"><button class="printAction" onclick="printReport()">Print / Save PDF</button><button class="copyAction" onclick="copyPendingReport()">Copy</button></div>
     <h1>MONICA TEXTILE MILLS</h1><h2>Pending Colors Report</h2>
     <p><b>Order:</b> ${salesEscape(order.mtmOrderNo)} &nbsp; <b>Party:</b> ${salesEscape(order.partyName)} &nbsp; <b>Date:</b> ${salesEscape(order.orderDate || "-")}</p>
     <table><thead><tr><th>Color No.</th><th>Pending QTY</th></tr></thead><tbody>${pendingRows}</tbody></table>

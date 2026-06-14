@@ -1,5 +1,7 @@
 import * as Notifications from "expo-notifications";
 import * as Print from "expo-print";
+import * as Clipboard from "expo-clipboard";
+import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -28,6 +30,7 @@ Notifications.setNotificationHandler({
 });
 
 const emptySalesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
+const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "1.0.0";
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
@@ -60,7 +63,8 @@ function isOrderLocked(order) {
 
 function manualPaidText(order) {
   if (!isOrderLocked(order)) return "";
-  const admin = String(order?.manualPaidBy || "Admin").trim();
+  const rawAdmin = String(order?.manualPaidBy || "Admin").trim();
+  const admin = rawAdmin.includes("@") ? rawAdmin.split("@")[0].toUpperCase() : rawAdmin.toUpperCase();
   return `Paid manually by admin: ${admin || "Admin"}`;
 }
 
@@ -239,6 +243,7 @@ export default function App() {
   const [packingQty, setPackingQty] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const previousAssignedIds = useRef(new Set());
 
   const staffEmail = normalize(session?.user?.email);
@@ -279,7 +284,6 @@ export default function App() {
     [packingQty]
   );
 
-  const unreadCount = notifications.filter((item) => !item.read).length;
   const completedOrderCount = assignedOrders.filter((order) => order.status === "Packed" || isOrderLocked(order)).length;
 
   const loadProfile = useCallback(async (userEmail) => {
@@ -464,10 +468,16 @@ export default function App() {
   }
 
   async function handleLogout() {
+    setMenuOpen(false);
     await supabase.auth.signOut();
     setSelectedOrderId(null);
     setPackingQty({});
     setQuery("");
+  }
+
+  function showAppVersion() {
+    setMenuOpen(false);
+    Alert.alert("MTM - Team", `Version ${APP_VERSION}`);
   }
 
   async function updateOrderStatus(orderId, status) {
@@ -551,10 +561,21 @@ export default function App() {
   function showPendingReport(order) {
     const lines = getPendingRows(order)
       .filter((row) => Number(row.pending || 0) !== 0)
-      .map((row) => `Color ${row.colorNo}: ${row.pending} pcs pending`);
+      .map((row) => `${row.colorNo}: ${row.pending} pcs`);
+    const text = lines.length ? lines.join("\n") : "No pending colors for this order.";
     Alert.alert(
       "Pending Colors Report",
-      lines.length ? lines.join("\n") : "No pending colors for this order."
+      text,
+      [
+        {
+          text: "Copy",
+          onPress: async () => {
+            await Clipboard.setStringAsync(text);
+            Alert.alert("Copied", "Pending report copied.");
+          }
+        },
+        { text: "OK" }
+      ]
     );
   }
 
@@ -603,10 +624,21 @@ export default function App() {
           <Text style={styles.title}>Team Member Portal</Text>
           <Text style={styles.subTitle}>{profile?.full_name || profile?.username || session.user.email}</Text>
         </View>
-        <Pressable style={styles.bell} onPress={() => setNotifications((items) => items.map((item) => ({ ...item, read: true })))}>
-          <Text style={styles.bellText}>Bell</Text>
-          {unreadCount > 0 && <Text style={styles.badge}>{unreadCount}</Text>}
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.menuButton} onPress={() => setMenuOpen((value) => !value)}>
+            <Text style={styles.menuDots}>⋮</Text>
+          </Pressable>
+          {menuOpen && (
+            <View style={styles.menuPanel}>
+              <Pressable style={styles.menuItem} onPress={showAppVersion}>
+                <Text style={styles.menuItemText}>Version {APP_VERSION}</Text>
+              </Pressable>
+              <Pressable style={styles.menuItem} onPress={handleLogout}>
+                <Text style={[styles.menuItemText, styles.menuLogoutText]}>Logout</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.statsRow}>
@@ -760,8 +792,15 @@ const styles = StyleSheet.create({
   header: { padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 28, fontWeight: "900", color: "#0f172a" },
   subTitle: { color: "#64748b", fontWeight: "700", marginTop: 4 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 8, position: "relative" },
   bell: { minWidth: 54, minHeight: 54, borderRadius: 18, backgroundColor: "#0f172a", alignItems: "center", justifyContent: "center" },
   bellText: { color: "#fff", fontWeight: "900" },
+  menuButton: { width: 48, height: 54, borderRadius: 18, backgroundColor: "#0f172a", alignItems: "center", justifyContent: "center" },
+  menuDots: { color: "#fff", fontSize: 30, fontWeight: "900", lineHeight: 32 },
+  menuPanel: { position: "absolute", right: 0, top: 62, zIndex: 50, minWidth: 190, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#dbeafe", shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 8, overflow: "hidden" },
+  menuItem: { paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#e5eefb" },
+  menuItemText: { color: "#0f172a", fontWeight: "900", fontSize: 16 },
+  menuLogoutText: { color: "#dc2626" },
   badge: { position: "absolute", top: -6, right: -6, backgroundColor: "#ef4444", color: "#fff", borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, fontWeight: "900" },
   statsRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16 },
   statCard: { flex: 1, backgroundColor: "#fff", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#dbeafe" },
