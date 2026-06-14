@@ -19,8 +19,8 @@
       ]
     },
     "extra": {
-      "supabaseUrl": "$EXPO_PUBLIC_SUPABASE_URL",
-      "supabaseAnonKey": "$EXPO_PUBLIC_SUPABASE_ANON_KEY",
+      "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
+      "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil",
       "eas": {
         "projectId": ""
       }
