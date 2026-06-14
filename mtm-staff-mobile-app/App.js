@@ -179,6 +179,7 @@ function makeSlipHtml(order, bales, profile) {
       <style>
         @page{size:A5 landscape;margin:6mm}
         *{box-sizing:border-box}
+        html,body{width:210mm;height:148mm}
         body{font-family:Arial,sans-serif;margin:0;color:#111}
         .page{display:grid;grid-template-columns:1fr 1fr;gap:4mm;page-break-after:always;width:198mm;height:136mm}
         .slipCopy{position:relative;display:flex;flex-direction:column;height:136mm;min-height:136mm}
