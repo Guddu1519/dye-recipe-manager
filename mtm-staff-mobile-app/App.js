@@ -533,12 +533,12 @@ export default function App() {
   }
 
   async function uploadBalePhoto(orderId, baleNo, stateSource = salesState) {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Photo Permission", "Allow photo access to upload bale proof.");
+      Alert.alert("Camera Permission", "Allow camera access to click live bale proof photo.");
       return;
     }
-    const picked = await ImagePicker.launchImageLibraryAsync({
+    const picked = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.75,
       allowsEditing: false

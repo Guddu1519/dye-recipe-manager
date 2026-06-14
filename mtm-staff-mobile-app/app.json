@@ -18,9 +18,7 @@
       },
       "permissions": [
         "NOTIFICATIONS",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES"
+        "CAMERA"
       ]
     },
     "extra": {
