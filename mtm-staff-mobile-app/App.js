@@ -273,6 +273,7 @@ export default function App() {
   );
 
   const unreadCount = notifications.filter((item) => !item.read).length;
+  const completedOrderCount = assignedOrders.filter((order) => order.status === "Packed" || isOrderLocked(order)).length;
 
   const loadProfile = useCallback(async (userEmail) => {
     if (!userEmail) {
@@ -594,7 +595,7 @@ export default function App() {
       <View style={styles.statsRow}>
         <View style={styles.statCard}><Text style={styles.statNo}>{assignedOrders.length}</Text><Text>Assigned</Text></View>
         <View style={styles.statCard}><Text style={styles.statNo}>{assignedOrders.filter((o) => o.status === "In Packing").length}</Text><Text>In Process</Text></View>
-        <View style={styles.statCard}><Text style={styles.statNo}>{assignedOrders.filter((o) => o.status === "Packed").length}</Text><Text>Completed</Text></View>
+        <View style={styles.statCard}><Text style={styles.statNo}>{completedOrderCount}</Text><Text>Completed</Text></View>
       </View>
 
       <View style={styles.toolbar}>
@@ -611,7 +612,7 @@ export default function App() {
           const total = getOrderTotal(item);
           const sent = getBaleSent(item);
           const locked = isOrderLocked(item);
-          const status = item.status || "Assigned";
+          const status = locked ? "Completed" : item.status || "Assigned";
           return (
             <Pressable onPress={() => setSelectedOrderId(String(item.id))} style={[styles.orderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
               <View style={styles.orderTop}>
@@ -622,16 +623,16 @@ export default function App() {
               <View style={styles.qualityLine}>
                 <Text style={styles.metaStrong}>Quality: </Text>
                 <Text style={styles.qualityBadge}>{item.quality || "-"}</Text>
+                <Text style={styles.metaStrong}>Cut: <Text style={styles.metaValue}>{item.cut || "-"}</Text></Text>
               </View>
-              <Text style={styles.meta}>Packing: {item.packing || "-"} | Patta: {item.patta || "-"}</Text>
-              <Text style={styles.metaStrong}>Cut: <Text style={styles.metaValue}>{item.cut || "-"}</Text></Text>
-              <Text style={styles.meta}>Stamping: {item.stamping || "-"} | Transport: {item.transport || "-"}</Text>
+              <Text style={styles.meta}>Stamping: {item.stamping || "-"} | Patta: {item.patta || "-"} | Packing: {item.packing || "-"}</Text>
+              <Text style={styles.meta}>Station: {orderStation(item)} | Transport: {item.transport || "-"}</Text>
               <Text style={styles.metaStrong}>Total / Sent / Pending: {total} / {sent} / {total - sent}</Text>
               <View style={styles.statusLine}>
                 <Text style={styles.metaStrong}>Status: </Text>
                 <Text style={[styles.status, locked && styles.statusLocked]}>{status}</Text>
               </View>
-              {locked && <Text style={styles.lockNote}>Manually paid by admin</Text>}
+              {locked && <Text style={styles.lockNote}>Manually paid by admin. Counted as completed.</Text>}
               <View style={styles.rowActions}>
                 {locked ? (
                   <AppButton title="View / Print Bales" onPress={() => setSelectedOrderId(String(item.id))} />
