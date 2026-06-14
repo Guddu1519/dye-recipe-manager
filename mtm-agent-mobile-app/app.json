@@ -21,7 +21,10 @@
     },
     "extra": {
       "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
-      "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil"
+      "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil",
+      "eas": {
+        "projectId": "b1c24c9a-838d-46f0-8b7d-f37cf477c64a"
+      }
     },
     "plugins": [
       "expo-secure-store"

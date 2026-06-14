@@ -8,4 +8,6 @@ ios/
 *.aab
 *.jks
 *.keystore
+credentials/
+credentials.json
 .env
