@@ -222,6 +222,7 @@ th{background:#dbeafe}
 .salesBalePrintTools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
 .salesBaleSelect{display:flex;align-items:center;gap:6px;font-weight:800}
 .salesBaleHistory{display:grid;gap:8px}.salesBaleBox{border:1px solid #dbeafe;border-radius:12px;padding:10px;background:#f8fafc}
+.salesBalePhoto{margin-top:8px;display:grid;gap:8px}.salesBalePhoto img{max-width:180px;max-height:130px;border-radius:12px;border:1px solid #bfdbfe;object-fit:cover}.salesBalePhotoMissing{margin-top:8px;color:#64748b;font-weight:800;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:8px}
 .salesMobileCards{display:none}
 .salesMobileCard{border:1px solid #dbeafe;border-radius:14px;padding:12px;background:#fff;box-shadow:0 8px 18px #0f172a0c;margin-bottom:10px}
 .salesMobileCard h3{margin:0 0 8px;font-size:17px;color:#0f172a}.salesMobileCard p{margin:5px 0;color:#334155}
@@ -2364,6 +2365,16 @@ async function loadSalesCloudState(options={}){
       salesState.staffs ||= [];
       salesState.orders.forEach(normalizeSalesOrderDetailFields);
       normalizeSalesTeamMemberNamesInState();
+      let hadExpiredPhotos = markExpiredSalesBalePhotos(salesState);
+      cleanupExpiredSalesBalePhotos();
+      if(hadExpiredPhotos && canUseSalesCloud()){
+        supabaseClient.from("sales_state").upsert({
+          id: "main",
+          data: salesState,
+          updated_by: currentUser.id,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "id" }).then(()=>{}).catch(err => console.warn("Expired bale photo cleanup save failed", err));
+      }
       localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
     }
     salesCloudLoaded = true;
@@ -2381,6 +2392,140 @@ async function refreshSalesCloudData(options={}){
   await loadSalesCloudState({silent: !!options.silent});
   renderSalesManager(false);
   if(!options.silent) showSuccessToast("Sales cloud refreshed");
+}
+
+const SALES_BALE_PHOTO_BUCKET = "bale-photos";
+const SALES_BALE_PHOTO_DAYS = 30;
+
+function isSalesBalePhotoExpired(bale){
+  let date = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
+  if(Number.isNaN(date.getTime())) return false;
+  return Date.now() - date.getTime() > SALES_BALE_PHOTO_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function getSalesBalePhotoMessage(bale){
+  return isSalesBalePhotoExpired(bale) ? "This bale was created more than 1 month ago. No photo data available." : "";
+}
+
+function markExpiredSalesBalePhotos(state=salesState){
+  let changed = false;
+  (state.orders || []).forEach(order => (order.bales || []).forEach(bale => {
+    if(bale.photoUrl && isSalesBalePhotoExpired(bale)){
+      bale.expiredPhotoPath = bale.photoPath || "";
+      bale.photoUrl = "";
+      bale.photoPath = "";
+      bale.photoDeletedAt = bale.photoDeletedAt || new Date().toISOString();
+      changed = true;
+    }
+  }));
+  return changed;
+}
+
+async function cleanupExpiredSalesBalePhotos(){
+  let paths = [];
+  (salesState.orders || []).forEach(order => (order.bales || []).forEach(bale => {
+    if(bale.expiredPhotoPath){
+      paths.push(bale.expiredPhotoPath);
+      bale.expiredPhotoPath = "";
+    }
+  }));
+  if(paths.length && supabaseClient){
+    try{ await supabaseClient.storage.from(SALES_BALE_PHOTO_BUCKET).remove(paths); }catch(err){ console.warn("Bale photo cleanup failed", err); }
+  }
+}
+
+function compressSalesBalePhoto(file){
+  return new Promise((resolve, reject) => {
+    let img = new Image();
+    let url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let maxWidth = 1200;
+      let scale = Math.min(1, maxWidth / img.width);
+      let canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      let ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Could not compress photo.")), "image/jpeg", 0.68);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read photo."));
+    };
+    img.src = url;
+  });
+}
+
+async function uploadSalesBalePhoto(orderId, baleNo, file){
+  if(!supabaseClient) throw new Error("Supabase is not connected.");
+  let order = salesState.orders.find(o => String(o.id) === String(orderId));
+  let bale = (order?.bales || []).find(b => Number(b.baleNo) === Number(baleNo));
+  if(!order || !bale) throw new Error("Bale not found.");
+  let blob = await compressSalesBalePhoto(file);
+  let safeOrder = String(order.mtmOrderNo || order.id || "order").replace(/[^a-z0-9_-]/gi, "_");
+  let path = `${safeOrder}/bale-${bale.baleNo}-${Date.now()}.jpg`;
+  let { error } = await supabaseClient.storage.from(SALES_BALE_PHOTO_BUCKET).upload(path, blob, {
+    contentType: "image/jpeg",
+    upsert: true
+  });
+  if(error) throw new Error("Photo upload failed: " + error.message + ". Create Supabase Storage bucket: " + SALES_BALE_PHOTO_BUCKET);
+  let { data } = supabaseClient.storage.from(SALES_BALE_PHOTO_BUCKET).getPublicUrl(path);
+  if(bale.photoPath){
+    try{ await supabaseClient.storage.from(SALES_BALE_PHOTO_BUCKET).remove([bale.photoPath]); }catch(err){ console.warn("Old bale photo delete failed", err); }
+  }
+  bale.photoUrl = data?.publicUrl || "";
+  bale.photoPath = path;
+  bale.photoUploadedAt = new Date().toISOString();
+  bale.photoDeletedAt = "";
+  await saveSalesState();
+  renderSalesManager(false);
+  salesSelectedOrderId = orderId;
+  renderSalesBaleWorkArea();
+  showSuccessToast("Bale photo uploaded");
+}
+
+function askSalesBalePhotoUpload(orderId, baleNo, adminOnly=false){
+  if(adminOnly && !isSalesAdmin()) return alert("Only Sales Admin can change bale photos.");
+  let input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.capture = "environment";
+  input.onchange = async () => {
+    let file = input.files?.[0];
+    if(!file) return;
+    try{ await uploadSalesBalePhoto(orderId, baleNo, file); }
+    catch(err){ alert(err.message || err); }
+  };
+  input.click();
+}
+
+async function deleteSalesBalePhoto(orderId, baleNo){
+  if(!isSalesAdmin()) return alert("Only Sales Admin can delete bale photos.");
+  let order = salesState.orders.find(o => String(o.id) === String(orderId));
+  let bale = (order?.bales || []).find(b => Number(b.baleNo) === Number(baleNo));
+  if(!bale) return alert("Bale not found.");
+  if(!bale.photoUrl && !bale.photoPath) return alert("No photo found.");
+  if(!confirm("Delete Bale " + baleNo + " photo?")) return;
+  if(bale.photoPath && supabaseClient){
+    try{ await supabaseClient.storage.from(SALES_BALE_PHOTO_BUCKET).remove([bale.photoPath]); }catch(err){ console.warn("Bale photo delete failed", err); }
+  }
+  bale.photoUrl = "";
+  bale.photoPath = "";
+  bale.photoDeletedAt = new Date().toISOString();
+  await saveSalesState();
+  renderSalesManager(false);
+  salesSelectedOrderId = orderId;
+  renderSalesBaleWorkArea();
+  showSuccessToast("Bale photo deleted");
+}
+
+function renderSalesBalePhoto(orderId, bale){
+  if(bale.photoUrl && !isSalesBalePhotoExpired(bale)){
+    return `<div class="salesBalePhoto"><a href="${salesEscape(bale.photoUrl)}" target="_blank"><img src="${salesEscape(bale.photoUrl)}" alt="Bale ${salesEscape(bale.baleNo)} photo proof"></a>${isSalesAdmin() ? `<div class="salesActions"><button class="salesSmallBtn gray" onclick="askSalesBalePhotoUpload('${salesEscape(orderId)}', ${Number(bale.baleNo)}, true)">Change Photo</button><button class="salesSmallBtn red" onclick="deleteSalesBalePhoto('${salesEscape(orderId)}', ${Number(bale.baleNo)})">Delete Photo</button></div>` : ""}</div>`;
+  }
+  let msg = getSalesBalePhotoMessage(bale) || "No photo proof uploaded.";
+  return `<div class="salesBalePhotoMissing">${salesEscape(msg)}${isSalesAdmin() ? `<br><button class="salesSmallBtn gray" onclick="askSalesBalePhotoUpload('${salesEscape(orderId)}', ${Number(bale.baleNo)}, true)">Upload Photo</button>` : ""}</div>`;
 }
 
 function startSalesCloudRefresh(){
@@ -2406,6 +2551,7 @@ async function saveSalesState(){
   salesState.orders ||= [];
   salesState.orders.forEach(normalizeSalesOrderDetailFields);
   normalizeSalesTeamMemberNamesInState();
+  markExpiredSalesBalePhotos(salesState);
   let { data, error } = await supabaseClient.from("sales_state").upsert({
     id: "main",
     data: salesState,
@@ -2424,6 +2570,8 @@ async function saveSalesState(){
     salesState.orders ||= [];
     salesState.agents ||= [];
     salesState.staffs ||= [];
+    markExpiredSalesBalePhotos(salesState);
+    cleanupExpiredSalesBalePhotos();
   }
   localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
 }
@@ -3368,7 +3516,10 @@ function getSalesBaleStatusHtml(order){
   if(!bales.length) return "Nothing dispatched yet.";
   return bales.map(bale => {
     let date = (bale.createdAt || "").slice(0,10) || "-";
-    return `Bale ${salesEscape(bale.baleNo)}: ${salesEscape(bale.totalQty)} pcs on ${salesEscape(date)}`;
+    let photo = bale.photoUrl && !isSalesBalePhotoExpired(bale)
+      ? ` <a href="${salesEscape(bale.photoUrl)}" target="_blank">View Photo</a>`
+      : ` <span class="muted">${salesEscape(getSalesBalePhotoMessage(bale) || "No photo")}</span>`;
+    return `Bale ${salesEscape(bale.baleNo)}: ${salesEscape(bale.totalQty)} pcs on ${salesEscape(date)}${photo}`;
   }).join("<br>");
 }
 
@@ -3654,7 +3805,8 @@ async function finishSalesBale(){
       let color = order.colors.find(c => sameSalesColor(c.colorNo, p.colorNo));
       color.pendingQty -= p.qty;
     });
-    order.bales.push({baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: order.assignedStaffName || getSalesUserEmail()});
+    let nextBale = {baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: order.assignedStaffName || getSalesUserEmail()};
+    order.bales.push(nextBale);
     if(order.colors.every(c => c.pendingQty <= 0)){
       order.status = "Packed";
     }else{
@@ -3665,6 +3817,9 @@ async function finishSalesBale(){
     renderSalesManager(false);
     renderSalesBaleWorkArea();
     showSuccessToast(order.status === "Packed" ? "Order ready for dispatch" : "Bale finished");
+    if(confirm("Bale created. Upload photo proof now?")){
+      askSalesBalePhotoUpload(order.id, nextBale.baleNo, false);
+    }
   }catch(err){
     alert(err.message || err);
   }
@@ -3691,6 +3846,9 @@ async function deleteSalesBale(orderId, baleNo){
   if(index < 0) return alert("Bale not found.");
   if(!confirm("Delete Bale " + baleNo + " and restore its quantities to pending?")) return;
   let bale = order.bales[index];
+  if(bale.photoPath && supabaseClient){
+    try{ await supabaseClient.storage.from(SALES_BALE_PHOTO_BUCKET).remove([bale.photoPath]); }catch(err){ console.warn("Bale photo delete failed", err); }
+  }
   (bale.colors || []).forEach(item => {
     let color = (order.colors || []).find(c => sameSalesColor(c.colorNo, item.colorNo));
     if(color) color.pendingQty = (Number(color.pendingQty) || 0) + (Number(item.qty) || 0);
@@ -4310,12 +4468,13 @@ function renderSalesBaleWorkArea(){
       if(prev && next) gaps.push((next - prev) / 60000);
     });
     let avgTime = gaps.length ? (gaps.reduce((sum, value)=>sum + value, 0) / gaps.length).toFixed(1) + " min" : "N/A";
-    let rows = bales.map(bale => `<tr><td>Bale ${salesEscape(bale.baleNo)}</td><td>${salesEscape(bale.totalQty)} pcs</td><td>${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</td><td>${salesEscape(getSalesTeamMemberName(order, bale))}</td><td>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</td><td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button> <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button> <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></td></tr>`).join("");
+    let rows = bales.map(bale => `<tr><td>Bale ${salesEscape(bale.baleNo)}</td><td>${salesEscape(bale.totalQty)} pcs</td><td>${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</td><td>${salesEscape(getSalesTeamMemberName(order, bale))}</td><td>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</td><td>${renderSalesBalePhoto(order.id, bale)}</td><td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button> <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button> <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></td></tr>`).join("");
     let mobileRows = bales.map(bale => `<div class="salesMobileCard">
       <h3>Bale ${salesEscape(bale.baleNo)} - ${salesEscape(bale.totalQty)} pcs</h3>
       <p><b>Created:</b> ${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</p>
       <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
       <p><b>Colors:</b><br>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</p>
+      ${renderSalesBalePhoto(order.id, bale)}
       <div class="salesActions"><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button><button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button><button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></div>
     </div>`).join("");
     area.innerHTML = `<h3>Team Member Report - ${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
@@ -4323,7 +4482,7 @@ function renderSalesBaleWorkArea(){
         <div><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}<br><b>Total Bales:</b> ${bales.length}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
         <div><b>Average Bales Per Day:</b> ${avgPerDay}<br><b>Average Bale Creating Time:</b> ${avgTime}<br><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(order)}">${salesEscape(getSalesOrderDisplayStatus(order))}</span> ${isSalesOrderLocked(order) ? getSalesManualPaidBadge(order) : ""}</div>
       </div>
-      <div class="salesTableWrap salesDesktopTable"><table class="salesTable"><tr><th>Bale</th><th>QTY</th><th>Created</th><th>By</th><th>Colors</th><th>Action</th></tr>${rows || '<tr><td colspan="6" class="muted">No bales created yet.</td></tr>'}</table></div>
+      <div class="salesTableWrap salesDesktopTable"><table class="salesTable"><tr><th>Bale</th><th>QTY</th><th>Created</th><th>By</th><th>Colors</th><th>Photo</th><th>Action</th></tr>${rows || '<tr><td colspan="7" class="muted">No bales created yet.</td></tr>'}</table></div>
       <div class="salesMobileCards">${mobileRows || '<div class="salesMobileCard muted">No bales created yet.</div>'}</div>`;
     return;
   }
@@ -4350,7 +4509,7 @@ function renderSalesBaleWorkArea(){
     <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Enter QTY" oninput="markSalesCustomQty(this)">
   </div>`;
   }).join("");
-  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} QTY</label>${bale.colors.map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join(", ")}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button>${!isSalesOrderLocked(order) ? ` <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button>` : ""}</div>`).join("");
+  let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} QTY</label>${bale.colors.map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join(", ")}${renderSalesBalePhoto(order.id, bale)}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button>${!isSalesOrderLocked(order) ? ` <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button>` : ""}</div>`).join("");
   area.innerHTML = `<h3>${salesEscape(order.mtmOrderNo)} - ${salesEscape(order.partyName)}</h3>
     ${isSalesAdmin() ? `<p><b>Assigned Team Member:</b> ${salesEscape(getSalesAssignedTeamMemberName(order))}</p>` : ""}
     <p><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(order.quality || "N/A")}</span></p>

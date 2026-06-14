@@ -1,6 +1,8 @@
 import * as Notifications from "expo-notifications";
 import * as Print from "expo-print";
 import * as Clipboard from "expo-clipboard";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +11,7 @@ import {
   Alert,
   BackHandler,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -32,6 +35,8 @@ Notifications.setNotificationHandler({
 const emptySalesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 12000;
+const BALE_PHOTO_BUCKET = "bale-photos";
+const BALE_PHOTO_DAYS = 30;
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
@@ -68,6 +73,33 @@ function getBaleSent(order) {
 
 function isOrderLocked(order) {
   return !!(order?.adminPaidLocked || order?.manualPaidByAdmin);
+}
+
+function isBalePhotoExpired(bale) {
+  const d = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
+  if (Number.isNaN(d.getTime())) return false;
+  return Date.now() - d.getTime() > BALE_PHOTO_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function balePhotoMessage(bale) {
+  return isBalePhotoExpired(bale)
+    ? "This bale was created more than 1 month ago. No photo data available."
+    : "No photo proof uploaded.";
+}
+
+function markExpiredBalePhotos(state, expiredPaths = []) {
+  let changed = false;
+  (state.orders || []).forEach((order) => (order.bales || []).forEach((bale) => {
+    if (bale.photoUrl && isBalePhotoExpired(bale)) {
+      if (bale.photoPath) expiredPaths.push(bale.photoPath);
+      bale.expiredPhotoPath = bale.photoPath || "";
+      bale.photoUrl = "";
+      bale.photoPath = "";
+      bale.photoDeletedAt = bale.photoDeletedAt || new Date().toISOString();
+      changed = true;
+    }
+  }));
+  return changed;
 }
 
 function manualPaidText(order) {
@@ -327,11 +359,20 @@ export default function App() {
     nextState.misc ||= [];
     nextState.agents ||= [];
     nextState.staffs ||= [];
+    const expiredPaths = [];
+    const hadExpired = markExpiredBalePhotos(nextState, expiredPaths);
+    if (expiredPaths.length) {
+      supabase.storage.from(BALE_PHOTO_BUCKET).remove(expiredPaths).catch(() => {});
+    }
+    if (hadExpired) {
+      supabase.from("sales_state").upsert({ id: "main", data: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" }).then(() => {}).catch(() => {});
+    }
     setSalesState(nextState);
     return nextState;
   }, []);
 
   const saveSalesState = useCallback(async (nextState) => {
+    markExpiredBalePhotos(nextState);
     const { error } = await supabase
       .from("sales_state")
       .upsert({ id: "main", data: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" });
@@ -489,6 +530,67 @@ export default function App() {
     Alert.alert("MTM - Team", `Version ${APP_VERSION}`);
   }
 
+  async function uploadBalePhoto(orderId, baleNo, stateSource = salesState) {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("Photo Permission", "Allow photo access to upload bale proof.");
+      return;
+    }
+    const picked = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.75,
+      allowsEditing: false
+    });
+    if (picked.canceled || !picked.assets?.[0]?.uri) return;
+    const order = (stateSource.orders || []).find((item) => String(item.id) === String(orderId));
+    const bale = (order?.bales || []).find((item) => Number(item.baleNo) === Number(baleNo));
+    if (!order || !bale) {
+      Alert.alert("Photo Upload Failed", "Bale not found.");
+      return;
+    }
+    try {
+      const compressed = await ImageManipulator.manipulateAsync(
+        picked.assets[0].uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.68, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      const response = await fetch(compressed.uri);
+      const arrayBuffer = await response.arrayBuffer();
+      const safeOrder = String(order.mtmOrderNo || order.id || "order").replace(/[^a-z0-9_-]/gi, "_");
+      const path = `${safeOrder}/bale-${bale.baleNo}-${Date.now()}.jpg`;
+      const { error } = await supabase.storage.from(BALE_PHOTO_BUCKET).upload(path, arrayBuffer, {
+        contentType: "image/jpeg",
+        upsert: true
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from(BALE_PHOTO_BUCKET).getPublicUrl(path);
+      const nextState = {
+        ...stateSource,
+        orders: (stateSource.orders || []).map((item) => {
+          if (String(item.id) !== String(orderId)) return item;
+          return {
+            ...item,
+            bales: (item.bales || []).map((existing) =>
+              Number(existing.baleNo) === Number(baleNo)
+                ? {
+                    ...existing,
+                    photoUrl: data?.publicUrl || "",
+                    photoPath: path,
+                    photoUploadedAt: new Date().toISOString(),
+                    photoDeletedAt: ""
+                  }
+                : existing
+            )
+          };
+        })
+      };
+      await saveSalesState(nextState);
+      Alert.alert("Photo Uploaded", "Bale photo proof saved.");
+    } catch (error) {
+      Alert.alert("Photo Upload Failed", (error.message || "Could not upload photo.") + "\nCreate Supabase Storage bucket: bale-photos");
+    }
+  }
+
   async function updateOrderStatus(orderId, status) {
     const order = salesState.orders.find((item) => String(item.id) === String(orderId));
     if (isOrderLocked(order)) {
@@ -545,7 +647,10 @@ export default function App() {
     try {
       await saveSalesState(nextState);
       setPackingQty({});
-      Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`);
+      Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`, [
+        { text: "Upload Photo", onPress: () => uploadBalePhoto(selectedOrder.id, nextBale.baleNo, nextState) },
+        { text: "Later" }
+      ]);
     } catch (error) {
       Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
     }
@@ -772,6 +877,11 @@ export default function App() {
                     <Text style={styles.metaStrong}>Bale {bale.baleNo}: {bale.totalQty} pcs</Text>
                     <Text style={styles.meta}>Created: {displayDate(bale.createdAt)}</Text>
                     <Text style={styles.meta}>{(bale.colors || []).map((row) => `${row.colorNo}: ${row.qty}`).join(", ")}</Text>
+                    {bale.photoUrl && !isBalePhotoExpired(bale) ? (
+                      <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} />
+                    ) : (
+                      <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
+                    )}
                     <AppButton title="Print This Bale" onPress={() => printBales(selectedOrder, bale.baleNo)} tone="ghost" />
                   </View>
                 ))}
@@ -865,6 +975,8 @@ const styles = StyleSheet.create({
   qtyInput: { borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 14, padding: 14, color: "#0f172a", fontSize: 24, fontWeight: "900", backgroundColor: "#fff" },
   baleHistory: { padding: 16, paddingBottom: 140 },
   baleCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, marginTop: 10, gap: 8 },
+  balePhoto: { width: "100%", height: 170, borderRadius: 14, marginTop: 4, borderWidth: 1, borderColor: "#bfdbfe" },
+  photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#f8fafc", borderRadius: 12, padding: 10 },
   fixedActions: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, gap: 8, shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 10 },
   floatingTotals: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingBottom: 2 },
   floatingLabel: { color: "#475569", fontWeight: "900", fontSize: 15 },
