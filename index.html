@@ -187,6 +187,9 @@ th{background:#dbeafe}
 .agentPortalMode .salesTabs button:not(#salesTabAgent){display:none}
 .agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelPending,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelStaffs,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
 .salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
+.salesSuggestWrap{position:relative;min-width:0}
+.salesSuggestWrap input{width:100%;box-sizing:border-box}
+.salesSuggestWrap .suggestionBox{top:calc(100% + 4px);left:0;right:0;width:auto}
 .salesCard{background:white;border:1px solid #dbeafe;border-radius:16px;padding:14px;box-shadow:0 12px 30px #0f172a0d}
 .salesCard h2,.salesCard h3{margin:0 0 12px;color:#0f172a}
 .salesActions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -480,36 +483,17 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
             <input id="salesMtmOrderNo" placeholder="MTM Order No.">
             <input id="salesPartyOrderNo" placeholder="Party Order No.">
             <input id="salesOrderDate" type="date" placeholder="Order Date">
-            <select id="salesPartyName" onchange="fillSalesPartyDetails()"><option value="">Select Party</option></select>
+            <div class="salesSuggestWrap"><input id="salesPartyName" placeholder="Select Party" autocomplete="off" oninput="showSalesAutocomplete(this,'party')" onkeydown="handleSalesAutocompleteKey(event,this,'party')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
             <input id="salesGstNo" placeholder="GST No.">
             <input id="salesAgentName" placeholder="Agent Name">
             <input id="salesAgentEmail" type="hidden">
             <input id="salesPartyAddress" placeholder="Party Address">
-            <select id="salesTransport"><option value="">Transport</option></select>
-            <select id="salesPacking"><option value="">Packing</option></select>
-            <select id="salesPatta"><option value="">Patta</option></select>
-            <select id="salesStamping"><option value="">Stamping</option></select>
-            <select id="salesQuality">
-              <option value="">Quality</option>
-              <option value="HI TECH">HI TECH</option>
-              <option value="SARA INDIA">SARA INDIA</option>
-              <option value="DULHAN">DULHAN</option>
-              <option value="ACTIVA">ACTIVA</option>
-              <option value="SOFIYA">SOFIYA</option>
-            </select>
-            <select id="salesCut">
-              <option value="">Cut</option>
-              <option value="THAN">THAN</option>
-              <option value="1 MTR">1 MTR</option>
-              <option value="2 MTR">2 MTR</option>
-              <option value="80 CM">80 CM</option>
-              <option value="75 CM">75 CM</option>
-              <option value="78 CM">78 CM</option>
-              <option value="77 CM">77 CM</option>
-              <option value="LUMP">LUMP</option>
-              <option value="FULL LUMP">FULL LUMP</option>
-              <option value="L95 THAN">L95 THAN</option>
-            </select>
+            <div class="salesSuggestWrap"><input id="salesTransport" placeholder="Transport" autocomplete="off" oninput="showSalesAutocomplete(this,'transport')" onkeydown="handleSalesAutocompleteKey(event,this,'transport')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+            <div class="salesSuggestWrap"><input id="salesPacking" placeholder="Packing" autocomplete="off" oninput="showSalesAutocomplete(this,'packing')" onkeydown="handleSalesAutocompleteKey(event,this,'packing')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+            <div class="salesSuggestWrap"><input id="salesPatta" placeholder="Patta" autocomplete="off" oninput="showSalesAutocomplete(this,'patta')" onkeydown="handleSalesAutocompleteKey(event,this,'patta')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+            <div class="salesSuggestWrap"><input id="salesStamping" placeholder="Stamping" autocomplete="off" oninput="showSalesAutocomplete(this,'stamping')" onkeydown="handleSalesAutocompleteKey(event,this,'stamping')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+            <div class="salesSuggestWrap"><input id="salesQuality" placeholder="Quality" autocomplete="off" oninput="showSalesAutocomplete(this,'quality')" onkeydown="handleSalesAutocompleteKey(event,this,'quality')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+            <div class="salesSuggestWrap"><input id="salesCut" placeholder="Cut" autocomplete="off" oninput="showSalesAutocomplete(this,'cut')" onkeydown="handleSalesAutocompleteKey(event,this,'cut')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
             <input id="salesRate" type="number" step="0.01" placeholder="Rate">
             <input id="salesQtyPerBale" type="number" placeholder="QTY Per Bale">
           </div>
@@ -2011,6 +1995,8 @@ function runF10SaveShortcut(event){
     saveStockPurchase();
   }else if(activeId === "customers"){
     saveProcessHouse();
+  }else if(currentManagerMode === "sales" && document.getElementById("salesPanelOrders")?.classList.contains("active")){
+    saveSalesOrder();
   }
 }
 
@@ -2566,7 +2552,7 @@ function resetSalesScreenState(){
 
 function refreshSalesDropdowns(){
   let partySelect = document.getElementById("salesPartyName");
-  if(partySelect){
+  if(partySelect && partySelect.tagName === "SELECT"){
     let current = partySelect.value;
     partySelect.innerHTML = '<option value="">Select Party</option>' + salesState.parties
       .sort((a,b)=>String(a.partyName).localeCompare(String(b.partyName)))
@@ -2580,7 +2566,7 @@ function refreshSalesDropdowns(){
   }
   [["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"]].forEach(([id,type]) => {
     let select = document.getElementById(id);
-    if(!select) return;
+    if(!select || select.tagName !== "SELECT") return;
     let current = select.value;
     let label = id.replace("sales", "");
     let values = salesState.misc.filter(m => m.type === type).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
@@ -2593,7 +2579,7 @@ function refreshSalesDropdowns(){
     }
   });
   let qualitySelect = document.getElementById("salesQuality");
-  if(qualitySelect){
+  if(qualitySelect && qualitySelect.tagName === "SELECT"){
     let current = qualitySelect.value;
     let presets = ["HI TECH","SARA INDIA","DULHAN","ACTIVA","SOFIYA"];
     let qualityValues = salesState.misc
@@ -2619,6 +2605,154 @@ function refreshSalesDropdowns(){
     }).join("");
     agentSelect.value = current;
   }
+  setupSalesAutocompleteFocus();
+  setupSalesOrderEnterNavigation();
+}
+
+function getSalesCutValues(){
+  return ["THAN","1 MTR","2 MTR","80 CM","75 CM","78 CM","77 CM","LUMP","FULL LUMP","L95 THAN"];
+}
+
+function getSalesAutocompleteValues(kind){
+  if(kind === "party"){
+    return salesState.parties.map(p => String(p.partyName || "").trim()).filter(Boolean);
+  }
+  if(kind === "quality"){
+    let presets = ["HI TECH","SARA INDIA","DULHAN","ACTIVA","SOFIYA"];
+    let misc = salesState.misc
+      .filter(m => String(m.type || "").toLowerCase() === "quality")
+      .map(m => String(m.name || "").trim())
+      .filter(Boolean);
+    return [...presets, ...misc];
+  }
+  if(kind === "cut") return getSalesCutValues();
+  return salesState.misc
+    .filter(m => String(m.type || "").toLowerCase() === String(kind || "").toLowerCase())
+    .map(m => String(m.name || "").trim())
+    .filter(Boolean);
+}
+
+function getUniqueSalesAutocompleteValues(kind){
+  return Array.from(new Set(getSalesAutocompleteValues(kind)))
+    .filter(Boolean)
+    .sort((a,b) => a.localeCompare(b, undefined, {numeric:true, sensitivity:"base"}));
+}
+
+function getSalesAutocompleteBox(input){
+  return input?.closest(".salesSuggestWrap")?.querySelector(".suggestionBox") || null;
+}
+
+function showSalesAutocomplete(input, kind){
+  let box = getSalesAutocompleteBox(input);
+  if(!box) return;
+  let query = normalizeName(input.value);
+  let values = getUniqueSalesAutocompleteValues(kind)
+    .filter(value => !query || normalizeName(value).includes(query))
+    .slice(0, 40);
+  if(!values.length){
+    box.innerHTML = "";
+    box.style.display = "none";
+    input.dataset.activeSuggestionIndex = "-1";
+    return;
+  }
+  box.innerHTML = values.map((value, index) => (
+    `<div class="suggestionItem" data-index="${index}" data-value="${salesEscape(value)}">${salesEscape(value)}</div>`
+  )).join("");
+  box.querySelectorAll(".suggestionItem").forEach(item => {
+    item.addEventListener("mousedown", event => {
+      event.preventDefault();
+      chooseSalesAutocomplete(input, item.dataset.value || item.textContent || "", kind);
+    });
+  });
+  box.style.display = "block";
+  input.dataset.activeSuggestionIndex = "-1";
+}
+
+function hideSalesAutocomplete(input){
+  let box = getSalesAutocompleteBox(input);
+  if(box) box.style.display = "none";
+  if(input) input.dataset.activeSuggestionIndex = "-1";
+}
+
+function updateSalesAutocompleteActive(input, nextIndex){
+  let box = getSalesAutocompleteBox(input);
+  if(!box) return;
+  let items = Array.from(box.querySelectorAll(".suggestionItem"));
+  if(!items.length) return;
+  let index = ((nextIndex % items.length) + items.length) % items.length;
+  items.forEach(item => item.classList.remove("active"));
+  items[index].classList.add("active");
+  items[index].scrollIntoView({block:"nearest"});
+  input.dataset.activeSuggestionIndex = String(index);
+  input.value = items[index].dataset.value || items[index].textContent || "";
+}
+
+function focusNextSalesOrderField(input){
+  let ids = ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesPartyName","salesGstNo","salesAgentName","salesPartyAddress","salesTransport","salesPacking","salesPatta","salesStamping","salesQuality","salesCut","salesRate","salesQtyPerBale"];
+  let index = ids.indexOf(input?.id);
+  if(index < 0) return;
+  let next = ids.slice(index + 1).map(id => document.getElementById(id)).find(el => el && !el.disabled && el.offsetParent !== null);
+  if(next){
+    next.focus();
+    if(typeof next.select === "function") next.select();
+  }
+}
+
+function setupSalesOrderEnterNavigation(){
+  let ids = ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesGstNo","salesAgentName","salesPartyAddress","salesRate","salesQtyPerBale"];
+  ids.forEach(id => {
+    let el = document.getElementById(id);
+    if(!el || el.dataset.salesEnterNavBound === "1") return;
+    el.dataset.salesEnterNavBound = "1";
+    el.addEventListener("keydown", event => {
+      if(event.key !== "Enter") return;
+      event.preventDefault();
+      focusNextSalesOrderField(el);
+    });
+  });
+}
+
+function chooseSalesAutocomplete(input, value, kind){
+  if(!input) return;
+  input.value = value || "";
+  hideSalesAutocomplete(input);
+  if(kind === "party") fillSalesPartyDetails();
+  focusNextSalesOrderField(input);
+}
+
+function handleSalesAutocompleteKey(event, input, kind){
+  if(event.key === "ArrowDown" || event.key === "ArrowUp"){
+    event.preventDefault();
+    let box = getSalesAutocompleteBox(input);
+    if(!box || box.style.display === "none") showSalesAutocomplete(input, kind);
+    let current = Number(input.dataset.activeSuggestionIndex || -1);
+    updateSalesAutocompleteActive(input, current + (event.key === "ArrowDown" ? 1 : -1));
+    return;
+  }
+  if(event.key === "Enter"){
+    event.preventDefault();
+    let box = getSalesAutocompleteBox(input);
+    let items = Array.from(box?.querySelectorAll(".suggestionItem") || []);
+    let active = Number(input.dataset.activeSuggestionIndex || -1);
+    if(items[active]){
+      chooseSalesAutocomplete(input, items[active].dataset.value || items[active].textContent || "", kind);
+    }else{
+      hideSalesAutocomplete(input);
+      if(kind === "party") fillSalesPartyDetails();
+      focusNextSalesOrderField(input);
+    }
+    return;
+  }
+  if(event.key === "Escape") hideSalesAutocomplete(input);
+}
+
+function setupSalesAutocompleteFocus(){
+  [["salesPartyName","party"],["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"],["salesQuality","quality"],["salesCut","cut"]].forEach(([id,kind]) => {
+    let el = document.getElementById(id);
+    if(!el || el.dataset.salesAutocompleteBound === "1") return;
+    el.dataset.salesAutocompleteBound = "1";
+    el.addEventListener("focus", () => showSalesAutocomplete(el, kind));
+  });
 }
 
 function fillSalesPartyDetails(){
@@ -3438,6 +3572,11 @@ function setSalesSelectValue(id, value){
   value = String(value || "").trim();
   if(!value){
     el.value = "";
+    return;
+  }
+  if(el.tagName !== "SELECT"){
+    el.value = value;
+    if(id === "salesPartyName") fillSalesPartyDetails();
     return;
   }
   if(!Array.from(el.options).some(option => option.value === value)){
