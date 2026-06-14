@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -96,6 +97,19 @@ function getPendingRows(order) {
       pending: ordered - sent
     };
   });
+}
+
+function getTakenDetails(order, colorNo) {
+  const key = String(colorNo || "").trim();
+  return (order.bales || [])
+    .map((bale) => {
+      const qty = (bale.colors || [])
+        .filter((row) => String(row.colorNo || "").trim() === key)
+        .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+      return qty ? `Bale ${bale.baleNo}: ${qty} pcs` : "";
+    })
+    .filter(Boolean)
+    .join(", ");
 }
 
 function makeSlipCopyHtml(order, bale, copyLabel, profile) {
@@ -409,6 +423,17 @@ export default function App() {
     previousAssignedIds.current = new Set(assignedOrders.map((order) => String(order.id)));
   }, [assignedOrders]);
 
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (selectedOrderId) {
+        setSelectedOrderId(null);
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [selectedOrderId]);
+
   async function handleLogin() {
     if (!email.trim() || !password) {
       Alert.alert("Missing Login", "Enter team member email and password.");
@@ -611,32 +636,58 @@ export default function App() {
 
       {selectedOrder && (
         <View style={styles.workSheet}>
-          <ScrollView>
-            <Text style={styles.sheetTitle}>Bale Creation</Text>
+          <ScrollView contentContainerStyle={styles.workScroll}>
+            <View style={styles.workHeader}>
+              <AppButton title="Back" onPress={() => setSelectedOrderId(null)} tone="ghost" />
+              <Text style={styles.sheetTitle}>Bale Creation</Text>
+            </View>
             <Text style={styles.sheetSub}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
-            <Text style={styles.metaStrong}>QTY Per Bale: {selectedOrder.qtyPerBale || "-"}</Text>
             {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>Manually paid by admin. Order is locked. Printing is available.</Text>}
-            <Text style={styles.selectedTotal}>Selected Total: {selectedTotal}</Text>
-            {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((row) => (
-              <View key={row.colorNo} style={styles.colorRow}>
-                <View>
-                  <Text style={styles.colorNo}>{row.colorNo}</Text>
-                  <Text style={styles.meta}>Ordered: {row.ordered} | Pending: {row.pending}</Text>
+            {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((row) => {
+              const alreadyTaken = getTakenDetails(selectedOrder, row.colorNo);
+              const completed = row.pending <= 0;
+              return (
+              <View key={row.colorNo} style={[styles.colorRow, completed && styles.colorCompleted]}>
+                <View style={styles.colorTopLine}>
+                  <Text style={styles.metaStrong}>Ordered: {row.ordered} pcs</Text>
+                  <Text style={styles.metaStrong}>Pending: {row.pending} pcs</Text>
                 </View>
-                <TextInput
-                  value={packingQty[row.colorNo] || ""}
-                  onChangeText={(value) => setPackingQty((current) => ({ ...current, [row.colorNo]: value.replace(/[^0-9.]/g, "") }))}
-                  keyboardType="numeric"
-                  placeholder="QTY"
-                  style={styles.qtyInput}
-                />
-                <AppButton
-                  title="Full"
-                  tone="ghost"
-                  onPress={() => setPackingQty((current) => ({ ...current, [row.colorNo]: String(row.pending) }))}
-                />
+                <View style={styles.colorBody}>
+                  <Text style={styles.colorNo}>{row.colorNo}</Text>
+                  <View style={styles.colorInfo}>
+                    {completed ? <Text style={styles.completedBadge}>Completed</Text> : null}
+                    {alreadyTaken ? <Text style={styles.takenText}>Already Taken: {alreadyTaken}</Text> : null}
+                  </View>
+                </View>
+                {!completed && (
+                  <>
+                    <View style={styles.qtyChoiceRow}>
+                      <Pressable
+                        style={styles.choiceBox}
+                        onPress={() => setPackingQty((current) => ({ ...current, [row.colorNo]: String(row.pending) }))}
+                      >
+                        <View style={[styles.fakeCheck, Number(packingQty[row.colorNo] || 0) === row.pending && styles.fakeCheckOn]} />
+                        <Text style={styles.choiceText}>Full QTY</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.choiceBox}
+                        onPress={() => setPackingQty((current) => ({ ...current, [row.colorNo]: current[row.colorNo] || "" }))}
+                      >
+                        <View style={[styles.fakeCheck, packingQty[row.colorNo] && Number(packingQty[row.colorNo]) !== row.pending && styles.fakeCheckOn]} />
+                        <Text style={styles.choiceText}>Custom</Text>
+                      </Pressable>
+                    </View>
+                    <TextInput
+                      value={packingQty[row.colorNo] || ""}
+                      onChangeText={(value) => setPackingQty((current) => ({ ...current, [row.colorNo]: value.replace(/[^0-9.]/g, "") }))}
+                      keyboardType="numeric"
+                      placeholder="Enter QTY"
+                      style={styles.qtyInput}
+                    />
+                  </>
+                )}
               </View>
-            ))}
+            );})}
             {(selectedOrder.bales || []).length > 0 && (
               <View style={styles.baleHistory}>
                 <Text style={styles.sheetTitle}>Bales</Text>
@@ -653,6 +704,10 @@ export default function App() {
             )}
           </ScrollView>
           <View style={styles.fixedActions}>
+            <View style={styles.floatingTotals}>
+              <Text style={styles.floatingLabel}>QTY Per Bale: {selectedOrder.qtyPerBale || "-"}</Text>
+              <Text style={styles.floatingLabel}>Selected Total: <Text style={styles.floatingTotalNo}>{selectedTotal}</Text></Text>
+            </View>
             <AppButton title="Clear QTY" onPress={() => setPackingQty({})} tone="ghost" />
             {!isOrderLocked(selectedOrder) && <AppButton title="Create Bale" onPress={createBale} />}
             <AppButton title="Close" onPress={() => setSelectedOrderId(null)} tone="danger" />
@@ -708,14 +763,30 @@ const styles = StyleSheet.create({
   buttonText: { color: "#fff", fontWeight: "900", fontSize: 15 },
   buttonGhostText: { color: "#1d4ed8" },
   workSheet: { ...StyleSheet.absoluteFillObject, backgroundColor: "#eef4fb", paddingTop: 12 },
-  sheetTitle: { fontSize: 24, fontWeight: "900", color: "#0f172a", paddingHorizontal: 16 },
+  workScroll: { paddingBottom: 210 },
+  workHeader: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, marginBottom: 8 },
+  sheetTitle: { fontSize: 24, fontWeight: "900", color: "#0f172a", paddingHorizontal: 0 },
   sheetSub: { color: "#475569", fontWeight: "800", paddingHorizontal: 16, marginTop: 4, marginBottom: 8 },
   selectedTotal: { color: "#1d4ed8", fontWeight: "900", fontSize: 24, paddingHorizontal: 16, marginVertical: 8 },
-  colorRow: { marginHorizontal: 16, marginBottom: 10, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#bfdbfe", padding: 14, gap: 10 },
-  colorNo: { color: "#1d4ed8", fontSize: 34, fontWeight: "900" },
-  qtyInput: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 12, fontSize: 20, fontWeight: "900", backgroundColor: "#fff" },
+  colorRow: { marginHorizontal: 16, marginBottom: 12, backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#bfdbfe", padding: 14, gap: 10 },
+  colorCompleted: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
+  colorTopLine: { flexDirection: "row", justifyContent: "space-between", gap: 10, flexWrap: "wrap" },
+  colorBody: { borderTopWidth: 1, borderTopColor: "#e2e8f0", paddingTop: 10, gap: 8 },
+  colorInfo: { gap: 7 },
+  colorNo: { color: "#1d4ed8", fontSize: 48, lineHeight: 54, fontWeight: "900" },
+  completedBadge: { color: "#166534", backgroundColor: "#dcfce7", overflow: "hidden", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, fontWeight: "900", alignSelf: "flex-start" },
+  takenText: { color: "#475569", fontWeight: "800", fontSize: 15 },
+  qtyChoiceRow: { flexDirection: "row", gap: 10 },
+  choiceBox: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#dbeafe", borderRadius: 14, padding: 14, backgroundColor: "#fff" },
+  fakeCheck: { width: 24, height: 24, borderRadius: 4, borderWidth: 1.5, borderColor: "#64748b", backgroundColor: "#fff" },
+  fakeCheckOn: { backgroundColor: "#1d4ed8", borderColor: "#1d4ed8" },
+  choiceText: { fontWeight: "900", color: "#1f2937", fontSize: 16 },
+  qtyInput: { borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 14, padding: 14, fontSize: 24, fontWeight: "900", backgroundColor: "#fff" },
   baleHistory: { padding: 16, paddingBottom: 140 },
   baleCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, marginTop: 10, gap: 8 },
   fixedActions: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, gap: 8, shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 10 },
+  floatingTotals: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingBottom: 2 },
+  floatingLabel: { color: "#475569", fontWeight: "900", fontSize: 15 },
+  floatingTotalNo: { color: "#1d4ed8", fontSize: 26, fontWeight: "900" },
   footerActions: { position: "absolute", left: 16, right: 16, bottom: 12 }
 });
