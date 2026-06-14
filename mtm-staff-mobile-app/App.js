@@ -3,6 +3,7 @@ import * as Print from "expo-print";
 import * as Clipboard from "expo-clipboard";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import * as ScreenCapture from "expo-screen-capture";
 import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -411,6 +412,7 @@ export default function App() {
     let mounted = true;
     async function boot() {
       try {
+        ScreenCapture.preventScreenCaptureAsync().catch(() => {});
         Notifications.requestPermissionsAsync().catch(() => {});
         const { data } = await withTimeout(supabase.auth.getSession(), "Login check is taking too long. Please reopen and try again.");
         if (!mounted) return;
