@@ -180,10 +180,10 @@ function makeSlipHtml(order, bales, profile) {
         @page{size:A5 landscape;margin:6mm}
         *{box-sizing:border-box}
         body{font-family:Arial,sans-serif;margin:0;color:#111}
-        .page{display:grid;grid-template-columns:1fr 1fr;gap:4mm;page-break-after:always}
-        .slipCopy{position:relative}
+        .page{display:grid;grid-template-columns:1fr 1fr;gap:4mm;page-break-after:always;width:198mm;height:136mm}
+        .slipCopy{position:relative;display:flex;flex-direction:column;height:136mm;min-height:136mm}
         .copyLabel{text-align:right;font-size:11px;margin-bottom:2px}
-        .packingSlip{border:1px solid #111}
+        .packingSlip{border:1px solid #111;flex:1;display:flex;flex-direction:column}
         .slipHead{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;border-bottom:1px solid #111;padding:5px 8px}
         h2{margin:0;font-size:15px;white-space:nowrap}
         h2:nth-child(2){text-align:center}
