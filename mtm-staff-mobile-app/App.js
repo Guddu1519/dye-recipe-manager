@@ -541,6 +541,16 @@ export default function App() {
     }
   }
 
+  function showPendingReport(order) {
+    const lines = getPendingRows(order)
+      .filter((row) => Number(row.pending || 0) !== 0)
+      .map((row) => `Color ${row.colorNo}: ${row.pending} pcs pending`);
+    Alert.alert(
+      "Pending Colors Report",
+      lines.length ? lines.join("\n") : "No pending colors for this order."
+    );
+  }
+
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
@@ -641,6 +651,7 @@ export default function App() {
                 ) : (
                   <AppButton title="Start Bale Creation" onPress={() => setSelectedOrderId(String(item.id))} />
                 )}
+                <AppButton title="Pending Report" onPress={() => showPendingReport(item)} tone="ghost" />
               </View>
             </Pressable>
           );
