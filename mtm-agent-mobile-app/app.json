@@ -17,7 +17,10 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0f172a"
       },
-      "permissions": []
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "extra": {
       "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
