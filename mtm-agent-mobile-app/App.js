@@ -75,13 +75,6 @@ function isOrderLocked(order) {
   return !!(order?.adminPaidLocked || order?.manualPaidByAdmin);
 }
 
-function manualPaidText(order) {
-  if (!isOrderLocked(order)) return "";
-  const rawAdmin = String(order?.manualPaidBy || "Admin").trim();
-  const admin = rawAdmin.includes("@") ? rawAdmin.split("@")[0].toUpperCase() : rawAdmin.toUpperCase();
-  return `Paid manually by admin: ${admin || "Admin"}`;
-}
-
 function getPendingRows(order) {
   const usedByColor = {};
   (order.bales || []).forEach((bale) => {
@@ -405,7 +398,7 @@ export default function App() {
           const pending = total - sent;
           const completed = pending <= 0 || isOrderLocked(item) || item.status === "Packed";
           return (
-            <Pressable style={styles.orderCard} onPress={() => setSelectedOrder(item)}>
+            <Pressable style={[styles.orderCard, completed && styles.completedOrderCard]} onPress={() => setSelectedOrder(item)}>
               <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"} - {item.partyName || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Party Order:</Text> {item.partyOrderNo || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Quality:</Text> <Text style={styles.badgeText}>{item.quality || "-"}</Text> | <Text style={styles.bold}>Cut:</Text> {item.cut || "-"}</Text>
@@ -415,8 +408,7 @@ export default function App() {
               <Text style={[styles.status, completed ? styles.statusDone : styles.statusOpen]}>
                 {completed ? "Completed" : item.status || "Pending"}
               </Text>
-              {!!manualPaidText(item) && <Text style={styles.locked}>{manualPaidText(item)}</Text>}
-              <AppButton title="View Details" onPress={() => setSelectedOrder(item)} />
+              <AppButton title="View Details" tone={completed ? "muted" : "primary"} onPress={() => setSelectedOrder(item)} />
             </Pressable>
           );
         }}
@@ -441,8 +433,6 @@ export default function App() {
                   <Text style={styles.detailItem}>Expected Bales: {expectedBales(selectedOrder)}</Text>
                   <Text style={styles.detailItem}>Created Bales: {(selectedOrder.bales || []).length}</Text>
                 </View>
-                {!!manualPaidText(selectedOrder) && <Text style={styles.locked}>{manualPaidText(selectedOrder)}</Text>}
-
                 <Text style={styles.subTitle}>Bale Dispatch</Text>
                 <Text style={styles.dispatchBox}>{baleSummary(selectedOrder)}</Text>
 
@@ -501,6 +491,7 @@ const styles = StyleSheet.create({
   sectionTitle: { marginTop: 18, marginBottom: 8, fontSize: 24, fontWeight: "900", color: "#0f172a" },
   empty: { color: "#64748b", fontSize: 16, padding: 16, textAlign: "center" },
   orderCard: { backgroundColor: "#fff", borderRadius: 18, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: "#dbeafe", shadowColor: "#0f172a", shadowOpacity: 0.06, shadowRadius: 12, elevation: 2 },
+  completedOrderCard: { backgroundColor: "#f8fafc", borderColor: "#cbd5e1" },
   orderNo: { fontSize: 22, color: "#0f172a", fontWeight: "900", marginBottom: 10 },
   meta: { color: "#334155", fontSize: 15, marginBottom: 6, lineHeight: 22 },
   bold: { fontWeight: "900", color: "#0f172a" },

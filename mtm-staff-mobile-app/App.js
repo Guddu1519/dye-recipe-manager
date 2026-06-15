@@ -103,13 +103,6 @@ function markExpiredBalePhotos(state, expiredPaths = []) {
   return changed;
 }
 
-function manualPaidText(order) {
-  if (!isOrderLocked(order)) return "";
-  const rawAdmin = String(order?.manualPaidBy || "Admin").trim();
-  const admin = rawAdmin.includes("@") ? rawAdmin.split("@")[0].toUpperCase() : rawAdmin.toUpperCase();
-  return `Paid manually by admin: ${admin || "Admin"}`;
-}
-
 function orderStation(order) {
   return order?.partyAddress || order?.address || order?.station || "-";
 }
@@ -264,6 +257,7 @@ function AppButton({ title, onPress, tone = "primary", disabled = false }) {
         styles.button,
         tone === "danger" && styles.buttonDanger,
         tone === "ghost" && styles.buttonGhost,
+        tone === "muted" && styles.buttonMuted,
         disabled && styles.buttonDisabled,
         pressed && !disabled && styles.buttonPressed
       ]}
@@ -781,7 +775,7 @@ export default function App() {
           const locked = isOrderLocked(item);
           const status = locked ? "Completed" : item.status || "Assigned";
           return (
-            <Pressable onPress={() => setSelectedOrderId(String(item.id))} style={[styles.orderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
+            <Pressable onPress={() => setSelectedOrderId(String(item.id))} style={[styles.orderCard, locked && styles.completedOrderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
               <View style={styles.orderTop}>
                 <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"} - {item.partyName || "-"}</Text>
               </View>
@@ -799,10 +793,9 @@ export default function App() {
                 <Text style={styles.metaStrong}>Status: </Text>
                 <Text style={[styles.status, locked && styles.statusLocked]}>{status}</Text>
               </View>
-              {locked && <Text style={styles.lockNote}>{manualPaidText(item)}</Text>}
               <View style={styles.rowActions}>
                 {locked ? (
-                  <AppButton title="View / Print Bales" onPress={() => setSelectedOrderId(String(item.id))} />
+                  <AppButton title="View / Print Bales" tone="muted" onPress={() => setSelectedOrderId(String(item.id))} />
                 ) : status === "Assigned" ? (
                   <AppButton title="Accept Order" onPress={() => updateOrderStatus(item.id, "Accepted")} />
                 ) : (
@@ -823,7 +816,7 @@ export default function App() {
               <Text style={styles.sheetTitle}>Bale Creation</Text>
             </View>
             <Text style={styles.sheetSub}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
-            {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>{manualPaidText(selectedOrder)}. Order completed and locked. Printing is available.</Text>}
+            {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>Status: Completed. Printing is available.</Text>}
             {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((row) => {
               const alreadyTaken = getTakenDetails(selectedOrder, row.colorNo);
               const completed = row.pending <= 0;
@@ -934,6 +927,7 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 110 },
   empty: { textAlign: "center", color: "#64748b", padding: 25, fontWeight: "700" },
   orderCard: { backgroundColor: "#fff", borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: "#dbeafe" },
+  completedOrderCard: { backgroundColor: "#f8fafc", borderColor: "#cbd5e1" },
   orderActive: { borderColor: "#2563eb", borderWidth: 2 },
   orderTop: { flexDirection: "row", justifyContent: "space-between", gap: 10 },
   orderNo: { fontSize: 22, fontWeight: "900", color: "#0f172a" },
@@ -951,6 +945,7 @@ const styles = StyleSheet.create({
   button: { backgroundColor: "#16a34a", borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
   buttonDanger: { backgroundColor: "#dc2626" },
   buttonGhost: { backgroundColor: "#e0edff" },
+  buttonMuted: { backgroundColor: "#64748b" },
   buttonDisabled: { opacity: 0.55 },
   buttonPressed: { transform: [{ scale: 0.98 }] },
   buttonText: { color: "#fff", fontWeight: "900", fontSize: 15 },
