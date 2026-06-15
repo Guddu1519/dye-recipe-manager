@@ -691,16 +691,16 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <h2>Send New Order To Admin</h2>
         <p class="muted">Agent can send order request directly. Admin can review it and push to a team member.</p>
         <div class="salesGrid">
-          <select id="agentOrderParty"><option value="">Select Assigned Party</option></select>
+          <div class="salesSuggestWrap"><input id="agentOrderParty" placeholder="Type Assigned Party" autocomplete="off" oninput="showSalesAutocomplete(this,'agentParty')" onkeydown="handleSalesAutocompleteKey(event,this,'agentParty')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
           <input id="agentOrderPartyNo" placeholder="Party Order No.">
           <input id="agentOrderDate" type="date">
-          <input id="agentOrderQuality" placeholder="Quality">
-          <input id="agentOrderCut" placeholder="Cut">
+          <div class="salesSuggestWrap"><input id="agentOrderQuality" placeholder="Quality" autocomplete="off" oninput="showSalesAutocomplete(this,'quality')" onkeydown="handleSalesAutocompleteKey(event,this,'quality')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+          <div class="salesSuggestWrap"><input id="agentOrderCut" placeholder="Cut" autocomplete="off" oninput="showSalesAutocomplete(this,'cut')" onkeydown="handleSalesAutocompleteKey(event,this,'cut')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
           <input id="agentOrderQtyPerBale" type="number" placeholder="QTY Per Bale">
-          <input id="agentOrderPacking" placeholder="Packing">
-          <input id="agentOrderPatta" placeholder="Patta">
+          <div class="salesSuggestWrap"><input id="agentOrderPacking" placeholder="Packing" autocomplete="off" oninput="showSalesAutocomplete(this,'packing')" onkeydown="handleSalesAutocompleteKey(event,this,'packing')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+          <div class="salesSuggestWrap"><input id="agentOrderPatta" placeholder="Patta" autocomplete="off" oninput="showSalesAutocomplete(this,'patta')" onkeydown="handleSalesAutocompleteKey(event,this,'patta')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
           <input id="agentOrderStamping" placeholder="Stamping">
-          <input id="agentOrderTransport" placeholder="Transport">
+          <div class="salesSuggestWrap"><input id="agentOrderTransport" placeholder="Transport" autocomplete="off" oninput="showSalesAutocomplete(this,'transport')" onkeydown="handleSalesAutocompleteKey(event,this,'transport')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
         </div>
         <h3>Color Order Entry</h3>
         <div id="agentOrderColorRows" style="display:grid;gap:8px"></div>
@@ -2844,6 +2844,12 @@ function getSalesAutocompleteValues(kind){
   if(kind === "party"){
     return salesState.parties.map(p => String(p.partyName || "").trim()).filter(Boolean);
   }
+  if(kind === "agentParty"){
+    return salesState.parties
+      .filter(p => salesAgentOwnsOrder({partyName:p.partyName, agentName:p.agentName, agentEmail:p.agentEmail}))
+      .map(p => String(p.partyName || "").trim())
+      .filter(Boolean);
+  }
   if(kind === "quality"){
     let presets = ["HI TECH","SARA INDIA","DULHAN","ACTIVA","SOFIYA"];
     let misc = salesState.misc
@@ -2916,6 +2922,9 @@ function updateSalesAutocompleteActive(input, nextIndex){
 
 function focusNextSalesOrderField(input){
   let ids = ["salesMtmOrderNo","salesPartyOrderNo","salesOrderDate","salesPartyName","salesGstNo","salesAgentName","salesPartyAddress","salesTransport","salesPacking","salesPatta","salesStamping","salesQuality","salesCut","salesRate","salesQtyPerBale"];
+  if(input?.id && input.id.startsWith("agentOrder")){
+    ids = ["agentOrderParty","agentOrderPartyNo","agentOrderDate","agentOrderQuality","agentOrderCut","agentOrderQtyPerBale","agentOrderPacking","agentOrderPatta","agentOrderStamping","agentOrderTransport"];
+  }
   let index = ids.indexOf(input?.id);
   if(index < 0) return;
   let next = ids.slice(index + 1).map(id => document.getElementById(id)).find(el => el && !el.disabled && el.offsetParent !== null);
@@ -2974,7 +2983,7 @@ function handleSalesAutocompleteKey(event, input, kind){
 }
 
 function setupSalesAutocompleteFocus(){
-  [["salesPartyName","party"],["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"],["salesQuality","quality"],["salesCut","cut"]].forEach(([id,kind]) => {
+  [["salesPartyName","party"],["salesTransport","transport"],["salesPacking","packing"],["salesPatta","patta"],["salesStamping","stamping"],["salesQuality","quality"],["salesCut","cut"],["agentOrderParty","agentParty"],["agentOrderTransport","transport"],["agentOrderPacking","packing"],["agentOrderPatta","patta"],["agentOrderQuality","quality"],["agentOrderCut","cut"]].forEach(([id,kind]) => {
     let el = document.getElementById(id);
     if(!el || el.dataset.salesAutocompleteBound === "1") return;
     el.dataset.salesAutocompleteBound = "1";
@@ -3063,6 +3072,10 @@ async function submitAgentOrderRequest(){
     if(!patta) missing.push("Patta");
     if(!stamping) missing.push("Stamping");
     if(missing.length) throw new Error("Required: " + missing.join(", "));
+    [["Quality", quality, "quality"], ["Cut", cut, "cut"], ["Transport", transport, "transport"], ["Packing", packing, "packing"], ["Patta", patta, "patta"]].forEach(([label, value, kind]) => {
+      let allowed = getUniqueSalesAutocompleteValues(kind).map(normalizeName);
+      if(allowed.length && !allowed.includes(normalizeName(value))) throw new Error(label + " must be selected from master data.");
+    });
     let totalQty = colorsList.reduce((sum,row)=>sum + row.qty,0);
     salesState.orders.push({
       id: Date.now().toString(),
@@ -3114,17 +3127,10 @@ function clearAgentOrderRequestForm(){
 }
 
 function refreshAgentOrderRequestForm(){
-  let select = document.getElementById("agentOrderParty");
-  if(!select) return;
-  let current = select.value;
-  let parties = (salesState.parties || [])
-    .filter(p => salesAgentOwnsOrder({partyName:p.partyName, agentName:p.agentName, agentEmail:p.agentEmail}))
-    .sort((a,b)=>String(a.partyName || "").localeCompare(String(b.partyName || "")));
-  select.innerHTML = '<option value="">Select Assigned Party</option>' + parties.map(p => `<option value="${salesEscape(p.partyName)}">${salesEscape(p.partyName)}</option>`).join("");
-  if(current && parties.some(p => normalizeName(p.partyName) === normalizeName(current))) select.value = current;
   let date = document.getElementById("agentOrderDate");
   if(date && !date.value) date.value = new Date().toISOString().slice(0,10);
   if(document.getElementById("agentOrderColorRows") && document.querySelectorAll("#agentOrderColorRows .salesColorRow").length === 0) addAgentOrderColorRow();
+  setupSalesAutocompleteFocus();
 }
 
 function clearSalesColorRows(){

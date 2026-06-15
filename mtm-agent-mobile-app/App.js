@@ -25,6 +25,8 @@ import { supabase } from "./src/supabase";
 const emptySalesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 12000;
+const CUT_OPTIONS = ["THAN", "1 MTR", "2 MTR", "80 CM", "75 CM", "78 CM", "77 CM", "LUMP", "FULL LUMP", "L95 THAN"];
+const QUALITY_PRESETS = ["HI TECH", "SARA INDIA", "DULHAN", "ACTIVA", "SOFIYA"];
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
@@ -32,6 +34,11 @@ function normalize(value) {
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function uniqueSorted(values) {
+  return Array.from(new Set(values.map(cleanText).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
 }
 
 function isBalePhotoExpired(bale) {
@@ -165,6 +172,7 @@ export default function App() {
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestForm, setRequestForm] = useState(emptyOrderRequest);
   const [savingRequest, setSavingRequest] = useState(false);
+  const [focusedSuggest, setFocusedSuggest] = useState("");
 
   const agentEmail = normalize(profile?.login_email || session?.user?.email);
   const agentName = normalize(profile?.full_name || profile?.username);
@@ -299,6 +307,21 @@ export default function App() {
       .sort((a, b) => String(a.partyName || "").localeCompare(String(b.partyName || "")));
   }, [agentEmail, agentName, salesState.agents, salesState.parties]);
 
+  const agentPartyOptions = useMemo(() => assignedParties.map((party) => party.partyName), [assignedParties]);
+
+  const miscOptions = useMemo(() => {
+    const byType = (type) => (salesState.misc || [])
+      .filter((item) => normalize(item.type) === type)
+      .map((item) => item.name);
+    return {
+      quality: uniqueSorted([...QUALITY_PRESETS, ...byType("quality")]),
+      cut: uniqueSorted(CUT_OPTIONS),
+      packing: uniqueSorted(byType("packing")),
+      patta: uniqueSorted(byType("patta")),
+      transport: uniqueSorted(byType("transport"))
+    };
+  }, [salesState.misc]);
+
   const filteredOrders = useMemo(() => {
     const q = normalize(query);
     if (!q) return agentOrders;
@@ -396,6 +419,45 @@ export default function App() {
     setRequestForm((current) => ({ ...current, colors: current.colors.length === 1 ? current.colors : current.colors.filter((row) => row.key !== key) }));
   }
 
+  function SuggestInput({ field, placeholder, options }) {
+    const value = requestForm[field] || "";
+    const matches = uniqueSorted(options || [])
+      .filter((option) => !value || normalize(option).includes(normalize(value)))
+      .slice(0, 35);
+    const show = focusedSuggest === field && matches.length > 0;
+    return (
+      <View style={styles.suggestWrap}>
+        <TextInput
+          value={value}
+          onFocus={() => setFocusedSuggest(field)}
+          onChangeText={(nextValue) => {
+            updateRequestField(field, nextValue);
+            setFocusedSuggest(field);
+          }}
+          placeholder={placeholder}
+          placeholderTextColor="#64748b"
+          style={styles.input}
+        />
+        {show && (
+          <View style={styles.suggestList}>
+            {matches.map((option) => (
+              <Pressable
+                key={option}
+                style={styles.suggestItem}
+                onPress={() => {
+                  updateRequestField(field, option);
+                  setFocusedSuggest("");
+                }}
+              >
+                <Text style={styles.suggestText}>{option}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  }
+
   async function submitOrderRequest() {
     try {
       setSavingRequest(true);
@@ -426,6 +488,17 @@ export default function App() {
       };
       const missing = Object.entries(requiredFields).filter(([, value]) => !cleanText(value)).map(([label]) => label);
       if (missing.length) throw new Error(`Required: ${missing.join(", ")}.`);
+      const mustMatch = [
+        ["Quality", requestForm.quality, miscOptions.quality],
+        ["Cut", requestForm.cut, miscOptions.cut],
+        ["Transport", requestForm.transport, miscOptions.transport],
+        ["Packing", requestForm.packing, miscOptions.packing],
+        ["Patta", requestForm.patta, miscOptions.patta]
+      ];
+      const wrong = mustMatch
+        .filter(([, value, options]) => options.length && !options.some((option) => normalize(option) === normalize(value)))
+        .map(([label]) => label);
+      if (wrong.length) throw new Error(`${wrong.join(", ")} must be selected from master data.`);
       const totalQty = colors.reduce((sum, row) => sum + row.qty, 0);
       const nextState = JSON.parse(JSON.stringify(salesState));
       nextState.orders ||= [];
@@ -683,26 +756,17 @@ export default function App() {
         <SafeAreaView style={[styles.modalScreen, styles.safeTop]}>
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Send Order To Admin</Text>
-            <Text style={styles.loginSub}>Type party name exactly as assigned, then add colors and QTY.</Text>
-            <TextInput value={requestForm.partyName} onChangeText={(value) => updateRequestField("partyName", value)} placeholder="Assigned Party Name" placeholderTextColor="#64748b" style={styles.input} />
-            {!!assignedParties.length && (
-              <View style={styles.partyChips}>
-                {assignedParties.slice(0, 12).map((party) => (
-                  <Pressable key={party.partyName} style={styles.partyChip} onPress={() => updateRequestField("partyName", party.partyName)}>
-                    <Text style={styles.partyChipText}>{party.partyName}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            )}
+            <Text style={styles.loginSub}>Type party/master values and select from suggestions. Stamping can be typed freely.</Text>
+            <SuggestInput field="partyName" placeholder="Assigned Party Name" options={agentPartyOptions} />
             <TextInput value={requestForm.partyOrderNo} onChangeText={(value) => updateRequestField("partyOrderNo", value)} placeholder="Party Order No." placeholderTextColor="#64748b" style={styles.input} />
             <TextInput value={requestForm.orderDate} onChangeText={(value) => updateRequestField("orderDate", value)} placeholder="Date YYYY-MM-DD" placeholderTextColor="#64748b" style={styles.input} />
-            <TextInput value={requestForm.quality} onChangeText={(value) => updateRequestField("quality", value)} placeholder="Quality" placeholderTextColor="#64748b" style={styles.input} />
-            <TextInput value={requestForm.cut} onChangeText={(value) => updateRequestField("cut", value)} placeholder="Cut" placeholderTextColor="#64748b" style={styles.input} />
+            <SuggestInput field="quality" placeholder="Quality" options={miscOptions.quality} />
+            <SuggestInput field="cut" placeholder="Cut" options={miscOptions.cut} />
             <TextInput value={requestForm.qtyPerBale} onChangeText={(value) => updateRequestField("qtyPerBale", value)} placeholder="QTY Per Bale" keyboardType="number-pad" placeholderTextColor="#64748b" style={styles.input} />
-            <TextInput value={requestForm.packing} onChangeText={(value) => updateRequestField("packing", value)} placeholder="Packing" placeholderTextColor="#64748b" style={styles.input} />
-            <TextInput value={requestForm.patta} onChangeText={(value) => updateRequestField("patta", value)} placeholder="Patta" placeholderTextColor="#64748b" style={styles.input} />
+            <SuggestInput field="packing" placeholder="Packing" options={miscOptions.packing} />
+            <SuggestInput field="patta" placeholder="Patta" options={miscOptions.patta} />
             <TextInput value={requestForm.stamping} onChangeText={(value) => updateRequestField("stamping", value)} placeholder="Stamping" placeholderTextColor="#64748b" style={styles.input} />
-            <TextInput value={requestForm.transport} onChangeText={(value) => updateRequestField("transport", value)} placeholder="Transport" placeholderTextColor="#64748b" style={styles.input} />
+            <SuggestInput field="transport" placeholder="Transport" options={miscOptions.transport} />
             <Text style={styles.subTitle}>Colors</Text>
             {requestForm.colors.map((row) => (
               <View key={row.key} style={styles.requestColorRow}>
@@ -782,6 +846,10 @@ const styles = StyleSheet.create({
   partyChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   partyChip: { backgroundColor: "#dbeafe", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   partyChipText: { color: "#1e3a8a", fontWeight: "900", fontSize: 12 },
+  suggestWrap: { marginBottom: 0 },
+  suggestList: { backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#bfdbfe", marginTop: -8, marginBottom: 12, overflow: "hidden" },
+  suggestItem: { paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#eff6ff" },
+  suggestText: { color: "#0f172a", fontWeight: "900", fontSize: 14 },
   requestColorRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   requestColorInput: { flex: 1 },
   requestQtyInput: { width: 96 },
