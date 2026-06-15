@@ -31,6 +31,7 @@ import { supabase } from "./src/supabase";
 const EMPTY_STATE = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 15000;
+const BALE_PHOTO_BUCKET = "bale-photos";
 const CUT_OPTIONS = ["THAN", "1 MTR", "2 MTR", "80 CM", "75 CM", "78 CM", "77 CM", "LUMP", "FULL LUMP", "L95 THAN"];
 const NAV_ITEMS = [
   ["dashboard", "Dashboard"],
@@ -51,6 +52,10 @@ function normalize(value) {
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function htmlEscape(value) {
+  return clean(value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
 function isBalePhotoExpired(bale) {
@@ -824,6 +829,74 @@ export default function App() {
     }
   ]);
 
+  const printBale = async (order, bale) => {
+    const rows = getBaleRows(bale);
+    const colorRows = rows.map((row) => `<tr><td>${htmlEscape(row.colorNo)}</td><td>${htmlEscape(row.qty)} pcs</td></tr>`).join("");
+    const html = `
+      <html>
+        <head>
+          <style>
+            @page{size:A5 landscape;margin:6mm}
+            body{font-family:Arial,sans-serif;color:#111;margin:0}
+            .copy{border:2px solid #111;padding:7px;height:92%;box-sizing:border-box}
+            .top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #111;padding-bottom:5px;margin-bottom:6px}
+            h1{font-size:18px;margin:0}.bale{font-size:18px;font-weight:800}
+            .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;font-size:12px;margin-bottom:6px}
+            b{font-weight:800} table{width:100%;border-collapse:collapse;font-size:12px}
+            th,td{border:1px solid #777;padding:3px 5px;text-align:left}
+            th{background:#dbeafe}.foot{text-align:center;font-weight:800;font-size:11px;margin-top:5px}
+          </style>
+        </head>
+        <body>
+          <div class="copy">
+            <div class="top"><h1>Assortment Slip</h1><div><b>Bale No :</b></div><div class="bale">Bale ${htmlEscape(bale.baleNo)}</div></div>
+            <div class="grid">
+              <div><b>Party:</b> ${htmlEscape(order.partyName)}</div>
+              <div><b>Creation Time:</b> ${htmlEscape(displayDate(bale.createdAt, true))}</div>
+              <div><b>Party Order No:</b> ${htmlEscape(order.partyOrderNo || "-")}</div>
+              <div><b>MTM Order No:</b> ${htmlEscape(order.mtmOrderNo || "-")}</div>
+              <div><b>Quality:</b> ${htmlEscape(order.quality || "-")}</div>
+              <div><b>Stamping:</b> ${htmlEscape(order.stamping || "-")}</div>
+              <div><b>Cut:</b> ${htmlEscape(order.cut || "-")}</div>
+              <div><b>Packing:</b> ${htmlEscape(order.packing || "-")}</div>
+              <div><b>Station:</b> ${htmlEscape(order.partyAddress || "-")}</div>
+              <div><b>Patta:</b> ${htmlEscape(order.patta || "-")}</div>
+              <div><b>Transport:</b> ${htmlEscape(order.transport || "-")}</div>
+              <div><b>By:</b> ${htmlEscape(clean(bale.staff || order.assignedStaffName || "-").replace(/@.*/, ""))}</div>
+            </div>
+            <table><tr><th>Color No.</th><th>Pieces</th></tr>${colorRows}<tr><td><b>Grand Total</b></td><td><b>${htmlEscape(bale.totalQty || 0)} pcs</b></td></tr></table>
+            <div class="foot">Monica Textile Mills, Pali</div>
+          </div>
+        </body>
+      </html>`;
+    await Print.printAsync({ html });
+  };
+
+  const deleteBalePhoto = (order, baleNo) => Alert.alert("Delete Photo", `Delete photo for Bale ${baleNo}?`, [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Delete",
+      style: "destructive",
+      onPress: async () => {
+        const next = clone(salesState);
+        const target = next.orders.find((item) => item.id === order.id);
+        const bale = (target?.bales || []).find((item) => Number(item.baleNo) === Number(baleNo));
+        if (!bale || (!bale.photoUrl && !bale.photoPath)) {
+          Alert.alert("No Photo", "No photo found for this bale.");
+          return;
+        }
+        if (bale.photoPath) {
+          await supabase.storage.from(BALE_PHOTO_BUCKET).remove([bale.photoPath]);
+        }
+        bale.photoUrl = "";
+        bale.photoPath = "";
+        bale.photoDeletedAt = new Date().toISOString();
+        await saveState(next, "Bale photo deleted");
+        setSelectedOrder(target);
+      }
+    }
+  ]);
+
   const printPending = async (order) => {
     const rows = (order.colors || []).filter((row) => Number(row.pendingQty ?? row.qty ?? 0) !== 0);
     const htmlRows = rows.map((row) => `<tr><td>${row.colorNo}</td><td>${row.pendingQty ?? row.qty} pcs</td></tr>`).join("");
@@ -1232,7 +1305,11 @@ export default function App() {
                   ) : (
                     <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
                   )}
-                  <AppButton title="Delete Bale" compact tone="danger" onPress={() => deleteBale(selectedOrder, bale.baleNo)} />
+                  <View style={styles.rowActions}>
+                    <AppButton title="Print Bale" compact onPress={() => printBale(selectedOrder, bale)} />
+                    <AppButton title="Delete Photo" compact tone="muted" onPress={() => deleteBalePhoto(selectedOrder, bale.baleNo)} />
+                    <AppButton title="Delete Bale" compact tone="danger" onPress={() => deleteBale(selectedOrder, bale.baleNo)} />
+                  </View>
                 </View>
               ))}
               {!(selectedOrder.bales || []).length && <Text style={styles.empty}>No bales created.</Text>}
