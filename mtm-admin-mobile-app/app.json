@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "MTM",
+    "owner": "guddu1519",
+    "slug": "mtm-admin",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#eff6ff"
+    },
+    "android": {
+      "package": "com.monicatxt.mtmadmin",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0f172a"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "extra": {
+      "adminUrl": "https://mtmdyeing.onrender.com/"
+    }
+  }
+}
