@@ -240,6 +240,10 @@ th{background:#dbeafe}
 .salesHighlightField.red{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .salesOrderDetails{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:7px 14px;margin-top:8px;align-items:start}
 .salesOrderDetails span{min-width:0;overflow-wrap:anywhere;word-break:normal}
+.salesStaffDetailsCell{min-width:260px}
+.salesStaffDetailBox{display:grid;gap:6px;line-height:1.32;color:#334155}
+.salesStaffDetailBox div{min-width:0;overflow-wrap:break-word}
+.salesStaffDetailBox b{color:#0f172a;white-space:nowrap}
 @media(max-width:1100px){
   .salesDesktopTable{display:none!important}
   .salesMobileCards{display:block!important}
@@ -3566,6 +3570,15 @@ function getSalesOrderToneClass(order){
   return status === "Completed" || status === "Packed" ? "salesCompletedOrder" : "";
 }
 
+function getSalesStaffOrderDetailsHtml(order){
+  return `<div class="salesStaffDetailBox">
+    <div><b>Party Conf No:</b> ${salesEscape(order.partyOrderNo || "-")} / <b>MTM Conf No:</b> ${salesEscape(order.mtmOrderNo || "-")}</div>
+    <div><b>Quality:</b> ${salesEscape(order.quality || "N/A")} | <b>Cut:</b> ${salesEscape(order.cut || "-")}</div>
+    <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}</div>
+    <div><b>Station:</b> ${salesEscape(order.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}</div>
+  </div>`;
+}
+
 function getSalesUserNameByEmail(email){
   let key = String(email || "").trim().toLowerCase();
   if(!key) return "";
@@ -4421,7 +4434,7 @@ function renderSalesStaffOrders(){
       <td>${salesEscape(o.agentName || "-")}</td>
       ${adminView ? `<td>${salesEscape(getSalesAssignedTeamMemberName(o))}</td>` : ""}
       <td><span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></td>
-      <td><b>${salesEscape(getSalesOrderConfLine(o))}</b><br><b>Quality:</b> ${salesEscape(o.quality || "N/A")} | <b>Cut:</b> ${salesEscape(o.cut || "-")}<br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
+      <td class="salesStaffDetailsCell">${getSalesStaffOrderDetailsHtml(o)}</td>
       <td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td>
       <td><span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></td>
       <td>${actionHtml(o)}</td>
@@ -4429,12 +4442,9 @@ function renderSalesStaffOrders(){
   if(mobile){
     mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard ${getSalesOrderToneClass(o)}">
       <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
-      <p><b>Order Details:</b> ${salesEscape(getSalesOrderConfLine(o))}</p>
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
       ${adminView ? `<p><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>` : ""}
-      <p><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> ${salesEscape(o.cut || "-")}</p>
-      <p><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</p>
-      <p><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</p>
+      ${getSalesStaffOrderDetailsHtml(o)}
       <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
       <p><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></p>
       <div class="salesActions">${actionHtml(o)}</div>
