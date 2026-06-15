@@ -122,7 +122,7 @@ function getPendingRows(order) {
     const ordered = Number(row.qty || 0);
     const sent = Number(usedByColor[colorNo] || 0);
     return { colorNo, ordered, sent, pending: ordered - sent };
-  });
+  }).filter((row) => row.pending > 0);
 }
 
 function baleSummary(order) {
@@ -160,6 +160,7 @@ export default function App() {
   const [salesState, setSalesState] = useState(emptySalesState);
   const [query, setQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedBale, setSelectedBale] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestForm, setRequestForm] = useState(emptyOrderRequest);
@@ -350,6 +351,7 @@ export default function App() {
     setMenuOpen(false);
     setQuery("");
     setSelectedOrder(null);
+    setSelectedBale(null);
     await supabase.auth.signOut();
   }
 
@@ -358,6 +360,7 @@ export default function App() {
       setLoading(true);
       setQuery("");
       setSelectedOrder(null);
+      setSelectedBale(null);
       await withTimeout(loadSalesState(), "Refresh is taking too long. Please check internet.");
     } catch (error) {
       Alert.alert("Refresh Failed", error.message || "Could not refresh orders.");
@@ -368,7 +371,6 @@ export default function App() {
 
   async function copyPendingReport(order) {
     const lines = getPendingRows(order)
-      .filter((row) => row.pending !== 0)
       .map((row) => `${row.colorNo}: ${row.pending} pcs`);
     const text = lines.length ? lines.join("\n") : "No pending colors.";
     await Clipboard.setStringAsync(text);
@@ -584,12 +586,14 @@ export default function App() {
                 <Text style={styles.dispatchBox}>{baleSummary(selectedOrder)}</Text>
                 {(selectedOrder.bales || []).map((bale) => (
                   <View key={bale.baleNo} style={styles.balePhotoCard}>
-                    <Text style={styles.pendingColor}>Bale {bale.baleNo} Photo</Text>
+                    <Text style={styles.pendingColor}>Bale {bale.baleNo} - {bale.totalQty || 0} pcs</Text>
+                    <Text style={styles.pendingValue}>Created: {displayDate(bale.createdAt)}</Text>
                     {bale.photoUrl && !isBalePhotoExpired(bale) ? (
                       <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
                     ) : (
                       <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
                     )}
+                    <AppButton title="View Details" onPress={() => setSelectedBale(bale)} />
                   </View>
                 ))}
 
@@ -605,7 +609,50 @@ export default function App() {
                   ))}
                 </View>
                 <AppButton title="Copy Pending Report" onPress={() => copyPendingReport(selectedOrder)} />
-                <AppButton title="Close" tone="muted" onPress={() => setSelectedOrder(null)} />
+                <AppButton title="Close" tone="muted" onPress={() => { setSelectedBale(null); setSelectedOrder(null); }} />
+              </>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      <Modal visible={!!selectedBale && !!selectedOrder} animationType="slide" onRequestClose={() => setSelectedBale(null)}>
+        <SafeAreaView style={[styles.modalScreen, styles.safeTop]}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            {selectedOrder && selectedBale && (
+              <>
+                <Text style={styles.modalTitle}>Assortment Slip</Text>
+                <View style={styles.slipCard}>
+                  <View style={styles.slipHeader}>
+                    <Text style={styles.slipTitle}>Bale {selectedBale.baleNo}</Text>
+                    <Text style={styles.slipQty}>{selectedBale.totalQty || 0} pcs</Text>
+                  </View>
+                  <Text style={styles.meta}><Text style={styles.bold}>Party:</Text> {selectedOrder.partyName || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Party Order No:</Text> {selectedOrder.partyOrderNo || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>MTM Order No:</Text> {selectedOrder.mtmOrderNo || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Creation Time:</Text> {displayDate(selectedBale.createdAt)}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Quality:</Text> {selectedOrder.quality || "-"} | <Text style={styles.bold}>Cut:</Text> {selectedOrder.cut || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Station:</Text> {selectedOrder.partyAddress || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Transport:</Text> {selectedOrder.transport || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Packing:</Text> {selectedOrder.packing || "-"} | <Text style={styles.bold}>Patta:</Text> {selectedOrder.patta || "-"}</Text>
+                  <Text style={styles.meta}><Text style={styles.bold}>Stamping:</Text> {selectedOrder.stamping || "-"}</Text>
+                </View>
+                <Text style={styles.subTitle}>Bale Colors</Text>
+                <View style={styles.pendingTable}>
+                  {(selectedBale.colors || []).map((row, index) => (
+                    <View style={styles.pendingRow} key={`${row.colorNo}_${index}`}>
+                      <Text style={styles.pendingColor}>{row.colorNo}</Text>
+                      <Text style={styles.pendingValue}>Pieces: {row.qty || 0}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={styles.subTitle}>Photo Proof</Text>
+                {selectedBale.photoUrl && !isBalePhotoExpired(selectedBale) ? (
+                  <Image source={{ uri: selectedBale.photoUrl }} style={styles.balePhotoLarge} resizeMode="contain" />
+                ) : (
+                  <Text style={styles.photoNote}>{balePhotoMessage(selectedBale)}</Text>
+                )}
+                <AppButton title="Close" tone="muted" onPress={() => setSelectedBale(null)} />
               </>
             )}
           </ScrollView>
@@ -716,7 +763,12 @@ const styles = StyleSheet.create({
   pendingValue: { color: "#334155", fontWeight: "800", marginBottom: 3 },
   balePhotoCard: { backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#dbeafe", padding: 12, marginTop: 10 },
   balePhoto: { width: "100%", height: 220, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff" },
+  balePhotoLarge: { width: "100%", height: 320, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff" },
   photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#f8fafc", borderRadius: 12, padding: 10 },
+  slipCard: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#cbd5e1", padding: 14, gap: 4 },
+  slipHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#e2e8f0", paddingBottom: 10, marginBottom: 8 },
+  slipTitle: { color: "#0f172a", fontSize: 22, fontWeight: "900" },
+  slipQty: { color: "#166534", fontSize: 18, fontWeight: "900" },
   partyChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   partyChip: { backgroundColor: "#dbeafe", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   partyChipText: { color: "#1e3a8a", fontWeight: "900", fontSize: 12 },
