@@ -157,6 +157,13 @@ function getTakenDetails(order, colorNo) {
     .join(", ");
 }
 
+function getBaleColorQty(bale, colorNo) {
+  const key = String(colorNo || "").trim();
+  return (bale?.colors || [])
+    .filter((row) => String(row.colorNo || "").trim() === key)
+    .reduce((sum, row) => sum + Number(row.qty || 0), 0);
+}
+
 function makeSlipCopyHtml(order, bale, copyLabel, profile) {
   const items = bale.colors || [];
   const pairCount = items.length > 18 ? 3 : items.length > 9 ? 2 : 1;
@@ -276,6 +283,7 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [salesState, setSalesState] = useState(emptySalesState);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [editingBaleNo, setEditingBaleNo] = useState(null);
   const [packingQty, setPackingQty] = useState({});
   const [notifications, setNotifications] = useState([]);
   const [query, setQuery] = useState("");
@@ -318,6 +326,11 @@ export default function App() {
   const selectedTotal = useMemo(
     () => Object.values(packingQty).reduce((sum, value) => sum + Number(value || 0), 0),
     [packingQty]
+  );
+
+  const editingBale = useMemo(
+    () => (selectedOrder?.bales || []).find((bale) => Number(bale.baleNo) === Number(editingBaleNo)) || null,
+    [selectedOrder, editingBaleNo]
   );
 
   const completedOrderCount = assignedOrders.filter((order) => order.status === "Packed" || isOrderLocked(order)).length;
@@ -485,6 +498,7 @@ export default function App() {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (selectedOrderId) {
         setSelectedOrderId(null);
+        setEditingBaleNo(null);
         return true;
       }
       return false;
@@ -617,15 +631,19 @@ export default function App() {
       Alert.alert("No QTY", "Enter at least one color QTY before creating bale.");
       return;
     }
+    const isEditing = !!editingBale;
     const nextBale = {
-      baleNo: (selectedOrder.bales || []).length + 1,
+      ...(editingBale || {}),
+      baleNo: editingBale?.baleNo || (selectedOrder.bales || []).length + 1,
       totalQty: selectedTotal,
       colors: packed,
-      createdAt: new Date().toISOString(),
-      staff: profile?.full_name || profile?.username || session?.user?.email
+      createdAt: editingBale?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      staff: editingBale?.staff || profile?.full_name || profile?.username || session?.user?.email
     };
     const total = getOrderTotal(selectedOrder);
-    const sentAfter = getBaleSent(selectedOrder) + selectedTotal;
+    const oldEditingQty = editingBale ? Number(editingBale.totalQty || 0) : 0;
+    const sentAfter = getBaleSent(selectedOrder) - oldEditingQty + selectedTotal;
     const nextStatus = sentAfter >= total ? "Packed" : "In Packing";
     const nextState = {
       ...salesState,
@@ -634,7 +652,9 @@ export default function App() {
           ? {
               ...order,
               status: nextStatus,
-              bales: [...(order.bales || []), nextBale],
+              bales: isEditing
+                ? (order.bales || []).map((bale) => Number(bale.baleNo) === Number(editingBaleNo) ? nextBale : bale)
+                : [...(order.bales || []), nextBale],
               updatedAt: new Date().toISOString()
             }
           : order
@@ -643,10 +663,15 @@ export default function App() {
     try {
       await saveSalesState(nextState);
       setPackingQty({});
-      Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`, [
-        { text: "Upload Photo", onPress: () => uploadBalePhoto(selectedOrder.id, nextBale.baleNo, nextState) },
-        { text: "Later" }
-      ]);
+      setEditingBaleNo(null);
+      if (isEditing) {
+        Alert.alert("Bale Updated", `Bale ${nextBale.baleNo} updated successfully.`);
+      } else {
+        Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`, [
+          { text: "Upload Photo", onPress: () => uploadBalePhoto(selectedOrder.id, nextBale.baleNo, nextState) },
+          { text: "Later" }
+        ]);
+      }
     } catch (error) {
       Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
     }
@@ -775,7 +800,7 @@ export default function App() {
           const locked = isOrderLocked(item);
           const status = locked ? "Completed" : item.status || "Assigned";
           return (
-            <Pressable onPress={() => setSelectedOrderId(String(item.id))} style={[styles.orderCard, locked && styles.completedOrderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
+            <Pressable onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} style={[styles.orderCard, locked && styles.completedOrderCard, String(item.id) === String(selectedOrderId) && styles.orderActive]}>
               <View style={styles.orderTop}>
                 <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"} - {item.partyName || "-"}</Text>
               </View>
@@ -795,11 +820,11 @@ export default function App() {
               </View>
               <View style={styles.rowActions}>
                 {locked ? (
-                  <AppButton title="View / Print Bales" tone="muted" onPress={() => setSelectedOrderId(String(item.id))} />
+                  <AppButton title="View / Print Bales" tone="muted" onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} />
                 ) : status === "Assigned" ? (
                   <AppButton title="Accept Order" onPress={() => updateOrderStatus(item.id, "Accepted")} />
                 ) : (
-                  <AppButton title="Start Bale Creation" onPress={() => setSelectedOrderId(String(item.id))} />
+                  <AppButton title="Start Bale Creation" onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} />
                 )}
                 <AppButton title="Pending Report" onPress={() => showPendingReport(item)} tone="ghost" />
               </View>
@@ -812,12 +837,14 @@ export default function App() {
         <View style={styles.workSheet}>
           <ScrollView contentContainerStyle={styles.workScroll}>
             <View style={styles.workHeader}>
-              <AppButton title="Back" onPress={() => setSelectedOrderId(null)} tone="ghost" />
+              <AppButton title="Back" onPress={() => { setSelectedOrderId(null); setEditingBaleNo(null); setPackingQty({}); }} tone="ghost" />
               <Text style={styles.sheetTitle}>Bale Creation</Text>
             </View>
             <Text style={styles.sheetSub}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
             {isOrderLocked(selectedOrder) && <Text style={styles.lockNote}>Status: Completed. Printing is available.</Text>}
-            {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((row) => {
+            {!isOrderLocked(selectedOrder) && getPendingRows(selectedOrder).map((baseRow) => {
+              const editingQty = getBaleColorQty(editingBale, baseRow.colorNo);
+              const row = editingBale ? { ...baseRow, pending: baseRow.pending + editingQty } : baseRow;
               const alreadyTaken = getTakenDetails(selectedOrder, row.colorNo);
               const completed = row.pending <= 0;
               return (
@@ -847,7 +874,7 @@ export default function App() {
                         style={styles.choiceBox}
                         onPress={() => setPackingQty((current) => ({ ...current, [row.colorNo]: current[row.colorNo] || "" }))}
                       >
-                        <View style={[styles.fakeCheck, packingQty[row.colorNo] && Number(packingQty[row.colorNo]) !== row.pending && styles.fakeCheckOn]} />
+                    <View style={[styles.fakeCheck, packingQty[row.colorNo] && Number(packingQty[row.colorNo]) !== row.pending && styles.fakeCheckOn]} />
                         <Text style={styles.choiceText}>Custom</Text>
                       </Pressable>
                     </View>
@@ -878,6 +905,20 @@ export default function App() {
                       <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
                     )}
                     <AppButton title="Print This Bale" onPress={() => printBales(selectedOrder, bale.baleNo)} tone="ghost" />
+                    {!isOrderLocked(selectedOrder) && (
+                      <AppButton
+                        title="Edit Bale"
+                        tone="muted"
+                        onPress={() => {
+                          const nextQty = {};
+                          (bale.colors || []).forEach((row) => {
+                            nextQty[String(row.colorNo || "").trim()] = String(row.qty || "");
+                          });
+                          setPackingQty(nextQty);
+                          setEditingBaleNo(bale.baleNo);
+                        }}
+                      />
+                    )}
                   </View>
                 ))}
               </View>
@@ -889,7 +930,7 @@ export default function App() {
               <Text style={styles.floatingLabel}>Selected Total: <Text style={styles.floatingTotalNo}>{selectedTotal}</Text></Text>
             </View>
             <AppButton title="Clear QTY" onPress={() => setPackingQty({})} tone="ghost" />
-            {!isOrderLocked(selectedOrder) && <AppButton title="Create Bale" onPress={createBale} />}
+            {!isOrderLocked(selectedOrder) && <AppButton title={editingBale ? "Update Bale" : "Create Bale"} onPress={createBale} />}
           </View>
         </View>
       )}

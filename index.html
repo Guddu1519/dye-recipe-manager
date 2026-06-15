@@ -2211,6 +2211,7 @@ let salesCloudLoaded = false;
 let salesProfiles = [];
 let salesRefreshTimer = null;
 let salesImportInProgress = false;
+let salesEditingBaleNo = null;
 let editingSalesPartyId = null;
 let editingSalesAgentId = null;
 let editingSalesMiscId = null;
@@ -3612,10 +3613,22 @@ async function startSalesBaleCreation(id){
     if(order.status === "Accepted") order.status = "In Packing";
   }
   salesSelectedOrderId = id;
+  salesEditingBaleNo = null;
   localStorage.setItem(SALES_ACTIVE_BALE_ORDER_KEY, id);
   await saveSalesState();
   renderSalesManager();
   document.getElementById("salesBaleWorkArea")?.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function getSalesEditingBale(order){
+  if(!order || !salesEditingBaleNo) return null;
+  return (order.bales || []).find(b => Number(b.baleNo) === Number(salesEditingBaleNo)) || null;
+}
+
+function getSalesBaleColorQty(bale, colorNo){
+  return (bale?.colors || [])
+    .filter(item => sameSalesColor(item.colorNo, colorNo))
+    .reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
 }
 
 function getSalesBaleDrafts(){
@@ -3814,6 +3827,7 @@ async function finishSalesBale(){
   try{
     let order = salesState.orders.find(o => o.id === salesSelectedOrderId);
     if(!order) return;
+    let editingBale = getSalesEditingBale(order);
     let packed = [];
     let overPacked = [];
     let total = 0;
@@ -3822,7 +3836,8 @@ async function finishSalesBale(){
       let qty = getSalesPackRowQty(row);
       let color = order.colors.find(c => sameSalesColor(c.colorNo, colorNo));
       if(qty > 0){
-        if(qty > (Number(color.pendingQty) || 0)) overPacked.push(`Color No. ${colorNo}: pending ${color.pendingQty}, saving ${qty}`);
+        let availableQty = (Number(color?.pendingQty) || 0) + getSalesBaleColorQty(editingBale, colorNo);
+        if(qty > availableQty) overPacked.push(`Color No. ${colorNo}: available ${availableQty}, saving ${qty}`);
         packed.push({colorNo, qty});
         total += qty;
       }
@@ -3830,16 +3845,25 @@ async function finishSalesBale(){
     if(isSalesOrderLocked(order)) return alert("This order is locked: manually paid by admin.");
     if(packed.length === 0) return alert("Enter pack QTY for this bale.");
     if(overPacked.length && !confirm("You are packing more than pending QTY:\n" + overPacked.join("\n") + "\n\nClick OK to save anyway.")) return;
-    let remainingBefore = order.colors.reduce((sum,c)=>sum + c.pendingQty,0);
     if(total > order.qtyPerBale){
       if(!confirm("Ordered quantity was " + order.qtyPerBale + " per bale, but you are saving " + total + ". Are you sure you want to save?")) return;
+    }
+    if(editingBale){
+      (editingBale.colors || []).forEach(item => {
+        let color = order.colors.find(c => sameSalesColor(c.colorNo, item.colorNo));
+        if(color) color.pendingQty = (Number(color.pendingQty) || 0) + (Number(item.qty) || 0);
+      });
     }
     packed.forEach(p => {
       let color = order.colors.find(c => sameSalesColor(c.colorNo, p.colorNo));
       color.pendingQty -= p.qty;
     });
-    let nextBale = {baleNo: order.bales.length + 1, totalQty: total, colors: packed, createdAt: new Date().toISOString(), staff: order.assignedStaffName || getSalesUserEmail()};
-    order.bales.push(nextBale);
+    let nextBale = editingBale || {baleNo: order.bales.length + 1, createdAt: new Date().toISOString()};
+    nextBale.totalQty = total;
+    nextBale.colors = packed;
+    nextBale.updatedAt = new Date().toISOString();
+    nextBale.staff = nextBale.staff || order.assignedStaffName || getSalesUserEmail();
+    if(!editingBale) order.bales.push(nextBale);
     if(order.colors.every(c => c.pendingQty <= 0)){
       order.status = "Packed";
     }else{
@@ -3847,10 +3871,12 @@ async function finishSalesBale(){
     }
     await saveSalesState();
     clearSalesBaleDraft(order.id);
+    let wasEditing = !!editingBale;
+    salesEditingBaleNo = null;
     renderSalesManager(false);
     renderSalesBaleWorkArea();
-    showSuccessToast(order.status === "Packed" ? "Order ready for dispatch" : "Bale finished");
-    if(confirm("Bale created. Upload photo proof now?")){
+    showSuccessToast(wasEditing ? "Bale updated" : (order.status === "Packed" ? "Order ready for dispatch" : "Bale finished"));
+    if(!wasEditing && confirm("Bale created. Upload photo proof now?")){
       askSalesBalePhotoUpload(order.id, nextBale.baleNo, false);
     }
   }catch(err){
@@ -3903,23 +3929,12 @@ async function editSalesBale(orderId, baleNo){
   if(isSalesOrderLocked(order)) return alert("This order is locked: manually paid by admin.");
   let bale = (order.bales || []).find(b => Number(b.baleNo) === Number(baleNo));
   if(!bale) return alert("Bale not found.");
-  for(let item of (bale.colors || [])){
-    let next = prompt("Edit Bale " + baleNo + " - Color " + item.colorNo + " QTY", item.qty);
-    if(next === null) return;
-    next = Number(next);
-    if(!(next >= 0)) return alert("QTY must be 0 or more.");
-    let color = (order.colors || []).find(c => sameSalesColor(c.colorNo, item.colorNo));
-    let diff = next - (Number(item.qty) || 0);
-    item.qty = next;
-    if(color) color.pendingQty = (Number(color.pendingQty) || 0) - diff;
-  }
-  bale.colors = (bale.colors || []).filter(item => Number(item.qty) > 0);
-  bale.totalQty = bale.colors.reduce((sum,item)=>sum + (Number(item.qty) || 0),0);
-  order.status = getSalesPendingQty(order) <= 0 ? "Packed" : "In Packing";
-  await saveSalesState();
-  renderSalesManager(false);
+  salesSelectedOrderId = orderId;
+  salesEditingBaleNo = Number(baleNo);
+  localStorage.setItem(SALES_ACTIVE_BALE_ORDER_KEY, orderId);
   renderSalesBaleWorkArea();
-  showSuccessToast("Bale updated");
+  document.getElementById("salesBaleWorkArea")?.scrollIntoView({behavior:"smooth", block:"start"});
+  showSuccessToast("Bale loaded for editing");
 }
 
 async function toggleSalesOrderPaidLock(orderId){
@@ -4165,7 +4180,7 @@ function applySalesRoleUi(){
       allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch";
     }
     if(isSalesStaff()){
-      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
+      allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "Update Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
     }
     if(!allowed){
       el.disabled = true;
@@ -4514,11 +4529,15 @@ function renderSalesBaleWorkArea(){
     return;
   }
   let hasFloatingCreateBar = !isSalesOrderLocked(order) && order.status !== "Packed";
+  let editingBale = getSalesEditingBale(order);
+  if(editingBale) hasFloatingCreateBar = true;
   area.classList.toggle("salesBaleWorkFloating", hasFloatingCreateBar);
   let rows = (order.colors || []).map(c => {
     let pendingQty = Number(c.pendingQty) || 0;
+    let editQty = getSalesBaleColorQty(editingBale, c.colorNo);
+    let availableQty = pendingQty + editQty;
     let takenSummary = getSalesColorBaleSummary(order, c.colorNo);
-    if(pendingQty <= 0){
+    if(pendingQty <= 0 && !editingBale){
       return `<div class="salesPackRow salesPackRowDone" data-color-no="${salesEscape(c.colorNo)}">
         <div class="salesPackColorNo">${salesEscape(c.colorNo)}</div>
         <div class="salesPackMeta"><b>Ordered:</b> ${salesEscape(c.qty)} pcs &nbsp; <b>Pending:</b> ${salesEscape(c.pendingQty)} pcs</div>
@@ -4530,10 +4549,10 @@ function renderSalesBaleWorkArea(){
     <div class="salesPackMeta"><b>Ordered:</b> ${salesEscape(c.qty)} pcs &nbsp; <b>Pending:</b> ${salesEscape(c.pendingQty)} pcs</div>
     ${takenSummary ? `<div class="salesPackTaken"><b>Already Taken:</b> ${salesEscape(takenSummary)}</div>` : ""}
     <div class="salesPackControl">
-      <label class="salesPackChoice"><input class="salesTakeAll" type="checkbox" data-pending="${c.pendingQty}" onchange="setSalesTakeAll(this)"> Full QTY</label>
-      <label class="salesPackChoice"><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)"> Custom</label>
+      <label class="salesPackChoice"><input class="salesTakeAll" type="checkbox" data-pending="${availableQty}" onchange="setSalesTakeAll(this)" ${editQty && Number(editQty) === Number(availableQty) ? "checked" : ""}> Full QTY</label>
+      <label class="salesPackChoice"><input class="salesUseCustom" type="checkbox" onchange="setSalesUseCustom(this)" ${editQty && Number(editQty) !== Number(availableQty) ? "checked" : ""}> Custom</label>
     </div>
-    <input class="salesPackQty" type="number" min="0" max="${c.pendingQty}" placeholder="Enter QTY" oninput="markSalesCustomQty(this)">
+    <input class="salesPackQty" type="number" min="0" max="${availableQty}" value="${editQty ? salesEscape(editQty) : ""}" placeholder="Enter QTY" oninput="markSalesCustomQty(this)">
   </div>`;
   }).join("");
   let history = (order.bales || []).map(bale => `<div class="salesBaleBox"><label class="salesBaleSelect"><input class="salesBalePrintCheck" type="checkbox" value="${bale.baleNo}"> Bale ${bale.baleNo} - ${bale.totalQty} QTY</label>${bale.colors.map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join(", ")}${renderSalesBalePhoto(order.id, bale)}<br><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print This Bale</button>${!isSalesOrderLocked(order) ? ` <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button>` : ""}</div>`).join("");
@@ -4544,10 +4563,11 @@ function renderSalesBaleWorkArea(){
       <div><b>Party Order No:</b> ${salesEscape(order.partyOrderNo || "-")}<br><b>Packing:</b> ${salesEscape(getSalesOrderPacking(order))}<br><b>Patta:</b> ${salesEscape(getSalesOrderPatta(order))}</div>
       <div><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(order))}<br><b>Transport:</b> ${salesEscape(getSalesOrderTransport(order))}<br><b>Cut:</b> ${salesEscape(order.cut || "-")}<br><b>Sent / Pending:</b> ${getSalesSentQty(order)} / ${getSalesPendingQty(order)}</div>
     </div>
-    ${isSalesOrderLocked(order) ? `<p><span class="salesBadge green">Status: Completed</span></p>` : order.status === "Packed" ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackStickySpacer"></div><div class="salesPackTools sticky"><div><b>QTY Per Bale:</b> ${order.qtyPerBale}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><div class="salesPackActionStack"><button class="salesSmallBtn clearQtyBtn" onclick="clearSalesCurrentBaleQty()">CLEAR QTY</button><button class="salesSmallBtn green" onclick="finishSalesBale()">Create Bale</button></div></div>`}
+    ${isSalesOrderLocked(order) ? `<p><span class="salesBadge green">Status: Completed</span></p>` : order.status === "Packed" && !editingBale ? '<p><span class="salesBadge green">Order ready for dispatch</span></p>' : `<div class="salesPackStickySpacer"></div><div class="salesPackTools sticky"><div><b>${editingBale ? `Editing Bale ${salesEscape(editingBale.baleNo)}` : `QTY Per Bale:`}</b> ${editingBale ? "" : salesEscape(order.qtyPerBale)}<br><span>Selected Total: <span id="salesCurrentBaleTotal" class="salesBaleTotal">0</span></span></div><div class="salesPackActionStack"><button class="salesSmallBtn clearQtyBtn" onclick="clearSalesCurrentBaleQty()">CLEAR QTY</button><button class="salesSmallBtn green" onclick="finishSalesBale()">${editingBale ? "Update Bale" : "Create Bale"}</button></div></div>`}
     <div id="salesPendingPackRows" class="salesPackGrid">${rows}</div>
     <h3>Completed Bale History</h3>${(order.bales || []).length ? `<div class="salesBalePrintTools"><button class="salesSmallBtn" onclick="printSelectedSalesBales('${order.id}')">Print Selected Bales</button><button class="salesSmallBtn gray" onclick="printSalesPackingSlips('${order.id}')">Print All Assortment Slips</button></div>` : ""}<div class="salesBaleHistory">${history || '<span class="muted">No bales yet.</span>'}</div>`;
-  restoreSalesBaleDraft(order.id);
+  if(!editingBale) restoreSalesBaleDraft(order.id);
+  updateCurrentBaleTotal();
   setTimeout(updateSalesPackStickyFallback, 0);
 }
 
