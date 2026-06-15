@@ -4,13 +4,13 @@
   },
   "build": {
     "preview": {
-      "credentialsSource": "remote",
+      "credentialsSource": "local",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "credentialsSource": "remote",
+      "credentialsSource": "local",
       "android": {
         "buildType": "app-bundle"
       }
