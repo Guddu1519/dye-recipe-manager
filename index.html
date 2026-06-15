@@ -534,8 +534,8 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <p><b>Total Order QTY:</b> <span id="salesTotalQty">0</span> | <b>Expected Bales:</b> <span id="salesExpectedBales">0</span></p>
           <div class="salesActions">
             <button id="salesOrderSaveBtn" class="salesSmallBtn green" onclick="saveSalesOrder()">Save Order</button>
-            <input id="salesOrderCsvFile" type="file" accept=".csv" style="display:none" onchange="importSalesOrderCsv(event)">
-            <button class="salesSmallBtn gray" onclick="document.getElementById('salesOrderCsvFile').click()">Import Order CSV</button>
+            <input id="salesOrderCsvFile" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importSalesOrderCsv(event)">
+            <button class="salesSmallBtn gray" onclick="document.getElementById('salesOrderCsvFile').click()">Import Order Excel / CSV</button>
             <button class="salesSmallBtn gray" onclick="downloadSalesOrderSample()">Sample Order CSV</button>
           </div>
         </div>
@@ -3042,10 +3042,27 @@ async function submitAgentOrderRequest(){
     let partyName = document.getElementById("agentOrderParty")?.value || "";
     let party = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
     if(!party) throw new Error("Select assigned party.");
+    if(!salesAgentOwnsOrder({partyName: party.partyName, agentName: party.agentName, agentEmail: party.agentEmail})){
+      throw new Error("This party is not assigned to your agent login.");
+    }
     let colorsList = collectAgentOrderColorRows();
     if(!colorsList.length) throw new Error("Add at least one color.");
     let qtyPerBale = Number(document.getElementById("agentOrderQtyPerBale")?.value);
     if(!(qtyPerBale > 0)) throw new Error("QTY Per Bale is required.");
+    let transport = document.getElementById("agentOrderTransport")?.value.trim() || "";
+    let packing = document.getElementById("agentOrderPacking")?.value.trim() || "";
+    let patta = document.getElementById("agentOrderPatta")?.value.trim() || "";
+    let stamping = document.getElementById("agentOrderStamping")?.value.trim() || "";
+    let quality = document.getElementById("agentOrderQuality")?.value.trim() || "";
+    let cut = document.getElementById("agentOrderCut")?.value.trim() || "";
+    let missing = [];
+    if(!quality) missing.push("Quality");
+    if(!cut) missing.push("Cut");
+    if(!transport) missing.push("Transport");
+    if(!packing) missing.push("Packing");
+    if(!patta) missing.push("Patta");
+    if(!stamping) missing.push("Stamping");
+    if(missing.length) throw new Error("Required: " + missing.join(", "));
     let totalQty = colorsList.reduce((sum,row)=>sum + row.qty,0);
     salesState.orders.push({
       id: Date.now().toString(),
@@ -3057,12 +3074,12 @@ async function submitAgentOrderRequest(){
       agentName: party.agentName || salesProfile?.fullName || salesProfile?.username || "",
       agentEmail: party.agentEmail || getSalesUserEmail(),
       partyAddress: party.address || party.city || "",
-      transport: document.getElementById("agentOrderTransport")?.value.trim() || "",
-      packing: document.getElementById("agentOrderPacking")?.value.trim() || "",
-      patta: document.getElementById("agentOrderPatta")?.value.trim() || "",
-      stamping: document.getElementById("agentOrderStamping")?.value.trim() || "",
-      quality: document.getElementById("agentOrderQuality")?.value.trim() || "",
-      cut: document.getElementById("agentOrderCut")?.value.trim() || "",
+      transport,
+      packing,
+      patta,
+      stamping,
+      quality,
+      cut,
       qtyPerBale,
       colors: colorsList,
       totalQty,
@@ -5451,7 +5468,25 @@ async function importSalesColorCsv(event){
 async function importSalesOrderCsv(event){
   if(isTrialUser()) return alert("Trial login can only view. Import is disabled.");
   let file = event.target.files?.[0]; if(!file) return;
-  let rows = parseSalesCsv(await file.text());
+  let rows = [];
+  if(/\.(xlsx|xls)$/i.test(file.name || "")){
+    let workbook = XLSX.read(await file.arrayBuffer(), {type:"array"});
+    let sheetName = workbook.SheetNames[0];
+    if(!sheetName) return alert("Excel file has no sheet.");
+    let sheetRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header:1, defval:""});
+    if(sheetRows.length >= 2){
+      let headers = sheetRows[0].map(h => String(h || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
+      rows = sheetRows.slice(1).filter(r => r.some(cell => String(cell || "").trim())).map(cols => {
+        let row = {};
+        headers.forEach((h,i) => row[h] = String(cols[i] || "").trim());
+        return row;
+      });
+    }
+  } else {
+    rows = parseSalesCsv(await file.text());
+  }
+  if(!rows.length) return alert("No order data found in file.");
+  let mergedColors = {};
   rows.forEach(row => {
     if(row.mtm_order_no) document.getElementById("salesMtmOrderNo").value = row.mtm_order_no;
     if(row.party_order_no) document.getElementById("salesPartyOrderNo").value = row.party_order_no;
@@ -5470,10 +5505,23 @@ async function importSalesOrderCsv(event){
     if(cut) setSalesSelectValue("salesCut", cut);
     if(row.rate) document.getElementById("salesRate").value = row.rate;
     if(row.qty_per_bale) document.getElementById("salesQtyPerBale").value = row.qty_per_bale;
+    let colorNo = salesCsvPick(row, ["color_no","color","color_name","shade","shade_no"]);
+    let qty = Number(salesCsvPick(row, ["qty","quantity","pcs","pieces"]));
+    if(colorNo && qty > 0){
+      let key = normalizeName(colorNo);
+      if(!mergedColors[key]) mergedColors[key] = {colorNo, qty:0};
+      mergedColors[key].qty += qty;
+    }
   });
+  let colorRows = Object.values(mergedColors);
+  if(colorRows.length){
+    let wrap = document.getElementById("salesColorRows");
+    if(wrap) wrap.innerHTML = "";
+    colorRows.sort((a,b)=>String(a.colorNo).localeCompare(String(b.colorNo), undefined, {numeric:true})).forEach(row => addSalesColorRow(row.colorNo, row.qty));
+  }
   updateSalesOrderTotals();
   event.target.value = "";
-  showSuccessToast("Order CSV loaded");
+  showSuccessToast("Order file loaded");
 }
 
 function downloadSalesPartySample(){ downloadSalesCsv("party-master-sample.csv", "party_name,gst_no,city,agent_name\nShree Textiles,24ABCDE1234F1Z5,Pali,Agent 1\n"); }

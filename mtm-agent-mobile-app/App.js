@@ -416,6 +416,16 @@ export default function App() {
       if (!colors.length) throw new Error("Add at least one color.");
       const qtyPerBale = Number(requestForm.qtyPerBale || 0);
       if (!(qtyPerBale > 0)) throw new Error("QTY Per Bale is required.");
+      const requiredFields = {
+        Quality: requestForm.quality,
+        Cut: requestForm.cut,
+        Transport: requestForm.transport,
+        Packing: requestForm.packing,
+        Patta: requestForm.patta,
+        Stamping: requestForm.stamping
+      };
+      const missing = Object.entries(requiredFields).filter(([, value]) => !cleanText(value)).map(([label]) => label);
+      if (missing.length) throw new Error(`Required: ${missing.join(", ")}.`);
       const totalQty = colors.reduce((sum, row) => sum + row.qty, 0);
       const nextState = JSON.parse(JSON.stringify(salesState));
       nextState.orders ||= [];

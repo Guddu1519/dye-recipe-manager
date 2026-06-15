@@ -7,6 +7,7 @@ import * as ScreenCapture from "expo-screen-capture";
 import * as Sharing from "expo-sharing";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import * as XLSX from "xlsx";
 import {
   ActivityIndicator,
   Alert,
@@ -585,13 +586,35 @@ export default function App() {
     return rows;
   };
 
-  const importOrderCsv = async () => {
+  const readOrderImportRows = async (asset) => {
+    const name = String(asset.name || "").toLowerCase();
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+      const workbook = XLSX.read(base64, { type: "base64" });
+      const sheetName = workbook.SheetNames[0];
+      if (!sheetName) throw new Error("Excel file has no sheet.");
+      return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "" }).map((row) => row.map((cell) => clean(cell)));
+    }
+    const text = await FileSystem.readAsStringAsync(asset.uri);
+    return parseCsvRows(text);
+  };
+
+  const importOrderFile = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: ["text/csv", "text/comma-separated-values", "application/csv", "text/plain"], copyToCacheDirectory: true });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          "text/csv",
+          "text/comma-separated-values",
+          "application/csv",
+          "text/plain",
+          "application/vnd.ms-excel",
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ],
+        copyToCacheDirectory: true
+      });
       if (result.canceled) return;
-      const text = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      const rows = parseCsvRows(text);
-      if (rows.length < 2) throw new Error("CSV should have header row and at least one data row.");
+      const rows = await readOrderImportRows(result.assets[0]);
+      if (rows.length < 2) throw new Error("File should have header row and at least one data row.");
       const headers = rows[0].map((header) => normalize(header).replace(/\s+/g, "_"));
       const get = (row, names) => {
         for (const name of names) {
@@ -647,7 +670,7 @@ export default function App() {
       });
       Alert.alert("Import Ready", `Imported ${colorRows.length} color row(s). Check details, then press Save Order.`);
     } catch (error) {
-      Alert.alert("Import Failed", error.message || "Could not import order CSV.");
+      Alert.alert("Import Failed", error.message || "Could not import order file.");
     }
   };
 
@@ -1002,7 +1025,7 @@ export default function App() {
     return (
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <Section title={orderForm.id ? "Edit Order" : "Create Order"}>
-          <AppButton title="Import Order CSV" tone="muted" onPress={importOrderCsv} />
+          <AppButton title="Import Order Excel / CSV" tone="muted" onPress={importOrderFile} />
           <View style={styles.formGrid}>
             <Field label="MTM Order No." value={orderForm.mtmOrderNo} onChangeText={(value) => setForm("mtmOrderNo", value)} />
             <Field label="Party Order No." value={orderForm.partyOrderNo} onChangeText={(value) => setForm("partyOrderNo", value)} />
