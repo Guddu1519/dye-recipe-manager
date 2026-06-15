@@ -142,7 +142,6 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [salesState, setSalesState] = useState(emptySalesState);
@@ -475,19 +474,14 @@ export default function App() {
             placeholderTextColor="#64748b"
             style={styles.input}
           />
-          <View style={styles.passwordRow}>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              placeholder="Password"
-              placeholderTextColor="#64748b"
-              style={styles.passwordInput}
-            />
-            <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
-              <Text style={styles.passwordToggleText}>{showPassword ? "×" : "👁"}</Text>
-            </Pressable>
-          </View>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="Password"
+            placeholderTextColor="#64748b"
+            style={styles.input}
+          />
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -656,10 +650,6 @@ const styles = StyleSheet.create({
   loginTitle: { fontSize: 30, fontWeight: "900", color: "#0f172a" },
   loginSub: { marginTop: 6, marginBottom: 18, color: "#64748b", fontWeight: "600" },
   input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 14, marginBottom: 12, fontSize: 16, color: "#0f172a", backgroundColor: "#fff" },
-  passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, backgroundColor: "#fff", marginBottom: 12 },
-  passwordInput: { flex: 1, padding: 14, fontSize: 16, color: "#0f172a" },
-  passwordToggle: { width: 34, height: 34, borderRadius: 999, backgroundColor: "#e2e8f0", alignItems: "center", justifyContent: "center", marginRight: 8 },
-  passwordToggleText: { color: "#1d4ed8", fontWeight: "900", fontSize: 15 },
   screen: { flex: 1, backgroundColor: "#eef6ff" },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 30, fontWeight: "900", color: "#0f172a" },

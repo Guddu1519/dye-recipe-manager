@@ -151,27 +151,19 @@ function AppButton({ title, onPress, tone = "primary", disabled = false, compact
 }
 
 function Field({ label, value, onChangeText, placeholder, keyboardType = "default", secureTextEntry = false, multiline = false }) {
-  const [showPassword, setShowPassword] = useState(false);
   return (
     <View style={styles.fieldWrap}>
       {!!label && <Text style={styles.label}>{label}</Text>}
-      <View style={secureTextEntry ? styles.passwordRow : null}>
-        <TextInput
-          value={String(value ?? "")}
-          onChangeText={onChangeText}
-          placeholder={placeholder || label}
-          placeholderTextColor="#94a3b8"
-          keyboardType={keyboardType}
-          secureTextEntry={secureTextEntry && !showPassword}
-          multiline={multiline}
-          style={[styles.input, secureTextEntry && styles.passwordInput, multiline && styles.inputMultiline]}
-        />
-        {secureTextEntry && (
-          <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
-            <Text style={styles.passwordToggleText}>{showPassword ? "×" : "👁"}</Text>
-          </Pressable>
-        )}
-      </View>
+      <TextInput
+        value={String(value ?? "")}
+        onChangeText={onChangeText}
+        placeholder={placeholder || label}
+        placeholderTextColor="#94a3b8"
+        keyboardType={keyboardType}
+        secureTextEntry={secureTextEntry}
+        multiline={multiline}
+        style={[styles.input, multiline && styles.inputMultiline]}
+      />
     </View>
   );
 }
@@ -1356,10 +1348,6 @@ const styles = StyleSheet.create({
   fieldWrap: { marginBottom: 10 },
   label: { color: "#334155", fontWeight: "800", marginBottom: 6 },
   input: { minHeight: 50, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 13, paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#fff", color: "#0f172a", fontSize: 16, justifyContent: "center" },
-  passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 13, backgroundColor: "#fff" },
-  passwordInput: { flex: 1, borderWidth: 0, marginBottom: 0 },
-  passwordToggle: { width: 34, height: 34, borderRadius: 999, backgroundColor: "#e2e8f0", alignItems: "center", justifyContent: "center", marginRight: 8 },
-  passwordToggleText: { color: "#1d4ed8", fontWeight: "900", fontSize: 15 },
   inputMultiline: { minHeight: 90, textAlignVertical: "top" },
   placeholder: { color: "#94a3b8" },
   choiceText: { color: "#0f172a", fontSize: 16 },

@@ -342,7 +342,6 @@ th{background:#dbeafe}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
 .auth-card h2{margin:0 0 8px}
 .auth-card p{margin:0 0 18px;color:#475569}
-.passwordWrap{position:relative}.passwordWrap input{padding-right:44px}.passwordEye{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:30px;height:30px;border:0;background:#e2e8f0;color:#0f172a;border-radius:999px;padding:0;font-size:14px;font-weight:900;line-height:30px;text-align:center;cursor:pointer}
 .auth-error{display:none;margin:0 0 12px;color:#b91c1c;background:#fee2e2;padding:10px;border-radius:8px}
 .auth-meta{font-size:13px;color:#64748b;margin-top:12px}
 #appShell{display:none}
@@ -768,7 +767,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to view and manage your cloud recipes.</p>
     <div id="loginError" class="auth-error"></div>
     <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
-    <div class="passwordWrap"><input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('loginPassword',this)" aria-label="Show password">👁</button></div>
+    <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
     <div class="auth-meta">Your session stays active on this device until you logout.</div>
@@ -781,7 +780,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to open Sales Manager.</p>
     <div id="salesLoginError" class="auth-error"></div>
     <input id="salesLoginEmail" type="email" placeholder="Sales Email" autocomplete="email">
-    <div class="passwordWrap"><input id="salesLoginPassword" type="password" placeholder="Sales Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('salesLoginPassword',this)" aria-label="Show password">👁</button></div>
+    <input id="salesLoginPassword" type="password" placeholder="Sales Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginSalesUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Sales Manager is separate from Dyeing Manager.</div>
@@ -794,7 +793,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to view only your assigned sales orders.</p>
     <div id="staffLoginError" class="auth-error"></div>
     <input id="staffLoginEmail" type="email" placeholder="Team Member Email" autocomplete="email">
-    <div class="passwordWrap"><input id="staffLoginPassword" type="password" placeholder="Team Member Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('staffLoginPassword',this)" aria-label="Show password">👁</button></div>
+    <input id="staffLoginPassword" type="password" placeholder="Team Member Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginStaffUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Team Member Portal shows assigned work only.</div>
@@ -807,7 +806,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to view only your party/order status.</p>
     <div id="agentLoginError" class="auth-error"></div>
     <input id="agentLoginEmail" type="email" placeholder="Agent Username / Email" autocomplete="email">
-    <div class="passwordWrap"><input id="agentLoginPassword" type="password" placeholder="Agent Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('agentLoginPassword',this)" aria-label="Show password">👁</button></div>
+    <input id="agentLoginPassword" type="password" placeholder="Agent Password" autocomplete="current-password">
     <button class="btn green" style="width:100%" onclick="loginAgentUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Agent Portal shows order status only.</div>
@@ -2276,17 +2275,6 @@ function salesEscape(value){
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
     "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
   })[ch]);
-}
-
-function togglePasswordVisibility(inputId, btn){
-  let input = document.getElementById(inputId);
-  if(!input) return;
-  let show = input.type === "password";
-  input.type = show ? "text" : "password";
-  if(btn){
-    btn.textContent = show ? "×" : "👁";
-    btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
-  }
 }
 
 function getSalesUserEmail(){
