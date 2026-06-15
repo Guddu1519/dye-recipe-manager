@@ -183,9 +183,9 @@ th{background:#dbeafe}
 .salesTabs button.active{background:#1d4ed8;color:white}
 .salesPanel{display:none}.salesPanel.active{display:block}
 .staffPortalMode .salesTabs button:not(#salesTabStaff):not(#salesTabTempSlip){display:none}
-.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelPending,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelAgents,.staffPortalMode #salesPanelStaffs,.staffPortalMode #salesPanelMisc{display:none!important}
+.staffPortalMode #salesPanelOrders,.staffPortalMode #salesPanelDispatch,.staffPortalMode #salesPanelPending,.staffPortalMode #salesPanelParties,.staffPortalMode #salesPanelAgents,.staffPortalMode #salesPanelStaffs,.staffPortalMode #salesPanelMisc{display:none!important}
 .agentPortalMode .salesTabs button:not(#salesTabAgent){display:none}
-.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelPending,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelStaffs,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
+.agentPortalMode #salesPanelOrders,.agentPortalMode #salesPanelDispatch,.agentPortalMode #salesPanelPending,.agentPortalMode #salesPanelParties,.agentPortalMode #salesPanelAgents,.agentPortalMode #salesPanelStaffs,.agentPortalMode #salesPanelMisc,.agentPortalMode #salesPanelStaff{display:none!important}
 .salesGrid{display:grid;grid-template-columns:repeat(3,minmax(220px,1fr));gap:12px}
 .salesSuggestWrap{position:relative;min-width:0}
 .salesSuggestWrap input{width:100%;box-sizing:border-box}
@@ -197,6 +197,16 @@ th{background:#dbeafe}
 .salesSmallBtn.gray{background:#64748b}.salesSmallBtn.green{background:#16a34a}.salesSmallBtn.red{background:#dc2626}.clearQtyBtn{background:#f8fafc;color:#0f172a;border:1px solid #cbd5e1;padding:7px 10px;font-size:12px;white-space:nowrap}
 .salesTableWrap{overflow-x:hidden;overflow-y:visible;border:1px solid #e2e8f0;border-radius:12px;background:white}
 .salesTable{width:100%;min-width:0;table-layout:auto}.salesTable th{position:sticky;top:0;z-index:1;white-space:nowrap;overflow-wrap:normal;word-break:keep-all}.salesTable td{white-space:normal;overflow-wrap:break-word;word-break:normal;vertical-align:top}
+.salesDispatchControls{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.salesDispatchControls label{display:grid;gap:6px;font-weight:800;color:#334155}
+.salesDispatchControls input{min-width:210px}
+.salesDispatchSummary{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.salesDispatchStat{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:10px 14px;color:#1e3a8a;font-weight:800}
+.salesDispatchCards{display:grid;gap:10px}
+.salesDispatchCard{display:grid;grid-template-columns:105px 1fr 1fr 1.4fr 1.2fr 100px 1fr;align-items:center;gap:10px;padding:13px;border:1px solid #dbeafe;border-left:5px solid #16a34a;border-radius:14px;background:#fff}
+.salesDispatchCard strong{display:block;color:#64748b;font-size:11px;text-transform:uppercase;margin-bottom:3px}
+.salesDispatchTime{font-size:17px;font-weight:900;color:#1d4ed8;white-space:nowrap}
+.salesDispatchQty{font-size:18px;font-weight:900;color:#166534;white-space:nowrap}
 .salesSmallBtn,.salesBadge{white-space:nowrap}
 .salesBadge{display:inline-block;border-radius:999px;padding:5px 9px;font-weight:800;font-size:12px;background:#dbeafe;color:#1e3a8a}
 .salesBadge.green{background:#dcfce7;color:#166534}.salesBadge.red{background:#fee2e2;color:#991b1b}.salesBadge.amber{background:#fef3c7;color:#92400e}
@@ -284,6 +294,9 @@ th{background:#dbeafe}
   .salesTableWrap{border-radius:12px;overflow-x:hidden;-webkit-overflow-scrolling:auto}
   .salesTable{min-width:0;font-size:13px}
   .salesTable th,.salesTable td{padding:8px;vertical-align:top}
+  .salesDispatchCard{grid-template-columns:1fr 1fr}
+  .salesDispatchCard>div:nth-child(4),.salesDispatchCard>div:nth-child(5),.salesDispatchCard>div:nth-child(7){grid-column:1/-1}
+  .salesDispatchControls,.salesDispatchControls label,.salesDispatchControls input{width:100%;min-width:0}
   .salesDesktopTable{display:none}
   .salesMobileCards{display:block}
   .salesEmptyPage{overflow-x:hidden}
@@ -475,6 +488,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
   <div class="salesShell">
     <div class="salesTabs">
       <button id="salesTabOrders" class="active" onclick="showSalesTab('orders')">Orders</button>
+      <button id="salesTabDispatch" onclick="showSalesTab('dispatch')">Daily Dispatch</button>
       <button id="salesTabPending" onclick="showSalesTab('pending')">Pending Summary</button>
       <button id="salesTabParties" onclick="showSalesTab('parties')">Party Master</button>
       <button id="salesTabAgents" onclick="showSalesTab('agents')">Agent Ledger</button>
@@ -546,6 +560,21 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <input id="salesOrderSearch" placeholder="Search order no, party, agent, GST, packing, patta, transport, status..." oninput="renderSalesOrders()">
         <div class="salesTableWrap salesDesktopTable" style="display:none"><table class="salesTable" id="salesOrdersTable"></table></div>
         <div class="salesOrderHistoryCards" id="salesOrdersMobileCards"></div>
+      </div>
+    </div>
+
+    <div id="salesPanelDispatch" class="salesPanel">
+      <div class="salesCard">
+        <h2>Daily Dispatch</h2>
+        <p class="muted">Bales created on the selected date, arranged by creation time in ascending order.</p>
+        <div class="salesDispatchControls">
+          <label>Dispatch Date
+            <input id="salesDispatchDate" type="date" onchange="renderSalesDailyDispatch()">
+          </label>
+          <button class="salesSmallBtn" onclick="setSalesDispatchToday()">Today</button>
+        </div>
+        <div id="salesDispatchSummary" class="salesDispatchSummary"></div>
+        <div id="salesDispatchCards" class="salesDispatchCards"></div>
       </div>
     </div>
 
@@ -2663,10 +2692,11 @@ function downloadSalesCsv(filename, content){
 function showSalesTab(tab, shouldRender=true){
   if(currentManagerMode === "staff" && !["staff","tempSlip"].includes(tab)) tab = "staff";
   if(currentManagerMode === "agent" && tab !== "agent") tab = "agent";
+  if(tab === "dispatch" && !isSalesAdmin()) tab = currentManagerMode === "agent" ? "agent" : "staff";
   let previousTab = salesActiveTab;
   if(previousTab && previousTab !== tab) resetSalesScreenState();
   salesActiveTab = tab;
-  ["orders","pending","parties","agents","staffs","misc","agent","staff","tempSlip"].forEach(name => {
+  ["orders","dispatch","pending","parties","agents","staffs","misc","agent","staff","tempSlip"].forEach(name => {
     document.getElementById("salesTab" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
     document.getElementById("salesPanel" + name[0].toUpperCase() + name.slice(1))?.classList.toggle("active", name === tab);
   });
@@ -4152,6 +4182,7 @@ function renderSalesManager(shouldLoadLocal=true){
   renderSalesStaffLedger();
   renderSalesMisc();
   renderSalesOrders();
+  renderSalesDailyDispatch();
   renderSalesPendingSummary();
   renderSalesAgentPortal();
   renderSalesStaffOrders();
@@ -4187,6 +4218,68 @@ function applySalesRoleUi(){
       if(el.tagName === "INPUT") el.readOnly = true;
     }
   });
+}
+
+function getSalesLocalDateKey(value){
+  let date = new Date(value || "");
+  if(Number.isNaN(date.getTime())) return "";
+  let year = date.getFullYear();
+  let month = String(date.getMonth() + 1).padStart(2, "0");
+  let day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function setSalesDispatchToday(){
+  let input = document.getElementById("salesDispatchDate");
+  if(!input) return;
+  input.value = getSalesLocalDateKey(new Date());
+  renderSalesDailyDispatch();
+}
+
+function renderSalesDailyDispatch(){
+  let cards = document.getElementById("salesDispatchCards");
+  let summary = document.getElementById("salesDispatchSummary");
+  let dateInput = document.getElementById("salesDispatchDate");
+  if(!cards || !summary || !dateInput) return;
+  if(!dateInput.value) dateInput.value = getSalesLocalDateKey(new Date());
+  if(!isSalesAdmin()){
+    cards.innerHTML = "";
+    summary.innerHTML = "";
+    return;
+  }
+
+  let rows = [];
+  (salesState.orders || []).forEach(order => {
+    (order.bales || []).forEach(bale => {
+      let createdAt = bale.createdAt || bale.updatedAt || "";
+      if(getSalesLocalDateKey(createdAt) !== dateInput.value) return;
+      rows.push({
+        createdAt,
+        mtmOrderNo: order.mtmOrderNo || "-",
+        partyOrderNo: order.partyOrderNo || "-",
+        partyName: order.partyName || "-",
+        agentName: order.agentName || "-",
+        qty: Number(bale.totalQty) || 0,
+        teamMember: getSalesTeamMemberName(order, bale)
+      });
+    });
+  });
+  rows.sort((a,b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+  let totalQty = rows.reduce((sum,row) => sum + row.qty, 0);
+  summary.innerHTML = `<div class="salesDispatchStat">Created Bales: ${rows.length}</div><div class="salesDispatchStat">Total QTY: ${totalQty}</div>`;
+  cards.innerHTML = rows.length ? rows.map(row => {
+    let time = new Date(row.createdAt).toLocaleTimeString("en-IN", {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    return `<div class="salesDispatchCard">
+      <div><strong>Time</strong><span class="salesDispatchTime">${salesEscape(time)}</span></div>
+      <div><strong>MTM Order No.</strong>${salesEscape(row.mtmOrderNo)}</div>
+      <div><strong>Party Conf No.</strong>${salesEscape(row.partyOrderNo)}</div>
+      <div><strong>Party Name</strong>${salesEscape(row.partyName)}</div>
+      <div><strong>Agent Name</strong>${salesEscape(row.agentName)}</div>
+      <div><strong>Bale QTY</strong><span class="salesDispatchQty">${salesEscape(row.qty)}</span></div>
+      <div><strong>Team Member</strong>${salesEscape(row.teamMember)}</div>
+    </div>`;
+  }).join("") : `<div class="muted" style="padding:20px;text-align:center">No bales were created on this date.</div>`;
 }
 
 function renderSalesParties(){
