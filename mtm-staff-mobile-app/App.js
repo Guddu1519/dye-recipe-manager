@@ -901,7 +901,7 @@ export default function App() {
                     <Text style={styles.meta}>Created: {displayDate(bale.createdAt)}</Text>
                     <Text style={styles.meta}>{(bale.colors || []).map((row) => `${row.colorNo}: ${row.qty}`).join(", ")}</Text>
                     {bale.photoUrl && !isBalePhotoExpired(bale) ? (
-                      <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} />
+                      <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
                     ) : (
                       <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
                     )}
@@ -1015,7 +1015,7 @@ const styles = StyleSheet.create({
   qtyInput: { borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 14, padding: 14, color: "#0f172a", fontSize: 24, fontWeight: "900", backgroundColor: "#fff" },
   baleHistory: { padding: 16, paddingBottom: 140 },
   baleCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, marginTop: 10, gap: 8 },
-  balePhoto: { width: "100%", height: 170, borderRadius: 14, marginTop: 4, borderWidth: 1, borderColor: "#bfdbfe" },
+  balePhoto: { width: "100%", height: 220, borderRadius: 14, marginTop: 4, borderWidth: 1, borderColor: "#bfdbfe", backgroundColor: "#fff" },
   photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#f8fafc", borderRadius: 12, padding: 10 },
   fixedActions: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, gap: 8, shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 10 },
   floatingTotals: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingBottom: 2 },

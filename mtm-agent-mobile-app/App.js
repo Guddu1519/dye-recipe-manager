@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -31,6 +32,18 @@ function normalize(value) {
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function isBalePhotoExpired(bale) {
+  const date = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
+  if (Number.isNaN(date.getTime())) return false;
+  return Date.now() - date.getTime() > 31 * 24 * 60 * 60 * 1000;
+}
+
+function balePhotoMessage(bale) {
+  return isBalePhotoExpired(bale)
+    ? "This bale was created more than 1 month ago. No photo data available."
+    : "No photo proof uploaded.";
 }
 
 function makeId() {
@@ -569,6 +582,16 @@ export default function App() {
                 </View>
                 <Text style={styles.subTitle}>Bale Dispatch</Text>
                 <Text style={styles.dispatchBox}>{baleSummary(selectedOrder)}</Text>
+                {(selectedOrder.bales || []).map((bale) => (
+                  <View key={bale.baleNo} style={styles.balePhotoCard}>
+                    <Text style={styles.pendingColor}>Bale {bale.baleNo} Photo</Text>
+                    {bale.photoUrl && !isBalePhotoExpired(bale) ? (
+                      <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
+                    ) : (
+                      <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
+                    )}
+                  </View>
+                ))}
 
                 <Text style={styles.subTitle}>Pending Colors</Text>
                 <View style={styles.pendingTable}>
@@ -691,6 +714,9 @@ const styles = StyleSheet.create({
   pendingRow: { backgroundColor: "#fff", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#dbeafe" },
   pendingColor: { color: "#1d4ed8", fontWeight: "900", fontSize: 19, marginBottom: 6 },
   pendingValue: { color: "#334155", fontWeight: "800", marginBottom: 3 },
+  balePhotoCard: { backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#dbeafe", padding: 12, marginTop: 10 },
+  balePhoto: { width: "100%", height: 220, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff" },
+  photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#f8fafc", borderRadius: 12, padding: 10 },
   partyChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
   partyChip: { backgroundColor: "#dbeafe", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   partyChipText: { color: "#1e3a8a", fontWeight: "900", fontSize: 12 },

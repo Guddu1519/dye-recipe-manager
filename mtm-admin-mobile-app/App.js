@@ -12,6 +12,7 @@ import {
   Alert,
   BackHandler,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -49,6 +50,18 @@ function normalize(value) {
 
 function clean(value) {
   return String(value || "").trim();
+}
+
+function isBalePhotoExpired(bale) {
+  const date = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
+  if (Number.isNaN(date.getTime())) return false;
+  return Date.now() - date.getTime() > 31 * 24 * 60 * 60 * 1000;
+}
+
+function balePhotoMessage(bale) {
+  return isBalePhotoExpired(bale)
+    ? "This bale was created more than 1 month ago. No photo data available."
+    : "No photo proof uploaded.";
 }
 
 function clone(value) {
@@ -1191,6 +1204,11 @@ export default function App() {
                   <Text style={styles.orderTitle}>Bale {bale.baleNo} - {bale.totalQty} QTY</Text>
                   <Text style={styles.detail}>{displayDate(bale.createdAt, true)} | By: {clean(bale.staff || selectedOrder.assignedStaffName || "-").replace(/@.*/, "")}</Text>
                   <Text style={styles.detail}>{getBaleRows(bale).map((row) => `${row.colorNo}: ${row.qty}`).join(", ")}</Text>
+                  {bale.photoUrl && !isBalePhotoExpired(bale) ? (
+                    <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
+                  ) : (
+                    <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
+                  )}
                   <AppButton title="Delete Bale" compact tone="danger" onPress={() => deleteBale(selectedOrder, bale.baleNo)} />
                 </View>
               ))}
@@ -1390,6 +1408,8 @@ const styles = StyleSheet.create({
   paragraph: { color: "#475569", lineHeight: 22 },
   paidNote: { padding: 10, borderRadius: 10, backgroundColor: "#dcfce7", color: "#166534", fontWeight: "900" },
   baleCard: { padding: 12, backgroundColor: "#f8fafc", borderRadius: 13, borderWidth: 1, borderColor: "#dbeafe", gap: 6 },
+  balePhoto: { width: "100%", height: 220, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff", marginTop: 6 },
+  photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#fff", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: "#e2e8f0" },
   busyOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(15,23,42,0.55)", alignItems: "center", justifyContent: "center", zIndex: 100 },
   busyText: { color: "#fff", marginTop: 10, fontWeight: "900" },
   drawerShade: { flex: 1, backgroundColor: "rgba(15,23,42,0.45)", flexDirection: "row" },
