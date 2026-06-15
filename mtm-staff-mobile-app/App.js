@@ -751,7 +751,7 @@ export default function App() {
               style={styles.passwordInput}
             />
             <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
-              <Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "Show"}</Text>
+              <Text style={styles.passwordToggleText}>{showPassword ? "×" : "👁"}</Text>
             </Pressable>
           </View>
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
@@ -957,8 +957,8 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: "#fff", color: "#0f172a", fontSize: 16 },
   passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, backgroundColor: "#fff", marginBottom: 12 },
   passwordInput: { flex: 1, padding: 14, fontSize: 16, color: "#0f172a" },
-  passwordToggle: { paddingHorizontal: 12, paddingVertical: 10 },
-  passwordToggleText: { color: "#1d4ed8", fontWeight: "900" },
+  passwordToggle: { width: 34, height: 34, borderRadius: 999, backgroundColor: "#e2e8f0", alignItems: "center", justifyContent: "center", marginRight: 8 },
+  passwordToggleText: { color: "#1d4ed8", fontWeight: "900", fontSize: 15 },
   header: { padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 28, fontWeight: "900", color: "#0f172a" },
   subTitle: { color: "#64748b", fontWeight: "700", marginTop: 4 },
