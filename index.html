@@ -342,6 +342,7 @@ th{background:#dbeafe}
 .auth-card{width:100%;max-width:420px;background:white;padding:24px;border-radius:12px;box-shadow:0 12px 40px #0002}
 .auth-card h2{margin:0 0 8px}
 .auth-card p{margin:0 0 18px;color:#475569}
+.passwordWrap{position:relative}.passwordWrap input{padding-right:56px}.passwordEye{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:#e2e8f0;color:#0f172a;border-radius:9px;padding:7px 9px;font-weight:800;cursor:pointer}
 .auth-error{display:none;margin:0 0 12px;color:#b91c1c;background:#fee2e2;padding:10px;border-radius:8px}
 .auth-meta{font-size:13px;color:#64748b;margin-top:12px}
 #appShell{display:none}
@@ -688,6 +689,28 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
 
     <div id="salesPanelAgent" class="salesPanel">
       <div class="salesCard">
+        <h2>Send New Order To Admin</h2>
+        <p class="muted">Agent can send order request directly. Admin can review it and push to a team member.</p>
+        <div class="salesGrid">
+          <select id="agentOrderParty"><option value="">Select Assigned Party</option></select>
+          <input id="agentOrderPartyNo" placeholder="Party Order No.">
+          <input id="agentOrderDate" type="date">
+          <input id="agentOrderQuality" placeholder="Quality">
+          <input id="agentOrderCut" placeholder="Cut">
+          <input id="agentOrderQtyPerBale" type="number" placeholder="QTY Per Bale">
+          <input id="agentOrderPacking" placeholder="Packing">
+          <input id="agentOrderPatta" placeholder="Patta">
+          <input id="agentOrderStamping" placeholder="Stamping">
+          <input id="agentOrderTransport" placeholder="Transport">
+        </div>
+        <h3>Color Order Entry</h3>
+        <div id="agentOrderColorRows" style="display:grid;gap:8px"></div>
+        <div class="salesActions">
+          <button class="salesSmallBtn gray" onclick="addAgentOrderColorRow()">Add Color</button>
+          <button class="salesSmallBtn green" onclick="submitAgentOrderRequest()">Send Order To Admin</button>
+        </div>
+      </div>
+      <div class="salesCard">
         <h2>Agent Order Status</h2>
         <p class="muted">Shows paid/due amount, pending colors, sent colors, and dispatch status for this agent.</p>
         <div id="salesAgentSummary" class="salesGrid"></div>
@@ -745,7 +768,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to view and manage your cloud recipes.</p>
     <div id="loginError" class="auth-error"></div>
     <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
-    <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="passwordWrap"><input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('loginPassword',this)">Show</button></div>
     <button class="btn green" style="width:100%" onclick="loginUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="showManagerSelect()">Back</button>
     <div class="auth-meta">Your session stays active on this device until you logout.</div>
@@ -758,7 +781,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to open Sales Manager.</p>
     <div id="salesLoginError" class="auth-error"></div>
     <input id="salesLoginEmail" type="email" placeholder="Sales Email" autocomplete="email">
-    <input id="salesLoginPassword" type="password" placeholder="Sales Password" autocomplete="current-password">
+    <div class="passwordWrap"><input id="salesLoginPassword" type="password" placeholder="Sales Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('salesLoginPassword',this)">Show</button></div>
     <button class="btn green" style="width:100%" onclick="loginSalesUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Sales Manager is separate from Dyeing Manager.</div>
@@ -771,7 +794,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to view only your assigned sales orders.</p>
     <div id="staffLoginError" class="auth-error"></div>
     <input id="staffLoginEmail" type="email" placeholder="Team Member Email" autocomplete="email">
-    <input id="staffLoginPassword" type="password" placeholder="Team Member Password" autocomplete="current-password">
+    <div class="passwordWrap"><input id="staffLoginPassword" type="password" placeholder="Team Member Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('staffLoginPassword',this)">Show</button></div>
     <button class="btn green" style="width:100%" onclick="loginStaffUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Team Member Portal shows assigned work only.</div>
@@ -784,7 +807,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
     <p>Login to view only your party/order status.</p>
     <div id="agentLoginError" class="auth-error"></div>
     <input id="agentLoginEmail" type="email" placeholder="Agent Username / Email" autocomplete="email">
-    <input id="agentLoginPassword" type="password" placeholder="Agent Password" autocomplete="current-password">
+    <div class="passwordWrap"><input id="agentLoginPassword" type="password" placeholder="Agent Password" autocomplete="current-password"><button type="button" class="passwordEye" onclick="togglePasswordVisibility('agentLoginPassword',this)">Show</button></div>
     <button class="btn green" style="width:100%" onclick="loginAgentUser()">Login</button>
     <button class="btn" style="width:100%;margin-top:10px;background:#64748b" onclick="openSalesManager()">Back</button>
     <div class="auth-meta">Agent Portal shows order status only.</div>
@@ -2255,6 +2278,14 @@ function salesEscape(value){
   })[ch]);
 }
 
+function togglePasswordVisibility(inputId, btn){
+  let input = document.getElementById(inputId);
+  if(!input) return;
+  let show = input.type === "password";
+  input.type = show ? "text" : "password";
+  if(btn) btn.textContent = show ? "Hide" : "Show";
+}
+
 function getSalesUserEmail(){
   return String(currentUser?.email || "").trim().toLowerCase();
 }
@@ -2986,6 +3017,108 @@ function addSalesColorRow(colorNo="", qty=""){
   updateSalesOrderTotals();
 }
 
+function addAgentOrderColorRow(colorNo="", qty=""){
+  let wrap = document.getElementById("agentOrderColorRows");
+  if(!wrap) return;
+  let row = document.createElement("div");
+  row.className = "salesColorRow";
+  row.innerHTML = `
+    <input class="agentOrderColorNo" placeholder="Color No. / Color Name" value="${salesEscape(colorNo)}">
+    <input class="agentOrderColorQty" type="number" min="0" step="1" placeholder="QTY" value="${salesEscape(qty)}">
+    <button class="salesSmallBtn red" onclick="this.closest('.salesColorRow').remove()">Delete</button>
+  `;
+  wrap.appendChild(row);
+}
+
+function collectAgentOrderColorRows(){
+  let merged = {};
+  document.querySelectorAll("#agentOrderColorRows .salesColorRow").forEach(row => {
+    let colorNo = String(row.querySelector(".agentOrderColorNo")?.value || "").trim();
+    let qty = Number(row.querySelector(".agentOrderColorQty")?.value);
+    if(!colorNo && !qty) return;
+    if(!colorNo) throw new Error("Color No. / Color Name is required.");
+    if(!(qty > 0)) throw new Error("QTY must be greater than 0 for " + colorNo);
+    let key = normalizeName(colorNo);
+    if(!merged[key]) merged[key] = {colorNo, qty:0};
+    merged[key].qty += qty;
+  });
+  return Object.values(merged).map(row => ({colorNo: row.colorNo, qty: row.qty, pendingQty: row.qty}));
+}
+
+async function submitAgentOrderRequest(){
+  if(!isSalesAgent()) return alert("Only Agent login can send order requests.");
+  try{
+    let partyName = document.getElementById("agentOrderParty")?.value || "";
+    let party = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(partyName));
+    if(!party) throw new Error("Select assigned party.");
+    let colorsList = collectAgentOrderColorRows();
+    if(!colorsList.length) throw new Error("Add at least one color.");
+    let qtyPerBale = Number(document.getElementById("agentOrderQtyPerBale")?.value);
+    if(!(qtyPerBale > 0)) throw new Error("QTY Per Bale is required.");
+    let totalQty = colorsList.reduce((sum,row)=>sum + row.qty,0);
+    salesState.orders.push({
+      id: Date.now().toString(),
+      mtmOrderNo: "AGENT-" + Date.now().toString().slice(-6),
+      partyOrderNo: document.getElementById("agentOrderPartyNo")?.value.trim() || "",
+      orderDate: document.getElementById("agentOrderDate")?.value || new Date().toISOString().slice(0,10),
+      partyName: party.partyName,
+      gstNo: party.gstNo || "",
+      agentName: party.agentName || salesProfile?.fullName || salesProfile?.username || "",
+      agentEmail: party.agentEmail || getSalesUserEmail(),
+      partyAddress: party.address || party.city || "",
+      transport: document.getElementById("agentOrderTransport")?.value.trim() || "",
+      packing: document.getElementById("agentOrderPacking")?.value.trim() || "",
+      patta: document.getElementById("agentOrderPatta")?.value.trim() || "",
+      stamping: document.getElementById("agentOrderStamping")?.value.trim() || "",
+      quality: document.getElementById("agentOrderQuality")?.value.trim() || "",
+      cut: document.getElementById("agentOrderCut")?.value.trim() || "",
+      qtyPerBale,
+      colors: colorsList,
+      totalQty,
+      expectedBales: calculateSalesExpectedBales(totalQty, qtyPerBale),
+      assignedStaff: "",
+      assignedStaffName: "",
+      assignmentStatus: "Not Assigned Yet",
+      status: "Not Assigned Yet",
+      bales: [],
+      createdBy: getSalesUserEmail(),
+      createdByAgent: true,
+      createdAt: new Date().toISOString()
+    });
+    await saveSalesState();
+    clearAgentOrderRequestForm();
+    renderSalesManager(false);
+    showSuccessToast("Order sent to admin");
+  }catch(err){
+    alert(err.message || err);
+  }
+}
+
+function clearAgentOrderRequestForm(){
+  ["agentOrderParty","agentOrderPartyNo","agentOrderDate","agentOrderQuality","agentOrderCut","agentOrderQtyPerBale","agentOrderPacking","agentOrderPatta","agentOrderStamping","agentOrderTransport"].forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.value = "";
+  });
+  let rows = document.getElementById("agentOrderColorRows");
+  if(rows) rows.innerHTML = "";
+  addAgentOrderColorRow();
+  refreshAgentOrderRequestForm();
+}
+
+function refreshAgentOrderRequestForm(){
+  let select = document.getElementById("agentOrderParty");
+  if(!select) return;
+  let current = select.value;
+  let parties = (salesState.parties || [])
+    .filter(p => salesAgentOwnsOrder({partyName:p.partyName, agentName:p.agentName, agentEmail:p.agentEmail}))
+    .sort((a,b)=>String(a.partyName || "").localeCompare(String(b.partyName || "")));
+  select.innerHTML = '<option value="">Select Assigned Party</option>' + parties.map(p => `<option value="${salesEscape(p.partyName)}">${salesEscape(p.partyName)}</option>`).join("");
+  if(current && parties.some(p => normalizeName(p.partyName) === normalizeName(current))) select.value = current;
+  let date = document.getElementById("agentOrderDate");
+  if(date && !date.value) date.value = new Date().toISOString().slice(0,10);
+  if(document.getElementById("agentOrderColorRows") && document.querySelectorAll("#agentOrderColorRows .salesColorRow").length === 0) addAgentOrderColorRow();
+}
+
 function clearSalesColorRows(){
   let wrap = document.getElementById("salesColorRows");
   if(wrap) wrap.innerHTML = "";
@@ -3498,15 +3631,7 @@ async function quickUpdateSalesOrderDetails(orderId){
 function getVisibleSalesOrders(){
   if(isTrialUser()) return salesState.orders;
   if(isSalesAdmin()) return salesState.orders;
-  if(isSalesAgent()){
-    let keys = [salesProfile?.fullName, salesProfile?.username, salesProfile?.loginEmail, getSalesUserEmail()].map(normalizeName).filter(Boolean);
-    return salesState.orders.filter(o => {
-      let directMatch = keys.includes(normalizeName(o.agentName)) || keys.includes(normalizeName(o.agentEmail));
-      if(directMatch) return true;
-      let party = salesState.parties.find(p => normalizeName(p.partyName) === normalizeName(o.partyName));
-      return !!party && (keys.includes(normalizeName(party.agentName)) || keys.includes(normalizeName(party.agentEmail)));
-    });
-  }
+  if(isSalesAgent()) return salesState.orders.filter(salesAgentOwnsOrder);
   let email = getSalesUserEmail();
   return salesState.orders.filter(o => String(o.assignedStaff || "").toLowerCase() === email);
 }
@@ -3521,6 +3646,22 @@ function getSalesAssignedTeamMemberName(order){
   if(!order) return "Not Assigned Yet";
   let staff = getSalesStaffByEmail(order.assignedStaff);
   return order.assignedStaffName || staff?.name || order.assignedStaff || "Not Assigned Yet";
+}
+
+function salesAgentOwnsOrder(order){
+  let keys = [salesProfile?.fullName, salesProfile?.username, salesProfile?.loginEmail, getSalesUserEmail()]
+    .map(normalizeName)
+    .filter(Boolean);
+  if(!keys.length || !order) return false;
+  if(keys.includes(normalizeName(order.agentName)) || keys.includes(normalizeName(order.agentEmail))) return true;
+  let agentRows = (salesState.agents || []).filter(agent =>
+    keys.includes(normalizeName(agent.email)) || keys.includes(normalizeName(agent.name))
+  );
+  if(agentRows.some(agent => normalizeName(agent.name) === normalizeName(order.agentName) || normalizeName(agent.email) === normalizeName(order.agentEmail))) return true;
+  let party = (salesState.parties || []).find(p => normalizeName(p.partyName) === normalizeName(order.partyName));
+  if(!party) return false;
+  if(keys.includes(normalizeName(party.agentName)) || keys.includes(normalizeName(party.agentEmail))) return true;
+  return agentRows.some(agent => normalizeName(agent.name) === normalizeName(party.agentName) || normalizeName(agent.email) === normalizeName(party.agentEmail));
 }
 
 function sameSalesColor(a, b){
@@ -3548,6 +3689,13 @@ function formatSalesDate(value){
   let parts = raw.split("-");
   if(parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
   return raw;
+}
+
+function formatSalesDateTime(value){
+  if(!value) return "-";
+  let date = new Date(value);
+  if(Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("en-IN", {day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit"});
 }
 
 function getSalesColorSummary(order, mode){
@@ -4185,6 +4333,7 @@ function renderSalesManager(shouldLoadLocal=true){
   renderSalesDailyDispatch();
   renderSalesPendingSummary();
   renderSalesAgentPortal();
+  refreshAgentOrderRequestForm();
   renderSalesStaffOrders();
   let activeInBaleWork = document.activeElement && document.getElementById("salesBaleWorkArea")?.contains(document.activeElement);
   if(!activeInBaleWork) renderSalesBaleWorkArea();
@@ -4208,7 +4357,7 @@ function applySalesRoleUi(){
     let text = (el.textContent || "").trim();
     let allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "salesPartySearch" || el.id === "salesAgentSearch" || el.id === "salesMiscSearch";
     if(isSalesAgent()){
-      allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch";
+      allowed = text === "Logout" || text === "Refresh" || text === "Add Color" || text === "Remove" || text === "Send Order To Admin" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "agentOrderParty" || el.id === "agentOrderPartyNo" || el.id === "agentOrderDate" || el.id === "agentOrderQuality" || el.id === "agentOrderCut" || el.id === "agentOrderQtyPerBale" || el.id === "agentOrderPacking" || el.id === "agentOrderPatta" || el.id === "agentOrderStamping" || el.id === "agentOrderTransport" || el.classList.contains("agentOrderColorNo") || el.classList.contains("agentOrderColorQty");
     }
     if(isSalesStaff()){
       allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "Update Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
@@ -4377,7 +4526,7 @@ function renderSalesPendingSummary(){
 }
 
 function getSalesOrderConfLine(order){
-  return `PARTY CONF NO ${order?.partyOrderNo || "-"} / MTM CONF NO ${order?.mtmOrderNo || "-"}`;
+  return `${order?.partyOrderNo || "-"} / MTM Order No. : ${order?.mtmOrderNo || "-"}`;
 }
 
 function getSalesPendingBales(order){
@@ -4483,7 +4632,7 @@ function renderSalesAgentPortal(){
     mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard ${getSalesOrderToneClass(o)}">
       <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
-      <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
+      <p><b>Total :</b> ${o.totalQty} / <b>Sent :</b> ${getSalesSentQty(o)} / <b>Pending :</b> ${getSalesPendingQty(o)}</p>
       <p><b>Bales:</b><br>${getSalesBaleStatusHtml(o)}</p>
       <p><b>Pending Colors:</b> ${salesEscape(getSalesColorSummary(o, "pending"))}</p>
       <p><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></p>
@@ -4553,7 +4702,7 @@ function renderSalesStaffOrders(){
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
       ${adminView ? `<p><b>Assigned To:</b> ${salesEscape(getSalesAssignedTeamMemberName(o))}</p>` : ""}
       ${getSalesStaffOrderDetailsHtml(o)}
-      <p><b>Total / Sent / Pending:</b> ${o.totalQty} / ${getSalesSentQty(o)} / ${getSalesPendingQty(o)}</p>
+      <p><b>Total :</b> ${o.totalQty} / <b>Sent :</b> ${getSalesSentQty(o)} / <b>Pending :</b> ${getSalesPendingQty(o)}</p>
       <p><b>Status:</b> <span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></p>
       <div class="salesActions">${actionHtml(o)}</div>
     </div>`).join("") : `<div class="salesMobileCard muted">No assigned orders.</div>`;
@@ -4603,10 +4752,10 @@ function renderSalesBaleWorkArea(){
       if(prev && next) gaps.push((next - prev) / 60000);
     });
     let avgTime = gaps.length ? (gaps.reduce((sum, value)=>sum + value, 0) / gaps.length).toFixed(1) + " min" : "N/A";
-    let rows = bales.map(bale => `<tr><td>Bale ${salesEscape(bale.baleNo)}</td><td>${salesEscape(bale.totalQty)} pcs</td><td>${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</td><td>${salesEscape(getSalesTeamMemberName(order, bale))}</td><td>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</td><td>${renderSalesBalePhoto(order.id, bale)}</td><td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button> <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button> <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></td></tr>`).join("");
+    let rows = bales.map(bale => `<tr><td>Bale ${salesEscape(bale.baleNo)}</td><td>${salesEscape(bale.totalQty)} pcs</td><td>${salesEscape(formatSalesDateTime(bale.createdAt))}</td><td>${salesEscape(getSalesTeamMemberName(order, bale))}</td><td>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</td><td>${renderSalesBalePhoto(order.id, bale)}</td><td><button class="salesSmallBtn" onclick="printSalesPackingSlips('${order.id}', ${bale.baleNo})">Print</button> <button class="salesSmallBtn gray" onclick="editSalesBale('${order.id}', ${bale.baleNo})">Edit Bale</button> <button class="salesSmallBtn red" onclick="deleteSalesBale('${order.id}', ${bale.baleNo})">Delete Bale</button></td></tr>`).join("");
     let mobileRows = bales.map(bale => `<div class="salesMobileCard">
       <h3>Bale ${salesEscape(bale.baleNo)} - ${salesEscape(bale.totalQty)} pcs</h3>
-      <p><b>Created:</b> ${salesEscape((bale.createdAt || "").slice(0,16).replace("T"," "))}</p>
+      <p><b>Created:</b> ${salesEscape(formatSalesDateTime(bale.createdAt))}</p>
       <p><b>By:</b> ${salesEscape(getSalesTeamMemberName(order, bale))}</p>
       <p><b>Colors:</b><br>${(bale.colors || []).map(c => `Color ${salesEscape(c.colorNo)}: ${salesEscape(c.qty)}`).join("<br>")}</p>
       ${renderSalesBalePhoto(order.id, bale)}

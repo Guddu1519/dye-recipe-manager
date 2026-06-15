@@ -19,6 +19,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar as NativeStatusBar,
   Text,
   TextInput,
   View
@@ -150,19 +151,27 @@ function AppButton({ title, onPress, tone = "primary", disabled = false, compact
 }
 
 function Field({ label, value, onChangeText, placeholder, keyboardType = "default", secureTextEntry = false, multiline = false }) {
+  const [showPassword, setShowPassword] = useState(false);
   return (
     <View style={styles.fieldWrap}>
       {!!label && <Text style={styles.label}>{label}</Text>}
-      <TextInput
-        value={String(value ?? "")}
-        onChangeText={onChangeText}
-        placeholder={placeholder || label}
-        placeholderTextColor="#94a3b8"
-        keyboardType={keyboardType}
-        secureTextEntry={secureTextEntry}
-        multiline={multiline}
-        style={[styles.input, multiline && styles.inputMultiline]}
-      />
+      <View style={secureTextEntry ? styles.passwordRow : null}>
+        <TextInput
+          value={String(value ?? "")}
+          onChangeText={onChangeText}
+          placeholder={placeholder || label}
+          placeholderTextColor="#94a3b8"
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry && !showPassword}
+          multiline={multiline}
+          style={[styles.input, secureTextEntry && styles.passwordInput, multiline && styles.inputMultiline]}
+        />
+        {secureTextEntry && (
+          <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
+            <Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "Show"}</Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 }
@@ -540,6 +549,103 @@ export default function App() {
     return Object.values(merged);
   };
 
+  const parseCsvRows = (text) => {
+    const rows = [];
+    let row = [];
+    let cell = "";
+    let quoted = false;
+    String(text || "").replace(/^\uFEFF/, "").split("").forEach((ch, index, arr) => {
+      if (ch === '"') {
+        if (quoted && arr[index + 1] === '"') cell += '"';
+        else quoted = !quoted;
+        return;
+      }
+      if (ch === "," && !quoted) {
+        row.push(cell.trim());
+        cell = "";
+        return;
+      }
+      if ((ch === "\n" || ch === "\r") && !quoted) {
+        if (ch === "\r" && arr[index + 1] === "\n") return;
+        row.push(cell.trim());
+        if (row.some(Boolean)) rows.push(row);
+        row = [];
+        cell = "";
+        return;
+      }
+      cell += ch;
+    });
+    row.push(cell.trim());
+    if (row.some(Boolean)) rows.push(row);
+    return rows;
+  };
+
+  const importOrderCsv = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: ["text/csv", "text/comma-separated-values", "application/csv", "text/plain"], copyToCacheDirectory: true });
+      if (result.canceled) return;
+      const text = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      const rows = parseCsvRows(text);
+      if (rows.length < 2) throw new Error("CSV should have header row and at least one data row.");
+      const headers = rows[0].map((header) => normalize(header).replace(/\s+/g, "_"));
+      const get = (row, names) => {
+        for (const name of names) {
+          const index = headers.indexOf(name);
+          if (index >= 0 && clean(row[index])) return clean(row[index]);
+        }
+        return "";
+      };
+      const colors = {};
+      let importedForm = { ...orderForm };
+      rows.slice(1).forEach((row) => {
+        importedForm = {
+          ...importedForm,
+          mtmOrderNo: importedForm.mtmOrderNo || get(row, ["mtm_order_no", "mtm_order", "mtm_no"]),
+          partyOrderNo: importedForm.partyOrderNo || get(row, ["party_order_no", "party_order", "party_conf_no"]),
+          orderDate: importedForm.orderDate || get(row, ["order_date", "date"]),
+          partyName: importedForm.partyName || get(row, ["party_name", "party"]),
+          gstNo: importedForm.gstNo || get(row, ["gst_no", "gst"]),
+          agentName: importedForm.agentName || get(row, ["agent_name", "agent"]),
+          partyAddress: importedForm.partyAddress || get(row, ["station", "address", "city"]),
+          transport: importedForm.transport || get(row, ["transport"]),
+          packing: importedForm.packing || get(row, ["packing"]),
+          patta: importedForm.patta || get(row, ["patta"]),
+          stamping: importedForm.stamping || get(row, ["stamping"]),
+          quality: importedForm.quality || get(row, ["quality"]),
+          cut: importedForm.cut || get(row, ["cut"]),
+          rate: importedForm.rate || get(row, ["rate"]),
+          qtyPerBale: importedForm.qtyPerBale || get(row, ["qty_per_bale", "bale_size", "qty_per_bale_size"])
+        };
+        const colorNo = get(row, ["color_no", "color", "color_name", "shade", "shade_no"]);
+        const qty = Number(get(row, ["qty", "quantity", "pcs", "pieces"]));
+        if (colorNo && qty > 0) {
+          const key = normalize(colorNo);
+          if (!colors[key]) colors[key] = { key: makeId(), colorNo, qty: 0 };
+          colors[key].qty += qty;
+        }
+      });
+      const party = (salesState.parties || []).find((item) => normalize(item.partyName) === normalize(importedForm.partyName));
+      if (party) {
+        importedForm = {
+          ...importedForm,
+          partyName: party.partyName,
+          gstNo: importedForm.gstNo || party.gstNo || "",
+          agentName: importedForm.agentName || party.agentName || "",
+          agentEmail: importedForm.agentEmail || party.agentEmail || "",
+          partyAddress: importedForm.partyAddress || party.address || party.city || ""
+        };
+      }
+      const colorRows = Object.values(colors);
+      setOrderForm({
+        ...importedForm,
+        colors: colorRows.length ? colorRows.map((row) => ({ ...row, qty: String(row.qty) })) : importedForm.colors
+      });
+      Alert.alert("Import Ready", `Imported ${colorRows.length} color row(s). Check details, then press Save Order.`);
+    } catch (error) {
+      Alert.alert("Import Failed", error.message || "Could not import order CSV.");
+    }
+  };
+
   const saveOrder = async () => {
     try {
       const colors = collectColors();
@@ -694,7 +800,7 @@ export default function App() {
     const rows = (order.colors || []).filter((row) => Number(row.pendingQty ?? row.qty ?? 0) !== 0);
     const htmlRows = rows.map((row) => `<tr><td>${row.colorNo}</td><td>${row.pendingQty ?? row.qty} pcs</td></tr>`).join("");
     await Print.printAsync({
-      html: `<html><head><style>@page{size:A4;margin:12mm}body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:8px}th{background:#dbeafe}</style></head><body><h1>MONICA TEXTILE MILLS</h1><h2>Pending Colors Report</h2><p><b>Party Conf No:</b> ${order.partyOrderNo || "-"} / <b>MTM Conf No:</b> ${order.mtmOrderNo || "-"}</p><p><b>Party:</b> ${order.partyName}</p><table><tr><th>Color No.</th><th>Pending QTY</th></tr>${htmlRows || "<tr><td colspan='2'>No pending colors</td></tr>"}</table></body></html>`
+      html: `<html><head><style>@page{size:A4;margin:12mm}body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:8px}th{background:#dbeafe}</style></head><body><h1>MONICA TEXTILE MILLS</h1><h2>Pending Colors Report</h2><p><b>Order Details:</b> ${order.partyOrderNo || "-"} / <b>MTM Order No. :</b> ${order.mtmOrderNo || "-"}</p><p><b>Party:</b> ${order.partyName}</p><table><tr><th>Color No.</th><th>Pending QTY</th></tr>${htmlRows || "<tr><td colspan='2'>No pending colors</td></tr>"}</table></body></html>`
     });
   };
 
@@ -800,7 +906,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingScreen}>
+      <SafeAreaView style={[styles.loadingScreen, styles.safeTop]}>
         <ActivityIndicator size="large" color="#2563eb" />
         <Text style={styles.loadingText}>Loading MTM Admin...</Text>
       </SafeAreaView>
@@ -809,11 +915,11 @@ export default function App() {
 
   if (!session) {
     return (
-      <KeyboardAvoidingView style={styles.loginPage} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={[styles.loginPage, styles.safeTop]} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={styles.loginCard}>
           <Text style={styles.loginTitle}>MTM</Text>
           <Text style={styles.loginSubtitle}>Sales Admin Portal</Text>
-          <Field label="Admin Email" value={email} onChangeText={setEmail} placeholder="garvit@mtm.sales" keyboardType="email-address" />
+          <Field label="Admin Email" value={email} onChangeText={setEmail} placeholder="Email" keyboardType="email-address" />
           <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />
           <AppButton title={busy ? "Logging in..." : "Login"} onPress={login} disabled={busy} tone="success" />
           <Text style={styles.version}>Version {APP_VERSION}</Text>
@@ -854,11 +960,11 @@ export default function App() {
         <Text style={styles.orderTitle}>{item.mtmOrderNo || "-"} - {item.partyName || "-"}</Text>
         <StatusBadge status={orderStatus(item)} />
       </View>
-      <Text style={styles.detail}><Text style={styles.bold}>Party Conf No:</Text> {item.partyOrderNo || "-"} / <Text style={styles.bold}>MTM Conf No:</Text> {item.mtmOrderNo || "-"}</Text>
+      <Text style={styles.detail}><Text style={styles.bold}>Order Details:</Text> {item.partyOrderNo || "-"} / <Text style={styles.bold}>MTM Order No. :</Text> {item.mtmOrderNo || "-"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Agent:</Text> {item.agentName || "-"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Assigned to:</Text> {item.assignedStaffName || "Not Assigned Yet"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Quality:</Text> {item.quality || "-"} | <Text style={styles.bold}>Cut:</Text> {item.cut || "-"}</Text>
-      <Text style={styles.detail}><Text style={styles.bold}>Total / Sent / Pending:</Text> {getOrderTotal(item)} / {getSentQty(item)} / {getPendingQty(item)}</Text>
+      <Text style={styles.detail}><Text style={styles.bold}>Total :</Text> {getOrderTotal(item)} / <Text style={styles.bold}>Sent :</Text> {getSentQty(item)} / <Text style={styles.bold}>Pending :</Text> {getPendingQty(item)}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Bales:</Text> {(item.bales || []).length} created / {item.expectedBales || expectedBales(getOrderTotal(item), item.qtyPerBale)} expected</Text>
     </Pressable>
   );
@@ -891,6 +997,7 @@ export default function App() {
     return (
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <Section title={orderForm.id ? "Edit Order" : "Create Order"}>
+          <AppButton title="Import Order CSV" tone="muted" onPress={importOrderCsv} />
           <View style={styles.formGrid}>
             <Field label="MTM Order No." value={orderForm.mtmOrderNo} onChangeText={(value) => setForm("mtmOrderNo", value)} />
             <Field label="Party Order No." value={orderForm.partyOrderNo} onChangeText={(value) => setForm("partyOrderNo", value)} />
@@ -1050,21 +1157,21 @@ export default function App() {
   const orderModal = selectedOrder && (
     <Modal visible transparent animationType="slide" onRequestClose={() => setSelectedOrder(null)}>
       <View style={styles.fullModal}>
-        <SafeAreaView style={styles.modalPage}>
+        <SafeAreaView style={[styles.modalPage, styles.safeTop]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
             <AppButton title="Close" compact tone="muted" onPress={() => setSelectedOrder(null)} />
           </View>
           <ScrollView contentContainerStyle={styles.modalContent}>
             <Section title="Order Details">
-              <Text style={styles.detail}><Text style={styles.bold}>Party Conf No:</Text> {selectedOrder.partyOrderNo || "-"} / <Text style={styles.bold}>MTM Conf No:</Text> {selectedOrder.mtmOrderNo || "-"}</Text>
+              <Text style={styles.detail}><Text style={styles.bold}>Order Details:</Text> {selectedOrder.partyOrderNo || "-"} / <Text style={styles.bold}>MTM Order No. :</Text> {selectedOrder.mtmOrderNo || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Party:</Text> {selectedOrder.partyName}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Agent:</Text> {selectedOrder.agentName || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Quality:</Text> {selectedOrder.quality || "-"} | <Text style={styles.bold}>Cut:</Text> {selectedOrder.cut || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Stamping:</Text> {selectedOrder.stamping || "-"} | <Text style={styles.bold}>Patta:</Text> {selectedOrder.patta || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Packing:</Text> {selectedOrder.packing || "-"} | <Text style={styles.bold}>Transport:</Text> {selectedOrder.transport || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Assigned to:</Text> {selectedOrder.assignedStaffName || "Not Assigned Yet"}</Text>
-              <Text style={styles.detail}><Text style={styles.bold}>Total / Sent / Pending:</Text> {getOrderTotal(selectedOrder)} / {getSentQty(selectedOrder)} / {getPendingQty(selectedOrder)}</Text>
+              <Text style={styles.detail}><Text style={styles.bold}>Total :</Text> {getOrderTotal(selectedOrder)} / <Text style={styles.bold}>Sent :</Text> {getSentQty(selectedOrder)} / <Text style={styles.bold}>Pending :</Text> {getPendingQty(selectedOrder)}</Text>
               <StatusBadge status={orderStatus(selectedOrder)} />
               {isLocked(selectedOrder) && <Text style={styles.paidNote}>Paid manually by admin: {clean(selectedOrder.manualPaidBy || "").split("@")[0].toUpperCase() || adminName}</Text>}
             </Section>
@@ -1122,7 +1229,7 @@ export default function App() {
   if (screen === "backup") content = renderBackup();
 
   return (
-    <SafeAreaView style={styles.app}>
+    <SafeAreaView style={[styles.app, styles.safeTop]}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         <Pressable style={styles.menuButton} onPress={() => setMenuOpen(true)}><Text style={styles.menuIcon}>☰</Text></Pressable>
@@ -1169,7 +1276,7 @@ function MasterEditor({ edit, agents, onClose, onSave }) {
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.fullModal}>
-        <SafeAreaView style={styles.modalPage}>
+        <SafeAreaView style={[styles.modalPage, styles.safeTop]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{item.id ? "Edit" : "Add"} {edit.kind}</Text>
             <AppButton title="Close" compact tone="muted" onPress={onClose} />
@@ -1204,6 +1311,7 @@ function MasterEditor({ edit, agents, onClose, onSave }) {
 }
 
 const styles = StyleSheet.create({
+  safeTop: { paddingTop: Platform.OS === "android" ? NativeStatusBar.currentHeight || 0 : 0 },
   app: { flex: 1, backgroundColor: "#f1f5f9" },
   flex: { flex: 1 },
   loadingScreen: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#eff6ff" },
@@ -1248,6 +1356,10 @@ const styles = StyleSheet.create({
   fieldWrap: { marginBottom: 10 },
   label: { color: "#334155", fontWeight: "800", marginBottom: 6 },
   input: { minHeight: 50, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 13, paddingHorizontal: 13, paddingVertical: 12, backgroundColor: "#fff", color: "#0f172a", fontSize: 16, justifyContent: "center" },
+  passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 13, backgroundColor: "#fff" },
+  passwordInput: { flex: 1, borderWidth: 0, marginBottom: 0 },
+  passwordToggle: { paddingHorizontal: 12, paddingVertical: 10 },
+  passwordToggleText: { color: "#1d4ed8", fontWeight: "900" },
   inputMultiline: { minHeight: 90, textAlignVertical: "top" },
   placeholder: { color: "#94a3b8" },
   choiceText: { color: "#0f172a", fontSize: 16 },

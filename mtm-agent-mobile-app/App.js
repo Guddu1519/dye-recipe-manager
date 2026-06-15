@@ -14,6 +14,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar as NativeStatusBar,
   Text,
   TextInput,
   View
@@ -30,6 +31,26 @@ function normalize(value) {
 
 function cleanText(value) {
   return String(value || "").trim();
+}
+
+function makeId() {
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function emptyOrderRequest() {
+  return {
+    partyName: "",
+    partyOrderNo: "",
+    orderDate: new Date().toISOString().slice(0, 10),
+    quality: "",
+    cut: "",
+    qtyPerBale: "",
+    packing: "",
+    patta: "",
+    stamping: "",
+    transport: "",
+    colors: [{ key: makeId(), colorNo: "", qty: "" }]
+  };
 }
 
 function withTimeout(promise, message = "Cloud request timed out. Please check internet and try again.") {
@@ -121,12 +142,16 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [salesState, setSalesState] = useState(emptySalesState);
   const [query, setQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestForm, setRequestForm] = useState(emptyOrderRequest);
+  const [savingRequest, setSavingRequest] = useState(false);
 
   const agentEmail = normalize(profile?.login_email || session?.user?.email);
   const agentName = normalize(profile?.full_name || profile?.username);
@@ -231,13 +256,35 @@ export default function App() {
   const agentOrders = useMemo(() => {
     const email = agentEmail;
     const name = agentName;
-    return (salesState.orders || []).filter((order) => {
-      const directMatch = normalize(order.agentEmail) === email || normalize(order.agentName) === name;
-      if (directMatch) return true;
+    const agentRows = (salesState.agents || []).filter(
+      (agent) => normalize(agent.email) === email || normalize(agent.name) === name
+    );
+    const ownsOrder = (order) => {
+      if (normalize(order.agentEmail) === email || normalize(order.agentName) === name) return true;
+      if (agentRows.some((agent) => normalize(agent.email) === normalize(order.agentEmail) || normalize(agent.name) === normalize(order.agentName))) return true;
       const party = (salesState.parties || []).find((p) => normalize(p.partyName) === normalize(order.partyName));
-      return !!party && (normalize(party.agentEmail) === email || normalize(party.agentName) === name);
+      if (!party) return false;
+      if (normalize(party.agentEmail) === email || normalize(party.agentName) === name) return true;
+      return agentRows.some((agent) => normalize(agent.email) === normalize(party.agentEmail) || normalize(agent.name) === normalize(party.agentName));
+    };
+    return (salesState.orders || []).filter((order) => {
+      return ownsOrder(order);
     });
-  }, [agentEmail, agentName, salesState.orders, salesState.parties]);
+  }, [agentEmail, agentName, salesState.orders, salesState.parties, salesState.agents]);
+
+  const assignedParties = useMemo(() => {
+    const email = agentEmail;
+    const name = agentName;
+    const agentRows = (salesState.agents || []).filter(
+      (agent) => normalize(agent.email) === email || normalize(agent.name) === name
+    );
+    return (salesState.parties || [])
+      .filter((party) => {
+        if (normalize(party.agentEmail) === email || normalize(party.agentName) === name) return true;
+        return agentRows.some((agent) => normalize(agent.email) === normalize(party.agentEmail) || normalize(agent.name) === normalize(party.agentName));
+      })
+      .sort((a, b) => String(a.partyName || "").localeCompare(String(b.partyName || "")));
+  }, [agentEmail, agentName, salesState.agents, salesState.parties]);
 
   const filteredOrders = useMemo(() => {
     const q = normalize(query);
@@ -316,9 +363,96 @@ export default function App() {
     Alert.alert("Copied", "Pending color report copied.");
   }
 
+  function updateRequestField(field, value) {
+    setRequestForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function updateRequestColor(key, field, value) {
+    setRequestForm((current) => ({
+      ...current,
+      colors: current.colors.map((row) => row.key === key ? { ...row, [field]: value } : row)
+    }));
+  }
+
+  function addRequestColor() {
+    setRequestForm((current) => ({ ...current, colors: [...current.colors, { key: makeId(), colorNo: "", qty: "" }] }));
+  }
+
+  function removeRequestColor(key) {
+    setRequestForm((current) => ({ ...current, colors: current.colors.length === 1 ? current.colors : current.colors.filter((row) => row.key !== key) }));
+  }
+
+  async function submitOrderRequest() {
+    try {
+      setSavingRequest(true);
+      const party = assignedParties.find((item) => normalize(item.partyName) === normalize(requestForm.partyName));
+      if (!party) throw new Error("Select one of your assigned parties.");
+      const merged = {};
+      requestForm.colors.forEach((row) => {
+        const colorNo = cleanText(row.colorNo);
+        const qty = Number(row.qty || 0);
+        if (!colorNo && !qty) return;
+        if (!colorNo) throw new Error("Color No. / Color Name is required.");
+        if (!(qty > 0)) throw new Error(`QTY must be greater than 0 for ${colorNo}.`);
+        const key = normalize(colorNo);
+        if (!merged[key]) merged[key] = { colorNo, qty: 0 };
+        merged[key].qty += qty;
+      });
+      const colors = Object.values(merged).map((row) => ({ ...row, pendingQty: row.qty }));
+      if (!colors.length) throw new Error("Add at least one color.");
+      const qtyPerBale = Number(requestForm.qtyPerBale || 0);
+      if (!(qtyPerBale > 0)) throw new Error("QTY Per Bale is required.");
+      const totalQty = colors.reduce((sum, row) => sum + row.qty, 0);
+      const nextState = JSON.parse(JSON.stringify(salesState));
+      nextState.orders ||= [];
+      nextState.orders.push({
+        id: makeId(),
+        mtmOrderNo: `AGENT-${Date.now().toString().slice(-6)}`,
+        partyOrderNo: cleanText(requestForm.partyOrderNo),
+        orderDate: requestForm.orderDate || new Date().toISOString().slice(0, 10),
+        partyName: party.partyName,
+        gstNo: party.gstNo || "",
+        agentName: party.agentName || profile?.full_name || profile?.username || "",
+        agentEmail: party.agentEmail || profile?.login_email || session?.user?.email || "",
+        partyAddress: party.address || party.city || "",
+        transport: cleanText(requestForm.transport),
+        packing: cleanText(requestForm.packing),
+        patta: cleanText(requestForm.patta),
+        stamping: cleanText(requestForm.stamping),
+        quality: cleanText(requestForm.quality),
+        cut: cleanText(requestForm.cut),
+        qtyPerBale,
+        totalQty,
+        expectedBales: Math.max(1, Math.round(totalQty / qtyPerBale)),
+        colors,
+        assignedStaff: "",
+        assignedStaffName: "",
+        assignmentStatus: "Not Assigned Yet",
+        status: "Not Assigned Yet",
+        bales: [],
+        createdBy: session?.user?.email || "",
+        createdByAgent: true,
+        createdAt: new Date().toISOString()
+      });
+      const { error } = await withTimeout(
+        supabase.from("sales_state").upsert({ id: "main", data: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" }),
+        "Order request save is taking too long. Please check internet."
+      );
+      if (error) throw error;
+      setSalesState(nextState);
+      setRequestForm(emptyOrderRequest());
+      setRequestOpen(false);
+      Alert.alert("Order Sent", "Order sent to admin.");
+    } catch (error) {
+      Alert.alert("Order Request Failed", error.message || "Could not send order.");
+    } finally {
+      setSavingRequest(false);
+    }
+  }
+
   if (loading && !session) {
     return (
-      <SafeAreaView style={styles.loadingScreen}>
+      <SafeAreaView style={[styles.loadingScreen, styles.safeTop]}>
         <ActivityIndicator size="large" color="#2563eb" />
         <Text style={styles.loadingText}>Loading MTM Agents...</Text>
       </SafeAreaView>
@@ -327,7 +461,7 @@ export default function App() {
 
   if (!session || !profile) {
     return (
-      <SafeAreaView style={styles.loginScreen}>
+      <SafeAreaView style={[styles.loginScreen, styles.safeTop]}>
         <StatusBar style="dark" />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginCard}>
           <Text style={styles.loginTitle}>MTM Agents</Text>
@@ -341,14 +475,19 @@ export default function App() {
             placeholderTextColor="#64748b"
             style={styles.input}
           />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Password"
-            placeholderTextColor="#64748b"
-            style={styles.input}
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              placeholder="Password"
+              placeholderTextColor="#64748b"
+              style={styles.passwordInput}
+            />
+            <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
+              <Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "Show"}</Text>
+            </Pressable>
+          </View>
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -356,7 +495,7 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, styles.safeTop]}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View>
@@ -388,6 +527,7 @@ export default function App() {
               style={styles.search}
             />
             <AppButton title="Refresh" onPress={refresh} tone="muted" disabled={loading} />
+            <AppButton title="Send New Order To Admin" onPress={() => setRequestOpen(true)} />
             <Text style={styles.sectionTitle}>Agent Orders</Text>
           </View>
         }
@@ -404,7 +544,7 @@ export default function App() {
               <Text style={styles.meta}><Text style={styles.bold}>Quality:</Text> <Text style={styles.badgeText}>{item.quality || "-"}</Text> | <Text style={styles.bold}>Cut:</Text> {item.cut || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Packing:</Text> {item.packing || "-"} | <Text style={styles.bold}>Patta:</Text> {item.patta || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Stamping:</Text> {item.stamping || "-"} | <Text style={styles.bold}>Transport:</Text> {item.transport || "-"}</Text>
-              <Text style={styles.meta}><Text style={styles.bold}>Total / Sent / Pending:</Text> {total} / {sent} / {pending}</Text>
+              <Text style={styles.meta}><Text style={styles.bold}>Total :</Text> {total} / <Text style={styles.bold}>Sent :</Text> {sent} / <Text style={styles.bold}>Pending :</Text> {pending}</Text>
               <Text style={[styles.status, completed ? styles.statusDone : styles.statusOpen]}>
                 {completed ? "Completed" : item.status || "Pending"}
               </Text>
@@ -415,7 +555,7 @@ export default function App() {
       />
 
       <Modal visible={!!selectedOrder} animationType="slide" onRequestClose={() => setSelectedOrder(null)}>
-        <SafeAreaView style={styles.modalScreen}>
+        <SafeAreaView style={[styles.modalScreen, styles.safeTop]}>
           <ScrollView contentContainerStyle={styles.modalContent}>
             {selectedOrder && (
               <>
@@ -464,11 +604,51 @@ export default function App() {
           </View>
         </Pressable>
       </Modal>
+
+      <Modal visible={requestOpen} animationType="slide" onRequestClose={() => setRequestOpen(false)}>
+        <SafeAreaView style={[styles.modalScreen, styles.safeTop]}>
+          <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <Text style={styles.modalTitle}>Send Order To Admin</Text>
+            <Text style={styles.loginSub}>Type party name exactly as assigned, then add colors and QTY.</Text>
+            <TextInput value={requestForm.partyName} onChangeText={(value) => updateRequestField("partyName", value)} placeholder="Assigned Party Name" placeholderTextColor="#64748b" style={styles.input} />
+            {!!assignedParties.length && (
+              <View style={styles.partyChips}>
+                {assignedParties.slice(0, 12).map((party) => (
+                  <Pressable key={party.partyName} style={styles.partyChip} onPress={() => updateRequestField("partyName", party.partyName)}>
+                    <Text style={styles.partyChipText}>{party.partyName}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <TextInput value={requestForm.partyOrderNo} onChangeText={(value) => updateRequestField("partyOrderNo", value)} placeholder="Party Order No." placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.orderDate} onChangeText={(value) => updateRequestField("orderDate", value)} placeholder="Date YYYY-MM-DD" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.quality} onChangeText={(value) => updateRequestField("quality", value)} placeholder="Quality" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.cut} onChangeText={(value) => updateRequestField("cut", value)} placeholder="Cut" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.qtyPerBale} onChangeText={(value) => updateRequestField("qtyPerBale", value)} placeholder="QTY Per Bale" keyboardType="number-pad" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.packing} onChangeText={(value) => updateRequestField("packing", value)} placeholder="Packing" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.patta} onChangeText={(value) => updateRequestField("patta", value)} placeholder="Patta" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.stamping} onChangeText={(value) => updateRequestField("stamping", value)} placeholder="Stamping" placeholderTextColor="#64748b" style={styles.input} />
+            <TextInput value={requestForm.transport} onChangeText={(value) => updateRequestField("transport", value)} placeholder="Transport" placeholderTextColor="#64748b" style={styles.input} />
+            <Text style={styles.subTitle}>Colors</Text>
+            {requestForm.colors.map((row) => (
+              <View key={row.key} style={styles.requestColorRow}>
+                <TextInput value={row.colorNo} onChangeText={(value) => updateRequestColor(row.key, "colorNo", value)} placeholder="Color No. / Name" placeholderTextColor="#64748b" style={[styles.input, styles.requestColorInput]} />
+                <TextInput value={row.qty} onChangeText={(value) => updateRequestColor(row.key, "qty", value)} placeholder="QTY" keyboardType="number-pad" placeholderTextColor="#64748b" style={[styles.input, styles.requestQtyInput]} />
+                <Pressable style={styles.removeButton} onPress={() => removeRequestColor(row.key)}><Text style={styles.removeText}>X</Text></Pressable>
+              </View>
+            ))}
+            <AppButton title="Add Color" tone="muted" onPress={addRequestColor} />
+            <AppButton title={savingRequest ? "Sending..." : "Send Order To Admin"} onPress={submitOrderRequest} disabled={savingRequest} />
+            <AppButton title="Close" tone="muted" onPress={() => setRequestOpen(false)} />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeTop: { paddingTop: Platform.OS === "android" ? NativeStatusBar.currentHeight || 0 : 0 },
   loadingScreen: { flex: 1, backgroundColor: "#eaf6ff", alignItems: "center", justifyContent: "center" },
   loadingText: { marginTop: 12, fontSize: 17, color: "#475569", fontWeight: "800" },
   loginScreen: { flex: 1, backgroundColor: "#eaf6ff", alignItems: "center", justifyContent: "center", padding: 20 },
@@ -476,6 +656,10 @@ const styles = StyleSheet.create({
   loginTitle: { fontSize: 30, fontWeight: "900", color: "#0f172a" },
   loginSub: { marginTop: 6, marginBottom: 18, color: "#64748b", fontWeight: "600" },
   input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 14, marginBottom: 12, fontSize: 16, color: "#0f172a", backgroundColor: "#fff" },
+  passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, backgroundColor: "#fff", marginBottom: 12 },
+  passwordInput: { flex: 1, padding: 14, fontSize: 16, color: "#0f172a" },
+  passwordToggle: { paddingHorizontal: 12, paddingVertical: 10 },
+  passwordToggleText: { color: "#1d4ed8", fontWeight: "900" },
   screen: { flex: 1, backgroundColor: "#eef6ff" },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 30, fontWeight: "900", color: "#0f172a" },
@@ -517,6 +701,14 @@ const styles = StyleSheet.create({
   pendingRow: { backgroundColor: "#fff", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#dbeafe" },
   pendingColor: { color: "#1d4ed8", fontWeight: "900", fontSize: 19, marginBottom: 6 },
   pendingValue: { color: "#334155", fontWeight: "800", marginBottom: 3 },
+  partyChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
+  partyChip: { backgroundColor: "#dbeafe", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  partyChipText: { color: "#1e3a8a", fontWeight: "900", fontSize: 12 },
+  requestColorRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  requestColorInput: { flex: 1 },
+  requestQtyInput: { width: 96 },
+  removeButton: { width: 42, height: 50, borderRadius: 13, backgroundColor: "#dc2626", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  removeText: { color: "#fff", fontWeight: "900" },
   menuOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.35)", justifyContent: "flex-start", alignItems: "flex-end", padding: 16, paddingTop: 58 },
   menuCard: { width: 230, backgroundColor: "#fff", borderRadius: 18, padding: 16, shadowColor: "#0f172a", shadowOpacity: 0.2, shadowRadius: 18, elevation: 8 },
   menuTitle: { fontSize: 20, fontWeight: "900", color: "#0f172a" },

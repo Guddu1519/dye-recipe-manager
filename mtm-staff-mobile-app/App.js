@@ -19,6 +19,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  StatusBar as NativeStatusBar,
   Text,
   TextInput,
   View
@@ -279,6 +280,7 @@ export default function App() {
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loginLoading, setLoginLoading] = useState(false);
   const [salesState, setSalesState] = useState(emptySalesState);
@@ -716,7 +718,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.center}>
+      <SafeAreaView style={[styles.center, styles.safeTop]}>
         <ActivityIndicator size="large" color="#1d4ed8" />
         <Text style={styles.loadingText}>Loading MTM Team...</Text>
       </SafeAreaView>
@@ -725,7 +727,7 @@ export default function App() {
 
   if (!session) {
     return (
-      <SafeAreaView style={styles.loginScreen}>
+      <SafeAreaView style={[styles.loginScreen, styles.safeTop]}>
         <StatusBar style="dark" />
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.loginCard}>
           <Text style={styles.loginTitle}>MTM Team</Text>
@@ -739,14 +741,19 @@ export default function App() {
             placeholderTextColor="#64748b"
             style={styles.input}
           />
-          <TextInput
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="Password"
-            placeholderTextColor="#64748b"
-            style={styles.input}
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              placeholder="Password"
+              placeholderTextColor="#64748b"
+              style={styles.passwordInput}
+            />
+            <Pressable style={styles.passwordToggle} onPress={() => setShowPassword((value) => !value)}>
+              <Text style={styles.passwordToggleText}>{showPassword ? "Hide" : "Show"}</Text>
+            </Pressable>
+          </View>
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -754,7 +761,7 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, styles.safeTop]}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View>
@@ -813,7 +820,7 @@ export default function App() {
               </View>
               <Text style={styles.meta}>Stamping: {item.stamping || "-"} | Patta: {item.patta || "-"} | Packing: {item.packing || "-"}</Text>
               <Text style={styles.meta}>Station: {orderStation(item)} | Transport: {item.transport || "-"}</Text>
-              <Text style={styles.metaStrong}>Total / Sent / Pending: {total} / {sent} / {total - sent}</Text>
+              <Text style={styles.metaStrong}>Total : {total} / Sent : {sent} / Pending : {total - sent}</Text>
               <View style={styles.statusLine}>
                 <Text style={styles.metaStrong}>Status: </Text>
                 <Text style={[styles.status, locked && styles.statusLocked]}>{status}</Text>
@@ -939,6 +946,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  safeTop: { paddingTop: Platform.OS === "android" ? NativeStatusBar.currentHeight || 0 : 0 },
   screen: { flex: 1, backgroundColor: "#eef4fb" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#eef4fb" },
   loadingText: { marginTop: 12, color: "#475569", fontWeight: "700" },
@@ -947,6 +955,10 @@ const styles = StyleSheet.create({
   loginTitle: { fontSize: 30, fontWeight: "900", color: "#0f172a" },
   loginSub: { marginTop: 6, marginBottom: 18, color: "#64748b", fontWeight: "600" },
   input: { borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, padding: 14, marginBottom: 12, backgroundColor: "#fff", color: "#0f172a", fontSize: 16 },
+  passwordRow: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 14, backgroundColor: "#fff", marginBottom: 12 },
+  passwordInput: { flex: 1, padding: 14, fontSize: 16, color: "#0f172a" },
+  passwordToggle: { paddingHorizontal: 12, paddingVertical: 10 },
+  passwordToggleText: { color: "#1d4ed8", fontWeight: "900" },
   header: { padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   title: { fontSize: 28, fontWeight: "900", color: "#0f172a" },
   subTitle: { color: "#64748b", fontWeight: "700", marginTop: 4 },
