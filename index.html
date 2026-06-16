@@ -2558,6 +2558,31 @@ function salesCsvPick(row, keys){
   return "";
 }
 
+function parseSalesColorCsvRows(text){
+  let lines = String(text || "").replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter(line => line.trim());
+  if(!lines.length) return [];
+  let splitLine = line => line.split(/,|\t|;/).map(cell => cell.trim().replace(/^"|"$/g, ""));
+  let first = splitLine(lines[0]).map(cell => cell.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
+  let hasHeader = first.some(cell => ["color_no","color","colorno","color_name","shade","shade_no","name"].includes(cell)) &&
+    first.some(cell => ["qty","quantity","pcs","pieces"].includes(cell));
+  if(hasHeader){
+    let headers = first;
+    return lines.slice(1).map(line => {
+      let cols = splitLine(line);
+      let row = {};
+      headers.forEach((h,i) => row[h] = cols[i] || "");
+      return {
+        colorNo: salesCsvPick(row, ["color_no","color","colorno","color_name","shade","shade_no","name"]),
+        qty: Number(salesCsvPick(row, ["qty","quantity","pcs","pieces"]))
+      };
+    });
+  }
+  return lines.map(line => {
+    let cols = splitLine(line);
+    return {colorNo: cols[0] || "", qty: Number(cols[1] || 0)};
+  });
+}
+
 function downloadSalesCsv(filename, content){
   let blob = new Blob([content], {type:"text/csv"});
   let url = URL.createObjectURL(blob);
@@ -2915,15 +2940,14 @@ function clearAgentOrderColorRows(){
 }
 
 async function importAgentOrderColorCsv(event){
-  if(!isSalesAgent()) return alert("Only Agent login can import order colors.");
   let file = event.target.files?.[0]; if(!file) return;
   try{
-    let rows = parseSalesCsv(await file.text());
+    let rows = parseSalesColorCsvRows(await file.text());
     if(!rows.length) throw new Error("CSV should have headers: color_no,qty");
     let merged = {};
     rows.forEach((row, index) => {
-      let colorNo = salesCsvPick(row, ["color_no","color","colorno","color_name","shade","shade_no","name"]);
-      let qty = Number(salesCsvPick(row, ["qty","quantity","pcs","pieces"]));
+      let colorNo = String(row.colorNo || "").trim();
+      let qty = Number(row.qty || 0);
       if(!colorNo && !qty) return;
       if(!colorNo) throw new Error("Row " + (index + 2) + ": Color No. / Color Name is required.");
       if(!(qty > 0)) throw new Error("Row " + (index + 2) + ": QTY must be greater than 0 for " + colorNo);

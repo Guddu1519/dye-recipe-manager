@@ -78,6 +78,33 @@ function parseCsvRows(text) {
   return rows;
 }
 
+function parseColorCsvRows(text) {
+  const lines = String(text || "").replace(/^\uFEFF/, "").trim().split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) return [];
+  const splitLine = (line) => line.split(/,|\t|;/).map((cell) => cell.trim().replace(/^"|"$/g, ""));
+  const first = splitLine(lines[0]).map((cell) => normalize(cell).replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
+  const colorKeys = ["color_no", "color", "colorno", "color_name", "shade", "shade_no", "name"];
+  const qtyKeys = ["qty", "quantity", "pcs", "pieces"];
+  const hasHeader = first.some((cell) => colorKeys.includes(cell)) && first.some((cell) => qtyKeys.includes(cell));
+  if (hasHeader) {
+    return lines.slice(1).map((line) => {
+      const cols = splitLine(line);
+      const get = (keys) => {
+        for (const key of keys) {
+          const index = first.indexOf(key);
+          if (index >= 0 && cleanText(cols[index])) return cleanText(cols[index]);
+        }
+        return "";
+      };
+      return { colorNo: get(colorKeys), qty: Number(get(qtyKeys)) };
+    });
+  }
+  return lines.map((line) => {
+    const cols = splitLine(line);
+    return { colorNo: cols[0] || "", qty: Number(cols[1] || 0) };
+  });
+}
+
 function emptyOrderRequest() {
   return {
     partyName: "",
@@ -507,20 +534,12 @@ export default function App() {
       });
       if (result.canceled) return;
       const text = await FileSystem.readAsStringAsync(result.assets[0].uri);
-      const rows = parseCsvRows(text);
-      if (rows.length < 2) throw new Error("CSV should have headers: color_no,qty");
-      const headers = rows[0].map((header) => normalize(header).replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
-      const get = (row, names) => {
-        for (const name of names) {
-          const index = headers.indexOf(name);
-          if (index >= 0 && cleanText(row[index])) return cleanText(row[index]);
-        }
-        return "";
-      };
+      const rows = parseColorCsvRows(text);
+      if (!rows.length) throw new Error("CSV should have headers: color_no,qty");
       const merged = {};
-      rows.slice(1).forEach((row, index) => {
-        const colorNo = get(row, ["color_no", "color", "colorno", "color_name", "shade", "shade_no", "name"]);
-        const qty = Number(get(row, ["qty", "quantity", "pcs", "pieces"]));
+      rows.forEach((row, index) => {
+        const colorNo = cleanText(row.colorNo);
+        const qty = Number(row.qty || 0);
         if (!colorNo && !qty) return;
         if (!colorNo) throw new Error(`Row ${index + 2}: Color No. / Color Name is required.`);
         if (!(qty > 0)) throw new Error(`Row ${index + 2}: QTY must be greater than 0 for ${colorNo}.`);
