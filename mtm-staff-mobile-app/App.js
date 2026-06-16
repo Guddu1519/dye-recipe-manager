@@ -149,23 +149,23 @@ function makeSlipCopyHtml(order, bale, copyLabel, profile) {
 
   return `
     <div class="slipCopy">
-      <div class="copyLabel">${escapeHtml(copyLabel).toUpperCase()}</div>
+      <div class="slipCopyLabel">${escapeHtml(copyLabel).toUpperCase()}</div>
       <section class="packingSlip">
         <div class="slipHead">
           <h2>Assortment Slip</h2>
-          <h2>Bale No :</h2>
+          <h2>Bale No : <span class="baleBlank"></span></h2>
           <h2>Bale ${escapeHtml(bale.baleNo)}</h2>
         </div>
         <div class="slipMeta">
-          <p class="party"><b>Party:</b> ${escapeHtml(order.partyName || "-")}</p>
-          <div class="metaCol">
+          <p class="slipPartyLine"><b>Party:</b> ${escapeHtml(order.partyName || "-")}</p>
+          <div class="slipMetaCol">
             <p><b>Party Order No:</b> ${escapeHtml(order.partyOrderNo || "-")}</p>
             <p><b>Quality:</b> ${escapeHtml(order.quality || "-")}</p>
             <p><b>Cut:</b> ${escapeHtml(order.cut || "-")}</p>
             <p><b>Station :</b> ${escapeHtml(orderStation(order))}</p>
             <p><b>Transport:</b> ${escapeHtml(order.transport || "-")}</p>
           </div>
-          <div class="metaCol">
+          <div class="slipMetaCol">
             <p><b>Creation Time:</b> ${escapeHtml(displayDate(bale.createdAt))}</p>
             <p><b>MTM Order No:</b> ${escapeHtml(order.mtmOrderNo || "-")}</p>
             <p><b>Stamping:</b> ${escapeHtml(order.stamping || "-")}</p>
@@ -187,7 +187,7 @@ function makeSlipCopyHtml(order, bale, copyLabel, profile) {
 
 function makeSlipHtml(order, bales, profile) {
   const pages = bales.map((bale) => `
-    <div class="page">
+    <div class="balePrintPage">
       ${makeSlipCopyHtml(order, bale, "Office Copy", profile)}
       ${makeSlipCopyHtml(order, bale, "Party Copy", profile)}
     </div>
@@ -199,25 +199,24 @@ function makeSlipHtml(order, bales, profile) {
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <style>
         @page{size:A5 landscape;margin:6mm}
-        *{box-sizing:border-box}
-        html,body{width:210mm;height:148mm}
-        body{font-family:Arial,sans-serif;margin:0;color:#111}
-        .page{display:grid;grid-template-columns:1fr 1fr;gap:4mm;page-break-after:always;width:198mm;height:136mm}
-        .slipCopy{position:relative;display:flex;flex-direction:column;height:136mm;min-height:136mm}
-        .copyLabel{text-align:right;font-size:11px;margin-bottom:2px}
-        .packingSlip{border:1px solid #111;flex:1;display:flex;flex-direction:column}
-        .slipHead{display:grid;grid-template-columns:1fr 1fr 1fr;align-items:center;border-bottom:1px solid #111;padding:5px 8px}
-        h2{margin:0;font-size:15px;white-space:nowrap}
-        h2:nth-child(2){text-align:center}
-        h2:nth-child(3){text-align:right}
-        .slipMeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:5px 8px;font-size:11px}
-        .party{grid-column:1 / -1;font-size:12px;font-weight:700;margin:0}
-        p{margin:2px 0;line-height:1.12}
-        table{width:calc(100% - 12px);margin:5px 6px;border-collapse:collapse;font-size:10.5px}
-        th,td{border:1px solid #888;padding:2px 4px;text-align:left}
+        *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:0;color:#111;background:#fff}
+        .balePrintPage{display:grid;grid-template-columns:1fr 1fr;gap:6px;break-after:page;page-break-after:always}
+        .balePrintPage:last-child{break-after:auto;page-break-after:auto}
+        .slipCopy{break-inside:avoid;page-break-inside:avoid}
+        .slipCopyLabel{text-align:right;font-size:15px;font-weight:500;margin:0 0 3px;line-height:1;text-transform:uppercase}
+        .packingSlip{border:2px solid #111;height:calc(148mm - 22mm);min-height:0;overflow:hidden}
+        .slipFooter{text-align:center;font-size:11px;font-weight:700;margin-top:3px}
+        .slipHead{display:grid;grid-template-columns:1.25fr 1.15fr .55fr;align-items:center;gap:5px;border-bottom:1px solid #111;padding:7px 10px}
+        .slipHead h2:nth-child(2){text-align:center}.slipHead h2:last-child{text-align:right}
+        .baleBlank{display:inline-block;width:20mm;vertical-align:middle}
+        h2{margin:0;font-size:15px;white-space:nowrap;line-height:1}.slipMeta{display:grid;grid-template-columns:1fr 1.05fr;gap:3px 14px;font-size:11px;padding:5px 10px 7px}
+        .slipPartyLine{grid-column:1/-1;font-size:12px;font-weight:800;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.1;margin:0}
+        .slipMetaCol{display:grid;gap:3px;min-width:0}
+        p{margin:0;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.12}
+        table{width:calc(100% - 20px);margin:5px 10px 0;border-collapse:collapse;font-size:12px}
+        th,td{border:1px solid #777;padding:4px;text-align:left;overflow-wrap:anywhere}
         th{background:#dbeafe}
         tfoot th{background:#fff}
-        .slipFooter{text-align:center;font-weight:700;font-size:10px;margin-top:2px}
       </style>
     </head>
     <body>${pages}</body>
@@ -540,6 +539,7 @@ export default function App() {
       Alert.alert("No QTY", "Enter at least one color QTY before creating bale.");
       return;
     }
+    const saveBaleNow = async () => {
     const isEditing = !!editingBale;
     const nextBale = {
       ...(editingBale || {}),
@@ -569,18 +569,32 @@ export default function App() {
           : order
       )
     };
-    try {
-      await saveSalesState(nextState);
-      setPackingQty({});
-      setEditingBaleNo(null);
-      if (isEditing) {
-        Alert.alert("Bale Updated", `Bale ${nextBale.baleNo} updated successfully.`);
-      } else {
-        Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`);
+      try {
+        await saveSalesState(nextState);
+        setPackingQty({});
+        setEditingBaleNo(null);
+        if (isEditing) {
+          Alert.alert("Bale Updated", `Bale ${nextBale.baleNo} updated successfully.`);
+        } else {
+          Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`);
+        }
+      } catch (error) {
+        Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
       }
-    } catch (error) {
-      Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
+    };
+    const baleSize = Number(selectedOrder.qtyPerBale || 0);
+    if (baleSize > 0 && selectedTotal !== baleSize) {
+      Alert.alert(
+        "Confirm Bale Size",
+        `Bale size is set to ${baleSize} pcs. You are saving ${selectedTotal} pcs. Do you still want to save?`,
+        [
+          { text: "No, Cancel", style: "cancel" },
+          { text: "Yes, Save", onPress: saveBaleNow }
+        ]
+      );
+      return;
     }
+    await saveBaleNow();
   }
 
   async function printBales(order, baleNo = null) {
@@ -832,7 +846,7 @@ export default function App() {
               <Text style={styles.floatingLabel}>QTY Per Bale: {selectedOrder.qtyPerBale || "-"}</Text>
               <Text style={styles.floatingLabel}>Selected Total: <Text style={styles.floatingTotalNo}>{selectedTotal}</Text></Text>
             </View>
-            <AppButton title="Clear QTY" onPress={() => setPackingQty({})} tone="ghost" />
+            <AppButton title="Clear QTY" onPress={() => Alert.alert("Clear Quantities", "Are you sure you want to clear all quantities?", [{ text: "No, Cancel", style: "cancel" }, { text: "Yes, Clear", style: "destructive", onPress: () => setPackingQty({}) }])} tone="ghost" />
             {!isOrderLocked(selectedOrder) && <AppButton title={editingBale ? "Update Bale" : "Create Bale"} onPress={createBale} />}
           </View>
         </View>

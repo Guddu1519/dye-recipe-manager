@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "MTM - Team",
+    "owner": "auraop2",
     "slug": "mtm-staff",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -25,7 +26,7 @@
       "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
       "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil",
       "eas": {
-        "projectId": "1d506480-849c-4a88-bc07-57496abd6fa3"
+        "projectId": "22d6bbc5-38d6-4a4f-835e-5060b59b69b0"
       }
     },
     "plugins": [

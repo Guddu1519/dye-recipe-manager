@@ -3759,6 +3759,7 @@ function markSalesCustomQty(input){
 
 
 function clearSalesCurrentBaleQty(){
+  if(!confirm("Are you sure you want to clear all quantities?")) return;
   document.querySelectorAll("#salesPendingPackRows .salesPackRow").forEach(row => {
     let qtyInput = row.querySelector(".salesPackQty");
     let takeAll = row.querySelector(".salesTakeAll");

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MTM",
-    "owner": "guddu1519",
+    "owner": "auraop2",
     "slug": "mtm-admin-native",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,7 @@
       "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
       "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil",
       "eas": {
-        "projectId": "1f2d788f-35c4-42b2-a390-2f01a52f26c9"
+        "projectId": "3058e2ec-4beb-41d1-af20-6b38440e7785"
       }
     },
     "plugins": [

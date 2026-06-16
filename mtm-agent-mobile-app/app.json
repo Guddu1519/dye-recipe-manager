@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MTM - Agents",
-    "owner": "guddu1519",
+    "owner": "auraop2",
     "slug": "mtm-agents",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,7 @@
       "supabaseUrl": "https://dgxrkymrestwrcwgntdu.supabase.co",
       "supabaseAnonKey": "sb_publishable__nucZ26XMvkLyBCn7hf5Sw_JgIQIGil",
       "eas": {
-        "projectId": "b1c24c9a-838d-46f0-8b7d-f37cf477c64a"
+        "projectId": "db392178-a218-4a95-8780-400a5957f965"
       }
     },
     "plugins": [

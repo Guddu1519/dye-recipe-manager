@@ -31,6 +31,7 @@ const EMPTY_STATE = { parties: [], misc: [], orders: [], agents: [], staffs: [] 
 const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 15000;
 const CUT_OPTIONS = ["THAN", "1 MTR", "2 MTR", "80 CM", "75 CM", "78 CM", "77 CM", "LUMP", "FULL LUMP", "L95 THAN"];
+const QUALITY_PRESETS = ["HI TECH", "SARA INDIA", "DULHAN", "ACTIVA", "SOFIYA"];
 const NAV_ITEMS = [
   ["dashboard", "Dashboard"],
   ["orders", "Orders"],
@@ -215,6 +216,44 @@ function ChoiceField({ label, value, options, onSelect, placeholder = "Select" }
           </View>
         </Pressable>
       </Modal>
+    </View>
+  );
+}
+
+function SuggestInput({ label, value, options, onChangeText, onSelect, placeholder }) {
+  const [focused, setFocused] = useState(false);
+  const matches = Array.from(new Set((options || []).map(clean).filter(Boolean)))
+    .filter((option) => !value || normalize(option).includes(normalize(value)))
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
+    .slice(0, 35);
+  return (
+    <View style={styles.fieldWrap}>
+      {!!label && <Text style={styles.label}>{label}</Text>}
+      <TextInput
+        value={String(value ?? "")}
+        onChangeText={onChangeText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 180)}
+        placeholder={placeholder || label}
+        placeholderTextColor="#94a3b8"
+        style={styles.input}
+      />
+      {focused && matches.length > 0 && (
+        <View style={styles.suggestList}>
+          {matches.map((option) => (
+            <Pressable
+              key={option}
+              style={styles.suggestItem}
+              onPress={() => {
+                onSelect ? onSelect(option) : onChangeText(option);
+                setFocused(false);
+              }}
+            >
+              <Text style={styles.suggestText}>{option}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -827,47 +866,72 @@ export default function App() {
 
   const printBale = async (order, bale) => {
     const rows = getBaleRows(bale);
-    const colorRows = rows.map((row) => `<tr><td>${htmlEscape(row.colorNo)}</td><td>${htmlEscape(row.qty)} pcs</td></tr>`).join("");
+    const pairCount = rows.length > 18 ? 3 : rows.length > 9 ? 2 : 1;
+    const rowsPerPair = Math.ceil(rows.length / pairCount) || 1;
+    const headerCells = Array.from({ length: pairCount }, () => "<th>Color No.</th><th>Pieces</th>").join("");
+    const colorRows = Array.from({ length: rowsPerPair }, (_, rowIndex) => {
+      const cells = [];
+      for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
+        const item = rows[(pairIndex * rowsPerPair) + rowIndex];
+        cells.push(item ? `<td>${htmlEscape(item.colorNo)}</td><td>${htmlEscape(item.qty)} pcs</td>` : "<td></td><td></td>");
+      }
+      return `<tr>${cells.join("")}</tr>`;
+    }).join("");
     const makeCopy = (label) => `
-          <div class="copy">
-            <div class="copyLabel">${htmlEscape(label).toUpperCase()}</div>
-            <div class="top"><h1>Assortment Slip</h1><div><b>Bale No :</b></div><div class="bale">Bale ${htmlEscape(bale.baleNo)}</div></div>
-            <div class="grid">
-              <div><b>Party:</b> ${htmlEscape(order.partyName)}</div>
-              <div><b>Creation Time:</b> ${htmlEscape(displayDate(bale.createdAt, true))}</div>
-              <div><b>Party Order No:</b> ${htmlEscape(order.partyOrderNo || "-")}</div>
-              <div><b>MTM Order No:</b> ${htmlEscape(order.mtmOrderNo || "-")}</div>
-              <div><b>Quality:</b> ${htmlEscape(order.quality || "-")}</div>
-              <div><b>Stamping:</b> ${htmlEscape(order.stamping || "-")}</div>
-              <div><b>Cut:</b> ${htmlEscape(order.cut || "-")}</div>
-              <div><b>Packing:</b> ${htmlEscape(order.packing || "-")}</div>
-              <div><b>Station:</b> ${htmlEscape(order.partyAddress || "-")}</div>
-              <div><b>Patta:</b> ${htmlEscape(order.patta || "-")}</div>
-              <div><b>Transport:</b> ${htmlEscape(order.transport || "-")}</div>
-              <div><b>By:</b> ${htmlEscape(clean(bale.staff || order.assignedStaffName || "-").replace(/@.*/, ""))}</div>
-            </div>
-            <table><tr><th>Color No.</th><th>Pieces</th></tr>${colorRows}<tr><td><b>Grand Total</b></td><td><b>${htmlEscape(bale.totalQty || 0)} pcs</b></td></tr></table>
-            <div class="foot">Monica Textile Mills, Pali</div>
+          <div class="slipCopy">
+            <div class="slipCopyLabel">${htmlEscape(label).toUpperCase()}</div>
+            <section class="packingSlip">
+              <div class="slipHead">
+                <h2>Assortment Slip</h2>
+                <h2>Bale No : <span class="baleBlank"></span></h2>
+                <h2>Bale ${htmlEscape(bale.baleNo)}</h2>
+              </div>
+              <div class="slipMeta">
+                <p class="slipPartyLine"><b>Party:</b> ${htmlEscape(order.partyName)}</p>
+                <div class="slipMetaCol">
+                  <p><b>Party Order No:</b> ${htmlEscape(order.partyOrderNo || "-")}</p>
+                  <p><b>Quality:</b> ${htmlEscape(order.quality || "-")}</p>
+                  <p><b>Cut:</b> ${htmlEscape(order.cut || "-")}</p>
+                  <p><b>Station :</b> ${htmlEscape(order.partyAddress || "-")}</p>
+                  <p><b>Transport:</b> ${htmlEscape(order.transport || "-")}</p>
+                </div>
+                <div class="slipMetaCol">
+                  <p><b>Creation Time:</b> ${htmlEscape(bale.createdAt ? new Date(bale.createdAt).toLocaleString("en-IN") : "-")}</p>
+                  <p><b>MTM Order No:</b> ${htmlEscape(order.mtmOrderNo || "-")}</p>
+                  <p><b>Stamping:</b> ${htmlEscape(order.stamping || "-")}</p>
+                  <p><b>Packing:</b> ${htmlEscape(order.packing || "-")}</p>
+                  <p><b>Patta:</b> ${htmlEscape(order.patta || "-")}</p>
+                  <p><b>By:</b> ${htmlEscape(clean(bale.staff || order.assignedStaffName || "-").replace(/@.*/, ""))}</p>
+                </div>
+              </div>
+              <table><thead><tr>${headerCells}</tr></thead><tbody>${colorRows}</tbody><tfoot><tr><th colspan="${(pairCount * 2) - 1}">Grand Total</th><th>${htmlEscape(bale.totalQty || 0)} pcs</th></tr></tfoot></table>
+            </section><div class="slipFooter">Monica Textile Mills, Pali</div>
           </div>`;
     const html = `
       <html>
         <head>
           <style>
             @page{size:A5 landscape;margin:6mm}
-            body{font-family:Arial,sans-serif;color:#111;margin:0}
-            .page{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-            .copy{border:2px solid #111;padding:7px;height:92%;box-sizing:border-box}
-            .copyLabel{text-align:right;font-size:13px;margin-bottom:3px}
-            .top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #111;padding-bottom:5px;margin-bottom:6px}
-            h1{font-size:18px;margin:0}.bale{font-size:18px;font-weight:800}
-            .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;font-size:12px;margin-bottom:6px}
-            b{font-weight:800} table{width:100%;border-collapse:collapse;font-size:12px}
-            th,td{border:1px solid #777;padding:3px 5px;text-align:left}
-            th{background:#dbeafe}.foot{text-align:center;font-weight:800;font-size:11px;margin-top:5px}
+            *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:0;color:#111;background:#fff}
+            .balePrintPage{display:grid;grid-template-columns:1fr 1fr;gap:6px;break-after:page;page-break-after:always}
+            .slipCopy{break-inside:avoid;page-break-inside:avoid}
+            .slipCopyLabel{text-align:right;font-size:15px;font-weight:500;margin:0 0 3px;line-height:1;text-transform:uppercase}
+            .packingSlip{border:2px solid #111;height:calc(148mm - 22mm);min-height:0;overflow:hidden}
+            .slipFooter{text-align:center;font-size:11px;font-weight:700;margin-top:3px}
+            .slipHead{display:grid;grid-template-columns:1.25fr 1.15fr .55fr;align-items:center;gap:5px;border-bottom:1px solid #111;padding:7px 10px}
+            .slipHead h2:nth-child(2){text-align:center}.slipHead h2:last-child{text-align:right}
+            .baleBlank{display:inline-block;width:20mm;vertical-align:middle}
+            h2{margin:0;font-size:15px;white-space:nowrap;line-height:1}.slipMeta{display:grid;grid-template-columns:1fr 1.05fr;gap:3px 14px;font-size:11px;padding:5px 10px 7px}
+            .slipPartyLine{grid-column:1/-1;font-size:12px;font-weight:800;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.1;margin:0}
+            .slipMetaCol{display:grid;gap:3px;min-width:0}
+            p{margin:0;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.12}
+            table{width:calc(100% - 20px);margin:5px 10px 0;border-collapse:collapse;font-size:12px}
+            th,td{border:1px solid #777;padding:4px;text-align:left;overflow-wrap:anywhere}
+            th{background:#dbeafe}tfoot th{background:#fff}
           </style>
         </head>
         <body>
-          <div class="page">${makeCopy("Office Copy")}${makeCopy("Party Copy")}</div>
+          <div class="balePrintPage">${makeCopy("Office Copy")}${makeCopy("Party Copy")}</div>
         </body>
       </html>`;
     await Print.printAsync({ html });
@@ -1067,10 +1131,15 @@ export default function App() {
     </View>
   );
 
-  const miscOptions = (type) => (salesState.misc || [])
-    .filter((item) => normalize(item.type) === normalize(type))
-    .map((item) => item.name)
-    .sort((a, b) => a.localeCompare(b));
+  const miscOptions = (type) => {
+    const values = (salesState.misc || [])
+      .filter((item) => normalize(item.type) === normalize(type))
+      .map((item) => item.name);
+    if (normalize(type) === "quality") values.push(...QUALITY_PRESETS);
+    if (normalize(type) === "cut") values.push(...CUT_OPTIONS);
+    return Array.from(new Set(values.map(clean).filter(Boolean)))
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+  };
 
   const renderOrderForm = () => {
     const total = orderForm.colors.reduce((sum, row) => sum + Number(row.qty || 0), 0);
@@ -1082,15 +1151,15 @@ export default function App() {
             <Field label="MTM Order No." value={orderForm.mtmOrderNo} onChangeText={(value) => setForm("mtmOrderNo", value)} />
             <Field label="Party Order No." value={orderForm.partyOrderNo} onChangeText={(value) => setForm("partyOrderNo", value)} />
             <Field label="Order Date (YYYY-MM-DD)" value={orderForm.orderDate} onChangeText={(value) => setForm("orderDate", value)} />
-            <ChoiceField label="Party" value={orderForm.partyName} options={salesState.parties.map((item) => item.partyName)} onSelect={selectParty} />
+            <SuggestInput label="Party" value={orderForm.partyName} options={salesState.parties.map((item) => item.partyName)} onChangeText={(value) => setForm("partyName", value)} onSelect={selectParty} />
             <Field label="GST No." value={orderForm.gstNo} onChangeText={(value) => setForm("gstNo", value)} />
             <Field label="Agent" value={orderForm.agentName} onChangeText={(value) => setForm("agentName", value)} />
             <Field label="Address / Station" value={orderForm.partyAddress} onChangeText={(value) => setForm("partyAddress", value)} />
             <ChoiceField label="Transport" value={orderForm.transport} options={miscOptions("transport")} onSelect={(value) => setForm("transport", value)} />
-            <ChoiceField label="Packing" value={orderForm.packing} options={miscOptions("packing")} onSelect={(value) => setForm("packing", value)} />
-            <ChoiceField label="Patta" value={orderForm.patta} options={miscOptions("patta")} onSelect={(value) => setForm("patta", value)} />
-            <ChoiceField label="Stamping" value={orderForm.stamping} options={miscOptions("stamping")} onSelect={(value) => setForm("stamping", value)} />
-            <ChoiceField label="Quality" value={orderForm.quality} options={miscOptions("quality")} onSelect={(value) => setForm("quality", value)} />
+            <SuggestInput label="Packing" value={orderForm.packing} options={miscOptions("packing")} onChangeText={(value) => setForm("packing", value)} />
+            <SuggestInput label="Patta" value={orderForm.patta} options={miscOptions("patta")} onChangeText={(value) => setForm("patta", value)} />
+            <SuggestInput label="Stamping" value={orderForm.stamping} options={miscOptions("stamping")} onChangeText={(value) => setForm("stamping", value)} />
+            <SuggestInput label="Quality" value={orderForm.quality} options={miscOptions("quality")} onChangeText={(value) => setForm("quality", value)} />
             <ChoiceField label="Cut" value={orderForm.cut} options={[...CUT_OPTIONS, ...miscOptions("cut")]} onSelect={(value) => setForm("cut", value)} />
             <Field label="Rate" value={orderForm.rate} onChangeText={(value) => setForm("rate", value)} keyboardType="decimal-pad" />
             <Field label="QTY Per Bale" value={orderForm.qtyPerBale} onChangeText={(value) => setForm("qtyPerBale", value)} keyboardType="number-pad" />
@@ -1444,6 +1513,9 @@ const styles = StyleSheet.create({
   inputMultiline: { minHeight: 90, textAlignVertical: "top" },
   placeholder: { color: "#94a3b8" },
   choiceText: { color: "#0f172a", fontSize: 16 },
+  suggestList: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 13, marginTop: -4, marginBottom: 8, overflow: "hidden" },
+  suggestItem: { paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "#eff6ff" },
+  suggestText: { color: "#0f172a", fontWeight: "800", fontSize: 14 },
   listHeader: { padding: 12, backgroundColor: "#fff", flexDirection: "row", gap: 8, alignItems: "center", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
   listHeaderColumn: { padding: 14, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#e2e8f0" },
   search: { flex: 1, minHeight: 46, borderWidth: 1, borderColor: "#cbd5e1", borderRadius: 13, paddingHorizontal: 14, color: "#0f172a", backgroundColor: "#fff" },
