@@ -672,6 +672,7 @@ export default function App() {
       if (!clean(orderForm.mtmOrderNo)) throw new Error("MTM Order No. is required.");
       if (!clean(orderForm.partyName)) throw new Error("Party is required.");
       if (!clean(orderForm.agentEmail)) throw new Error("Selected party must have an agent.");
+      if (!(Number(orderForm.rate) > 0)) throw new Error("Rate is required.");
       if (!clean(orderForm.packing) || !clean(orderForm.patta) || !clean(orderForm.stamping) || !clean(orderForm.transport)) {
         throw new Error("Packing, Patta, Stamping and Transport are required.");
       }
@@ -1031,6 +1032,7 @@ export default function App() {
       <Text style={styles.detail}><Text style={styles.bold}>Order Details:</Text> {item.partyOrderNo || "-"} / <Text style={styles.bold}>MTM Order No. :</Text> {item.mtmOrderNo || "-"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Agent:</Text> {item.agentName || "-"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Assigned to:</Text> {item.assignedStaffName || "Not Assigned Yet"}</Text>
+      <Text style={styles.detail}><Text style={styles.bold}>Rate:</Text> {Number(item.rate) > 0 ? `Rs. ${item.rate}` : "-"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Quality:</Text> {item.quality || "-"} | <Text style={styles.bold}>Cut:</Text> {item.cut || "-"}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Total :</Text> {getOrderTotal(item)} / <Text style={styles.bold}>Sent :</Text> {getSentQty(item)} / <Text style={styles.bold}>Pending :</Text> {getPendingQty(item)}</Text>
       <Text style={styles.detail}><Text style={styles.bold}>Bales:</Text> {(item.bales || []).length} created / {item.expectedBales || expectedBales(getOrderTotal(item), item.qtyPerBale)} expected</Text>
@@ -1235,6 +1237,7 @@ export default function App() {
               <Text style={styles.detail}><Text style={styles.bold}>Order Details:</Text> {selectedOrder.partyOrderNo || "-"} / <Text style={styles.bold}>MTM Order No. :</Text> {selectedOrder.mtmOrderNo || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Party:</Text> {selectedOrder.partyName}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Agent:</Text> {selectedOrder.agentName || "-"}</Text>
+              <Text style={styles.detail}><Text style={styles.bold}>Rate:</Text> {Number(selectedOrder.rate) > 0 ? `Rs. ${selectedOrder.rate}` : "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Quality:</Text> {selectedOrder.quality || "-"} | <Text style={styles.bold}>Cut:</Text> {selectedOrder.cut || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Stamping:</Text> {selectedOrder.stamping || "-"} | <Text style={styles.bold}>Patta:</Text> {selectedOrder.patta || "-"}</Text>
               <Text style={styles.detail}><Text style={styles.bold}>Packing:</Text> {selectedOrder.packing || "-"} | <Text style={styles.bold}>Transport:</Text> {selectedOrder.transport || "-"}</Text>

@@ -51,6 +51,7 @@ function emptyOrderRequest() {
     orderDate: new Date().toISOString().slice(0, 10),
     quality: "",
     cut: "",
+    rate: "",
     qtyPerBale: "",
     packing: "",
     patta: "",
@@ -462,6 +463,8 @@ export default function App() {
       });
       const colors = Object.values(merged).map((row) => ({ ...row, pendingQty: row.qty }));
       if (!colors.length) throw new Error("Add at least one color.");
+      const rate = Number(requestForm.rate || 0);
+      if (!(rate > 0)) throw new Error("Rate is required.");
       const qtyPerBale = Number(requestForm.qtyPerBale || 0);
       if (!(qtyPerBale > 0)) throw new Error("QTY Per Bale is required.");
       const requiredFields = {
@@ -504,6 +507,7 @@ export default function App() {
         stamping: cleanText(requestForm.stamping),
         quality: cleanText(requestForm.quality),
         cut: cleanText(requestForm.cut),
+        rate,
         qtyPerBale,
         totalQty,
         expectedBales: Math.max(1, Math.round(totalQty / qtyPerBale)),
@@ -620,6 +624,7 @@ export default function App() {
               <Text style={styles.orderNo}>{item.mtmOrderNo || "Order"} - {item.partyName || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Party Order:</Text> {item.partyOrderNo || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Quality:</Text> <Text style={styles.badgeText}>{item.quality || "-"}</Text> | <Text style={styles.bold}>Cut:</Text> {item.cut || "-"}</Text>
+              <Text style={styles.meta}><Text style={styles.bold}>Rate:</Text> {item.rate ? `Rs. ${item.rate}` : "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Packing:</Text> {item.packing || "-"} | <Text style={styles.bold}>Patta:</Text> {item.patta || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Stamping:</Text> {item.stamping || "-"} | <Text style={styles.bold}>Transport:</Text> {item.transport || "-"}</Text>
               <Text style={styles.meta}><Text style={styles.bold}>Total :</Text> {total} / <Text style={styles.bold}>Sent :</Text> {sent} / <Text style={styles.bold}>Pending :</Text> {pending}</Text>
@@ -640,6 +645,7 @@ export default function App() {
                 <Text style={styles.modalTitle}>{selectedOrder.mtmOrderNo} - {selectedOrder.partyName}</Text>
                 <Text style={styles.meta}><Text style={styles.bold}>Party Order:</Text> {selectedOrder.partyOrderNo || "-"}</Text>
                 <Text style={styles.meta}><Text style={styles.bold}>Quality:</Text> {selectedOrder.quality || "-"} | <Text style={styles.bold}>Cut:</Text> {selectedOrder.cut || "-"}</Text>
+                <Text style={styles.meta}><Text style={styles.bold}>Rate:</Text> {selectedOrder.rate ? `Rs. ${selectedOrder.rate}` : "-"}</Text>
                 <Text style={styles.meta}><Text style={styles.bold}>Station:</Text> {selectedOrder.partyAddress || "-"}</Text>
                 <Text style={styles.meta}><Text style={styles.bold}>Transport:</Text> {selectedOrder.transport || "-"}</Text>
                 <Text style={styles.meta}><Text style={styles.bold}>Packing:</Text> {selectedOrder.packing || "-"} | <Text style={styles.bold}>Patta:</Text> {selectedOrder.patta || "-"}</Text>
@@ -737,6 +743,7 @@ export default function App() {
             <TextInput value={requestForm.orderDate} onChangeText={(value) => updateRequestField("orderDate", value)} placeholder="Date YYYY-MM-DD" placeholderTextColor="#64748b" style={styles.input} />
             <SuggestInput field="quality" value={requestForm.quality || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Quality" options={miscOptions.quality} />
             <SuggestInput field="cut" value={requestForm.cut || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Cut" options={miscOptions.cut} />
+            <TextInput value={requestForm.rate} onChangeText={(value) => updateRequestField("rate", value.replace(/[^0-9.]/g, ""))} placeholder="Rate" keyboardType="decimal-pad" placeholderTextColor="#64748b" style={styles.input} />
             <TextInput value={requestForm.qtyPerBale} onChangeText={(value) => updateRequestField("qtyPerBale", value)} placeholder="QTY Per Bale" keyboardType="number-pad" placeholderTextColor="#64748b" style={styles.input} />
             <SuggestInput field="packing" value={requestForm.packing || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Packing" options={miscOptions.packing} />
             <SuggestInput field="patta" value={requestForm.patta || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Patta" options={miscOptions.patta} />

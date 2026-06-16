@@ -695,6 +695,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
           <input id="agentOrderDate" type="date">
           <div class="salesSuggestWrap"><input id="agentOrderQuality" placeholder="Quality" autocomplete="off" oninput="showSalesAutocomplete(this,'quality')" onkeydown="handleSalesAutocompleteKey(event,this,'quality')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
           <div class="salesSuggestWrap"><input id="agentOrderCut" placeholder="Cut" autocomplete="off" oninput="showSalesAutocomplete(this,'cut')" onkeydown="handleSalesAutocompleteKey(event,this,'cut')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
+          <input id="agentOrderRate" type="number" step="0.01" placeholder="Rate">
           <input id="agentOrderQtyPerBale" type="number" placeholder="QTY Per Bale">
           <div class="salesSuggestWrap"><input id="agentOrderPacking" placeholder="Packing" autocomplete="off" oninput="showSalesAutocomplete(this,'packing')" onkeydown="handleSalesAutocompleteKey(event,this,'packing')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
           <div class="salesSuggestWrap"><input id="agentOrderPatta" placeholder="Patta" autocomplete="off" oninput="showSalesAutocomplete(this,'patta')" onkeydown="handleSalesAutocompleteKey(event,this,'patta')" onblur="setTimeout(()=>hideSalesAutocomplete(this),160)"><div class="suggestionBox"></div></div>
@@ -2908,7 +2909,9 @@ async function submitAgentOrderRequest(){
     }
     let colorsList = collectAgentOrderColorRows();
     if(!colorsList.length) throw new Error("Add at least one color.");
+    let rate = Number(document.getElementById("agentOrderRate")?.value);
     let qtyPerBale = Number(document.getElementById("agentOrderQtyPerBale")?.value);
+    if(!(rate > 0)) throw new Error("Rate is required.");
     if(!(qtyPerBale > 0)) throw new Error("QTY Per Bale is required.");
     let transport = document.getElementById("agentOrderTransport")?.value.trim() || "";
     let packing = document.getElementById("agentOrderPacking")?.value.trim() || "";
@@ -2945,6 +2948,7 @@ async function submitAgentOrderRequest(){
       stamping,
       quality,
       cut,
+      rate,
       qtyPerBale,
       colors: colorsList,
       totalQty,
@@ -2968,7 +2972,7 @@ async function submitAgentOrderRequest(){
 }
 
 function clearAgentOrderRequestForm(){
-  ["agentOrderParty","agentOrderPartyNo","agentOrderDate","agentOrderQuality","agentOrderCut","agentOrderQtyPerBale","agentOrderPacking","agentOrderPatta","agentOrderStamping","agentOrderTransport"].forEach(id => {
+  ["agentOrderParty","agentOrderPartyNo","agentOrderDate","agentOrderQuality","agentOrderCut","agentOrderRate","agentOrderQtyPerBale","agentOrderPacking","agentOrderPatta","agentOrderStamping","agentOrderTransport"].forEach(id => {
     let el = document.getElementById(id);
     if(el) el.value = "";
   });
@@ -3347,9 +3351,11 @@ async function saveSalesOrder(){
     let packing = getSalesSelectValue("salesPacking");
     let patta = getSalesSelectValue("salesPatta");
     let stamping = getSalesSelectValue("salesStamping");
+    let rate = Number(document.getElementById("salesRate").value);
     if(!document.getElementById("salesMtmOrderNo").value.trim()) throw new Error("MTM Order No. is required.");
     if(!document.getElementById("salesPartyName").value.trim()) throw new Error("Party Name is required.");
     if(!document.getElementById("salesAgentName").value.trim() || !document.getElementById("salesAgentEmail")?.value.trim()) throw new Error("Selected party must have an agent linked.");
+    if(!(rate > 0)) throw new Error("Rate is required.");
     if(!packing) throw new Error("Packing is required.");
     if(!patta) throw new Error("Patta is required.");
     if(!stamping) throw new Error("Stamping is required.");
@@ -3377,7 +3383,7 @@ async function saveSalesOrder(){
       stampingName: stamping,
       quality: document.getElementById("salesQuality").value.trim(),
       cut: document.getElementById("salesCut")?.value.trim() || "",
-      rate: Number(document.getElementById("salesRate").value) || 0,
+      rate,
       qtyPerBale,
       colors: existing ? rebuildSalesEditedOrderColors(existing, colorsList) : colorsList,
       totalQty,
@@ -4216,7 +4222,7 @@ function applySalesRoleUi(){
     let text = (el.textContent || "").trim();
     let allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "salesPartySearch" || el.id === "salesAgentSearch" || el.id === "salesMiscSearch";
     if(isSalesAgent()){
-      allowed = text === "Logout" || text === "Refresh" || text === "Add Color" || text === "Remove" || text === "Send Order To Admin" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "agentOrderParty" || el.id === "agentOrderPartyNo" || el.id === "agentOrderDate" || el.id === "agentOrderQuality" || el.id === "agentOrderCut" || el.id === "agentOrderQtyPerBale" || el.id === "agentOrderPacking" || el.id === "agentOrderPatta" || el.id === "agentOrderStamping" || el.id === "agentOrderTransport" || el.classList.contains("agentOrderColorNo") || el.classList.contains("agentOrderColorQty");
+      allowed = text === "Logout" || text === "Refresh" || text === "Add Color" || text === "Remove" || text === "Send Order To Admin" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "agentOrderParty" || el.id === "agentOrderPartyNo" || el.id === "agentOrderDate" || el.id === "agentOrderQuality" || el.id === "agentOrderCut" || el.id === "agentOrderRate" || el.id === "agentOrderQtyPerBale" || el.id === "agentOrderPacking" || el.id === "agentOrderPatta" || el.id === "agentOrderStamping" || el.id === "agentOrderTransport" || el.classList.contains("agentOrderColorNo") || el.classList.contains("agentOrderColorQty");
     }
     if(isSalesStaff()){
       allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "Update Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
@@ -4436,7 +4442,7 @@ function renderSalesOrders(){
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
       <td>${salesEscape(o.orderDate || (o.createdAt || "").slice(0,10))}</td>
       <td><span class="salesHighlightField">${salesEscape(o.partyName)}</span></td><td>${salesEscape(o.gstNo)}</td><td>${salesEscape(o.agentName)}${o.agentEmail ? `<br><span class="muted">${salesEscape(o.agentEmail)}</span>` : ""}</td>
-      <td><b>${salesEscape(getSalesOrderConfLine(o))}</b><br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
+      <td><b>${salesEscape(getSalesOrderConfLine(o))}</b><br><b>Rate:</b> ${Number(o.rate) > 0 ? `Rs. ${salesEscape(o.rate)}` : "-"}<br><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span> | <b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span><br><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))} | <b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))} | <b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}<br><b>Station:</b> ${salesEscape(o.partyAddress || "-")} | <b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</td>
       <td><span class="${o.assignedStaff ? "salesHighlightField" : "salesHighlightField red"}">Assigned to : ${o.assignedStaff ? salesEscape(getSalesAssignedTeamMemberName(o)) : "Not Assigned Yet"}</span></td>
       <td>${o.totalQty}</td><td>${getSalesPendingQty(o)}</td><td>${o.qtyPerBale}</td><td>${calculateSalesExpectedBales(o.totalQty, o.qtyPerBale)}</td><td>${(o.bales || []).length}</td><td>${getSalesPendingBales(o)}</td>
       <td><span class="salesBadge ${getSalesOrderStatusClass(o)}">${salesEscape(getSalesOrderDisplayStatus(o))}</span></td>
@@ -4447,6 +4453,7 @@ function renderSalesOrders(){
       <div class="salesOrderLine"><span><b>MTM Order No:</b> ${salesEscape(o.mtmOrderNo)}</span><span><b>Date:</b> ${salesEscape(formatSalesDate(o.orderDate || o.createdAt))}</span></div>
       <div class="salesOrderLine"><span><b>Party Name:</b> <span class="salesHighlightField">${salesEscape(o.partyName || "-")}</span></span><span><b>GST No:</b> ${salesEscape(o.gstNo || "-")}</span><span><b>Agent:</b> ${salesEscape(o.agentName || "-")}</span></div>
       <div class="salesOrderLine"><span><b>Order Details:</b> ${salesEscape(getSalesOrderConfLine(o))}</span></div>
+      <div class="salesOrderLine"><span><b>Rate:</b> ${Number(o.rate) > 0 ? `Rs. ${salesEscape(o.rate)}` : "-"}</span></div>
       <div class="salesOrderLine"><span><b>Stamping:</b> ${salesEscape(getSalesOrderStamping(o))}</span><span><b>Patta:</b> ${salesEscape(getSalesOrderPatta(o))}</span><span><b>Packing:</b> ${salesEscape(getSalesOrderPacking(o))}</span></div>
       <div class="salesOrderLine"><span><b>Quality:</b> <span class="salesQualityBadge">${salesEscape(o.quality || "N/A")}</span></span><span><b>Cut:</b> <span class="salesHighlightField">${salesEscape(o.cut || "-")}</span></span></div>
       <div class="salesOrderLine"><span><b>Station:</b> ${salesEscape(o.partyAddress || "-")}</span><span><b>Transport:</b> ${salesEscape(getSalesOrderTransport(o))}</span></div>
@@ -4478,10 +4485,10 @@ function renderSalesAgentPortal(){
     <div class="salesCard"><h3>Pending QTY</h3><b style="font-size:28px">${pendingColors}</b></div>
     <div class="salesCard"><h3>Sent QTY</h3><b style="font-size:28px">${sentColors}</b></div>
   `;
-  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th><th>Total QTY</th><th>Sent</th><th>Pending</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
+  table.innerHTML = `<tr><th>Order</th><th>Party</th><th>Agent</th><th>Rate</th><th>Total QTY</th><th>Sent</th><th>Pending</th><th>Bale Dispatch</th><th>Pending Colors</th><th>Sent Colors</th><th>Status</th></tr>` +
     orders.map(o => `<tr>
       <td>${salesEscape(o.mtmOrderNo)}<br><span class="muted">${salesEscape(o.partyOrderNo)}</span></td>
-      <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.agentName || "-")}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
+      <td>${salesEscape(o.partyName)}</td><td>${salesEscape(o.agentName || "-")}</td><td>${Number(o.rate) > 0 ? `Rs. ${salesEscape(o.rate)}` : "-"}</td><td>${o.totalQty}</td><td>${getSalesSentQty(o)}</td><td>${getSalesPendingQty(o)}</td>
       <td>${getSalesBaleStatusHtml(o)}</td>
       <td>${salesEscape(getSalesColorSummary(o, "pending"))}</td>
       <td>${salesEscape(getSalesColorSummary(o, "sent"))}</td>
@@ -4491,6 +4498,7 @@ function renderSalesAgentPortal(){
     mobile.innerHTML = orders.length ? orders.map(o => `<div class="salesMobileCard ${getSalesOrderToneClass(o)}">
       <h3>${salesEscape(o.mtmOrderNo)} - ${salesEscape(o.partyName)}</h3>
       <p><b>Agent:</b> ${salesEscape(o.agentName || "-")}</p>
+      <p><b>Rate:</b> ${Number(o.rate) > 0 ? `Rs. ${salesEscape(o.rate)}` : "-"}</p>
       <p><b>Total :</b> ${o.totalQty} / <b>Sent :</b> ${getSalesSentQty(o)} / <b>Pending :</b> ${getSalesPendingQty(o)}</p>
       <p><b>Bales:</b><br>${getSalesBaleStatusHtml(o)}</p>
       <p><b>Pending Colors:</b> ${salesEscape(getSalesColorSummary(o, "pending"))}</p>
