@@ -185,6 +185,15 @@ function Field({ label, value, onChangeText, placeholder, keyboardType = "defaul
 
 function ChoiceField({ label, value, options, onSelect, placeholder = "Select" }) {
   const [open, setOpen] = useState(false);
+  const choices = [];
+  const seen = new Set();
+  (options || []).forEach((option) => {
+    const item = typeof option === "string" ? { label: option, value: option } : option;
+    const key = normalize(item.value || item.label);
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    choices.push(item);
+  });
   return (
     <View style={styles.fieldWrap}>
       {!!label && <Text style={styles.label}>{label}</Text>}
@@ -196,11 +205,10 @@ function ChoiceField({ label, value, options, onSelect, placeholder = "Select" }
           <View style={styles.choiceModal}>
             <Text style={styles.modalTitle}>{label || placeholder}</Text>
             <ScrollView style={{ maxHeight: 420 }}>
-              {options.map((option) => {
-                const item = typeof option === "string" ? { label: option, value: option } : option;
+              {choices.map((item, index) => {
                 return (
                   <Pressable
-                    key={`${item.value}-${item.label}`}
+                    key={`${normalize(item.value || item.label)}-${index}`}
                     style={styles.choiceRow}
                     onPress={() => {
                       onSelect(item.value, item);
@@ -222,7 +230,15 @@ function ChoiceField({ label, value, options, onSelect, placeholder = "Select" }
 
 function SuggestInput({ label, value, options, onChangeText, onSelect, placeholder }) {
   const [focused, setFocused] = useState(false);
-  const matches = Array.from(new Set((options || []).map(clean).filter(Boolean)))
+  const uniqueOptions = [];
+  const seenOptions = new Set();
+  (options || []).map(clean).filter(Boolean).forEach((option) => {
+    const key = normalize(option);
+    if (seenOptions.has(key)) return;
+    seenOptions.add(key);
+    uniqueOptions.push(option);
+  });
+  const matches = uniqueOptions
     .filter((option) => !value || normalize(option).includes(normalize(value)))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }))
     .slice(0, 35);
@@ -240,9 +256,9 @@ function SuggestInput({ label, value, options, onChangeText, onSelect, placehold
       />
       {focused && matches.length > 0 && (
         <View style={styles.suggestList}>
-          {matches.map((option) => (
+          {matches.map((option, index) => (
             <Pressable
-              key={option}
+              key={`${normalize(option)}-${index}`}
               style={styles.suggestItem}
               onPress={() => {
                 onSelect ? onSelect(option) : onChangeText(option);
