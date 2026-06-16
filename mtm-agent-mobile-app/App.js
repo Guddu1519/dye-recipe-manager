@@ -144,6 +144,44 @@ function AppButton({ title, onPress, tone = "primary", disabled = false }) {
   );
 }
 
+function SuggestInput({ field, placeholder, options, value, focusedSuggest, setFocusedSuggest, onChange }) {
+  const matches = uniqueSorted(options || [])
+    .filter((option) => !value || normalize(option).includes(normalize(value)))
+    .slice(0, 35);
+  const show = focusedSuggest === field && matches.length > 0;
+  return (
+    <View style={styles.suggestWrap}>
+      <TextInput
+        value={value}
+        onFocus={() => setFocusedSuggest(field)}
+        onChangeText={(nextValue) => {
+          onChange(field, nextValue);
+          setFocusedSuggest(field);
+        }}
+        placeholder={placeholder}
+        placeholderTextColor="#64748b"
+        style={styles.input}
+      />
+      {show && (
+        <View style={styles.suggestList}>
+          {matches.map((option) => (
+            <Pressable
+              key={option}
+              style={styles.suggestItem}
+              onPress={() => {
+                onChange(field, option);
+                setFocusedSuggest("");
+              }}
+            >
+              <Text style={styles.suggestText}>{option}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -404,45 +442,6 @@ export default function App() {
 
   function removeRequestColor(key) {
     setRequestForm((current) => ({ ...current, colors: current.colors.length === 1 ? current.colors : current.colors.filter((row) => row.key !== key) }));
-  }
-
-  function SuggestInput({ field, placeholder, options }) {
-    const value = requestForm[field] || "";
-    const matches = uniqueSorted(options || [])
-      .filter((option) => !value || normalize(option).includes(normalize(value)))
-      .slice(0, 35);
-    const show = focusedSuggest === field && matches.length > 0;
-    return (
-      <View style={styles.suggestWrap}>
-        <TextInput
-          value={value}
-          onFocus={() => setFocusedSuggest(field)}
-          onChangeText={(nextValue) => {
-            updateRequestField(field, nextValue);
-            setFocusedSuggest(field);
-          }}
-          placeholder={placeholder}
-          placeholderTextColor="#64748b"
-          style={styles.input}
-        />
-        {show && (
-          <View style={styles.suggestList}>
-            {matches.map((option) => (
-              <Pressable
-                key={option}
-                style={styles.suggestItem}
-                onPress={() => {
-                  updateRequestField(field, option);
-                  setFocusedSuggest("");
-                }}
-              >
-                <Text style={styles.suggestText}>{option}</Text>
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </View>
-    );
   }
 
   async function submitOrderRequest() {
@@ -733,16 +732,16 @@ export default function App() {
           <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.modalTitle}>Send Order To Admin</Text>
             <Text style={styles.loginSub}>Type party/master values and select from suggestions. Stamping can be typed freely.</Text>
-            <SuggestInput field="partyName" placeholder="Assigned Party Name" options={agentPartyOptions} />
+            <SuggestInput field="partyName" value={requestForm.partyName || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Assigned Party Name" options={agentPartyOptions} />
             <TextInput value={requestForm.partyOrderNo} onChangeText={(value) => updateRequestField("partyOrderNo", value)} placeholder="Party Order No." placeholderTextColor="#64748b" style={styles.input} />
             <TextInput value={requestForm.orderDate} onChangeText={(value) => updateRequestField("orderDate", value)} placeholder="Date YYYY-MM-DD" placeholderTextColor="#64748b" style={styles.input} />
-            <SuggestInput field="quality" placeholder="Quality" options={miscOptions.quality} />
-            <SuggestInput field="cut" placeholder="Cut" options={miscOptions.cut} />
+            <SuggestInput field="quality" value={requestForm.quality || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Quality" options={miscOptions.quality} />
+            <SuggestInput field="cut" value={requestForm.cut || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Cut" options={miscOptions.cut} />
             <TextInput value={requestForm.qtyPerBale} onChangeText={(value) => updateRequestField("qtyPerBale", value)} placeholder="QTY Per Bale" keyboardType="number-pad" placeholderTextColor="#64748b" style={styles.input} />
-            <SuggestInput field="packing" placeholder="Packing" options={miscOptions.packing} />
-            <SuggestInput field="patta" placeholder="Patta" options={miscOptions.patta} />
+            <SuggestInput field="packing" value={requestForm.packing || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Packing" options={miscOptions.packing} />
+            <SuggestInput field="patta" value={requestForm.patta || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Patta" options={miscOptions.patta} />
             <TextInput value={requestForm.stamping} onChangeText={(value) => updateRequestField("stamping", value)} placeholder="Stamping" placeholderTextColor="#64748b" style={styles.input} />
-            <SuggestInput field="transport" placeholder="Transport" options={miscOptions.transport} />
+            <SuggestInput field="transport" value={requestForm.transport || ""} focusedSuggest={focusedSuggest} setFocusedSuggest={setFocusedSuggest} onChange={updateRequestField} placeholder="Transport" options={miscOptions.transport} />
             <Text style={styles.subTitle}>Colors</Text>
             {requestForm.colors.map((row) => (
               <View key={row.key} style={styles.requestColorRow}>
