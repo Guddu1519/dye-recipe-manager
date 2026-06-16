@@ -95,14 +95,14 @@ function getSentQty(order) {
   return (order?.bales || []).reduce((sum, bale) => sum + Number(bale.totalQty || 0), 0);
 }
 
+function getColorSentQty(order, colorNo) {
+  return (order?.bales || []).reduce((sum, bale) => sum + getBaleRows(bale)
+    .filter((item) => normalize(item.colorNo) === normalize(colorNo))
+    .reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
+}
+
 function getPendingQty(order) {
-  return (order?.colors || []).reduce((sum, row) => {
-    if (row.pendingQty !== undefined) return sum + Number(row.pendingQty || 0);
-    const sent = (order.bales || []).reduce((baleSum, bale) => baleSum + getBaleRows(bale)
-      .filter((item) => normalize(item.colorNo) === normalize(row.colorNo))
-      .reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0), 0);
-    return sum + Number(row.qty || 0) - sent;
-  }, 0);
+  return (order?.colors || []).reduce((sum, row) => sum + Number(row.qty || 0) - getColorSentQty(order, row.colorNo), 0);
 }
 
 function expectedBales(total, size) {
@@ -938,8 +938,10 @@ export default function App() {
   };
 
   const printPending = async (order) => {
-    const rows = (order.colors || []).filter((row) => Number(row.pendingQty ?? row.qty ?? 0) !== 0);
-    const htmlRows = rows.map((row) => `<tr><td>${row.colorNo}</td><td>${row.pendingQty ?? row.qty} pcs</td></tr>`).join("");
+    const rows = (order.colors || [])
+      .map((row) => ({ colorNo: row.colorNo, pendingQty: Number(row.qty || 0) - getColorSentQty(order, row.colorNo) }))
+      .filter((row) => Number(row.pendingQty || 0) !== 0);
+    const htmlRows = rows.map((row) => `<tr><td>${row.colorNo}</td><td>${row.pendingQty} pcs</td></tr>`).join("");
     await Print.printAsync({
       html: `<html><head><style>@page{size:A4;margin:12mm}body{font-family:Arial}table{width:100%;border-collapse:collapse}th,td{border:1px solid #444;padding:8px}th{background:#dbeafe}</style></head><body><h1>MONICA TEXTILE MILLS</h1><h2>Pending Colors Report</h2><p><b>Order Details:</b> ${order.partyOrderNo || "-"} / <b>MTM Order No. :</b> ${order.mtmOrderNo || "-"}</p><p><b>Party:</b> ${order.partyName}</p><table><tr><th>Color No.</th><th>Pending QTY</th></tr>${htmlRows || "<tr><td colspan='2'>No pending colors</td></tr>"}</table></body></html>`
     });
@@ -947,8 +949,9 @@ export default function App() {
 
   const copyPending = async (order) => {
     const text = (order.colors || [])
-      .filter((row) => Number(row.pendingQty ?? row.qty ?? 0) !== 0)
-      .map((row) => `${row.colorNo}: ${row.pendingQty ?? row.qty} pcs`)
+      .map((row) => ({ colorNo: row.colorNo, pendingQty: Number(row.qty || 0) - getColorSentQty(order, row.colorNo) }))
+      .filter((row) => Number(row.pendingQty || 0) !== 0)
+      .map((row) => `${row.colorNo}: ${row.pendingQty} pcs`)
       .join("\n") || "No pending colors";
     await Clipboard.setStringAsync(text);
     Alert.alert("Copied", "Pending colors copied.");

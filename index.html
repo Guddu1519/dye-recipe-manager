@@ -556,7 +556,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       </div>
       <div class="salesCard">
         <h2>Order History</h2>
-        <input id="salesOrderSearch" placeholder="Search order no, party, agent, GST, packing, patta, transport, status..." oninput="renderSalesOrders()">
+        <input id="salesOrderSearch" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search order no, party, agent, GST, packing, patta, transport, status..." oninput="renderSalesOrders()">
         <div class="salesTableWrap salesDesktopTable" style="display:none"><table class="salesTable" id="salesOrdersTable"></table></div>
         <div class="salesOrderHistoryCards" id="salesOrdersMobileCards"></div>
       </div>
@@ -609,7 +609,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Parties</h2>
-          <input id="salesPartySearch" placeholder="Search saved parties..." oninput="renderSalesParties()">
+          <input id="salesPartySearch" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search saved parties..." oninput="renderSalesParties()">
           <div class="salesTableWrap"><table class="salesTable" id="salesPartyTable"></table></div>
         </div>
       </div>
@@ -633,7 +633,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Agents</h2>
-          <input id="salesAgentSearch" placeholder="Search saved agents..." oninput="renderSalesAgents()">
+          <input id="salesAgentSearch" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search saved agents..." oninput="renderSalesAgents()">
           <div class="salesTableWrap"><table class="salesTable" id="salesAgentsTable"></table></div>
         </div>
       </div>
@@ -679,7 +679,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         </div>
         <div class="salesCard" style="grid-column:span 2">
           <h2>Saved Misc Values</h2>
-          <input id="salesMiscSearch" placeholder="Search saved misc values..." oninput="renderSalesMisc()">
+          <input id="salesMiscSearch" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search saved misc values..." oninput="renderSalesMisc()">
           <div class="salesTableWrap"><table class="salesTable" id="salesMiscTable"></table></div>
         </div>
       </div>
@@ -725,7 +725,7 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
       <div class="salesCard">
         <h2>Team Member Order Workflow</h2>
         <p class="muted">Only orders assigned to the logged-in team member email are shown here.</p>
-        <input id="salesStaffOrderSearch" placeholder="Search by order no, party, agent, team member, quality, stamping..." oninput="renderSalesStaffOrders()">
+        <input id="salesStaffOrderSearch" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search by order no, party, agent, team member, quality, stamping..." oninput="renderSalesStaffOrders()">
         <select id="salesStaffMemberFilter" onchange="renderSalesStaffOrders()"></select>
         <div class="salesTableWrap salesDesktopTable"><table class="salesTable" id="salesStaffOrdersTable"></table></div>
         <div class="salesMobileCards" id="salesStaffOrdersMobileCards"></div>
@@ -2583,7 +2583,12 @@ function showSalesTab(tab, shouldRender=true){
 function clearSalesSearchFields(){
   ["salesOrderSearch","salesPartySearch","salesAgentSearch","salesMiscSearch","salesStaffOrderSearch"].forEach(id => {
     let el = document.getElementById(id);
-    if(el) el.value = "";
+    if(el){
+      el.value = "";
+      el.defaultValue = "";
+      el.setAttribute("value", "");
+      el.autocomplete = "off";
+    }
   });
 }
 
@@ -3540,12 +3545,29 @@ function sameSalesColor(a, b){
   return normalizeName(a) === normalizeName(b);
 }
 
+function getSalesBaleRows(bale){
+  return bale?.colors || bale?.items || [];
+}
+
+function getSalesColorSentQty(order, colorNo){
+  return (order?.bales || []).reduce((sum, bale) => {
+    return sum + getSalesBaleRows(bale)
+      .filter(item => sameSalesColor(item.colorNo, colorNo))
+      .reduce((itemSum, item) => itemSum + (Number(item.qty) || 0), 0);
+  }, 0);
+}
+
 function getSalesSentQty(order){
-  return (order.colors || []).reduce((sum, c) => sum + ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)), 0);
+  return (order?.bales || []).reduce((sum, bale) => {
+    let rowsTotal = getSalesBaleRows(bale).reduce((rowSum, item) => rowSum + (Number(item.qty) || 0), 0);
+    return sum + (rowsTotal || Number(bale.totalQty || 0));
+  }, 0);
 }
 
 function getSalesPendingQty(order){
-  return (order.colors || []).reduce((sum, c) => sum + (Number(c.pendingQty) || 0), 0);
+  return (order?.colors || []).reduce((sum, c) => {
+    return sum + ((Number(c.qty) || 0) - getSalesColorSentQty(order, c.colorNo));
+  }, 0);
 }
 
 function calculateSalesExpectedBales(totalQty, baleSize){
@@ -3572,9 +3594,13 @@ function formatSalesDateTime(value){
 
 function getSalesColorSummary(order, mode){
   return (order.colors || [])
-    .filter(c => mode === "pending" ? (Number(c.pendingQty) || 0) > 0 : ((Number(c.qty) || 0) - (Number(c.pendingQty) || 0)) > 0)
     .map(c => {
-      let qty = mode === "pending" ? Number(c.pendingQty) || 0 : (Number(c.qty) || 0) - (Number(c.pendingQty) || 0);
+      let sent = getSalesColorSentQty(order, c.colorNo);
+      return {...c, sentQty: sent, livePendingQty: (Number(c.qty) || 0) - sent};
+    })
+    .filter(c => mode === "pending" ? c.livePendingQty !== 0 : c.sentQty > 0)
+    .map(c => {
+      let qty = mode === "pending" ? c.livePendingQty : c.sentQty;
       return `${c.colorNo}: ${qty}`;
     }).join(", ") || "None";
 }
@@ -3997,7 +4023,9 @@ async function toggleSalesOrderPaidLock(orderId){
 function printSalesOrderPendingReport(orderId){
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
-  let pendingList = (order.colors || []).filter(c => Number(c.pendingQty) !== 0);
+  let pendingList = (order.colors || [])
+    .map(c => ({colorNo: c.colorNo, pendingQty: (Number(c.qty) || 0) - getSalesColorSentQty(order, c.colorNo)}))
+    .filter(c => Number(c.pendingQty) !== 0);
   let pendingRows = pendingList.map(c => `<tr><td>${salesEscape(c.colorNo)}</td><td>${salesEscape(c.pendingQty)} pcs</td></tr>`).join("");
   let pendingCopyText = pendingList.length ? pendingList.map(c => `${c.colorNo}: ${c.pendingQty} pcs`).join("\n") : "No pending colors.";
   if(!pendingRows) pendingRows = `<tr><td colspan="2">No pending colors.</td></tr>`;
