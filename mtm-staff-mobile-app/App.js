@@ -244,6 +244,14 @@ function AppButton({ title, onPress, tone = "primary", disabled = false, style, 
   );
 }
 
+function AppFooter() {
+  return (
+    <View pointerEvents="none" style={styles.appFooter}>
+      <Text style={styles.appFooterText}>Designed & Developed by Garvit | Monica Textile Mills - Pali</Text>
+    </View>
+  );
+}
+
 export default function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -617,6 +625,7 @@ export default function App() {
       <SafeAreaView style={[styles.center, styles.safeTop]}>
         <ActivityIndicator size="large" color="#1d4ed8" />
         <Text style={styles.loadingText}>Loading MTM Team...</Text>
+        <AppFooter />
       </SafeAreaView>
     );
   }
@@ -647,6 +656,7 @@ export default function App() {
           />
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
         </KeyboardAvoidingView>
+        <AppFooter />
       </SafeAreaView>
     );
   }
@@ -827,6 +837,7 @@ export default function App() {
           </View>
         </View>
       )}
+      {!selectedOrder && <AppFooter />}
     </SafeAreaView>
   );
 }
@@ -913,7 +924,9 @@ const styles = StyleSheet.create({
   floatingTotals: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingBottom: 2 },
   floatingLabel: { color: "#475569", fontWeight: "900", fontSize: 15 },
   floatingTotalNo: { color: "#1d4ed8", fontSize: 26, fontWeight: "900" },
-  footerActions: { position: "absolute", left: 16, right: 16, bottom: 12 }
+  footerActions: { position: "absolute", left: 16, right: 16, bottom: 12 },
+  appFooter: { position: "absolute", left: 0, right: 0, bottom: 2, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 },
+  appFooterText: { color: "#64748b", fontSize: 10, fontWeight: "800", textAlign: "center" }
 });
 
 

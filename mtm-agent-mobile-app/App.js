@@ -145,6 +145,14 @@ function AppButton({ title, onPress, tone = "primary", disabled = false }) {
   );
 }
 
+function AppFooter() {
+  return (
+    <View pointerEvents="none" style={styles.appFooter}>
+      <Text style={styles.appFooterText}>Designed & Developed by Garvit | Monica Textile Mills - Pali</Text>
+    </View>
+  );
+}
+
 function SuggestInput({ field, placeholder, options, value, focusedSuggest, setFocusedSuggest, onChange }) {
   const matches = uniqueSorted(options || [])
     .filter((option) => !value || normalize(option).includes(normalize(value)))
@@ -542,6 +550,7 @@ export default function App() {
       <SafeAreaView style={[styles.loadingScreen, styles.safeTop]}>
         <ActivityIndicator size="large" color="#2563eb" />
         <Text style={styles.loadingText}>Loading MTM Agents...</Text>
+        <AppFooter />
       </SafeAreaView>
     );
   }
@@ -572,6 +581,7 @@ export default function App() {
           />
           <AppButton title={loginLoading ? "Logging in..." : "Login"} onPress={handleLogin} disabled={loginLoading} />
         </KeyboardAvoidingView>
+        <AppFooter />
       </SafeAreaView>
     );
   }
@@ -763,6 +773,7 @@ export default function App() {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+      <AppFooter />
     </SafeAreaView>
   );
 }
@@ -837,5 +848,7 @@ const styles = StyleSheet.create({
   menuOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.35)", justifyContent: "flex-start", alignItems: "flex-end", padding: 16, paddingTop: 58 },
   menuCard: { width: 230, backgroundColor: "#fff", borderRadius: 18, padding: 16, shadowColor: "#0f172a", shadowOpacity: 0.2, shadowRadius: 18, elevation: 8 },
   menuTitle: { fontSize: 20, fontWeight: "900", color: "#0f172a" },
-  menuSub: { color: "#64748b", fontWeight: "700", marginTop: 4, marginBottom: 10 }
+  menuSub: { color: "#64748b", fontWeight: "700", marginTop: 4, marginBottom: 10 },
+  appFooter: { position: "absolute", left: 0, right: 0, bottom: 2, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 },
+  appFooterText: { color: "#64748b", fontSize: 10, fontWeight: "800", textAlign: "center" }
 });

@@ -156,6 +156,14 @@ function AppButton({ title, onPress, tone = "primary", disabled = false, compact
   );
 }
 
+function AppFooter() {
+  return (
+    <View pointerEvents="none" style={styles.appFooter}>
+      <Text style={styles.appFooterText}>Designed & Developed by Garvit | Monica Textile Mills - Pali</Text>
+    </View>
+  );
+}
+
 function Field({ label, value, onChangeText, placeholder, keyboardType = "default", secureTextEntry = false, multiline = false }) {
   return (
     <View style={styles.fieldWrap}>
@@ -978,6 +986,7 @@ export default function App() {
       <SafeAreaView style={[styles.loadingScreen, styles.safeTop]}>
         <ActivityIndicator size="large" color="#2563eb" />
         <Text style={styles.loadingText}>Loading MTM Admin...</Text>
+        <AppFooter />
       </SafeAreaView>
     );
   }
@@ -993,6 +1002,7 @@ export default function App() {
           <AppButton title={busy ? "Logging in..." : "Login"} onPress={login} disabled={busy} tone="success" />
           <Text style={styles.version}>Version {APP_VERSION}</Text>
         </View>
+        <AppFooter />
       </KeyboardAvoidingView>
     );
   }
@@ -1334,6 +1344,7 @@ export default function App() {
       </Modal>
       {orderModal}
       {masterModal}
+      <AppFooter />
     </SafeAreaView>
   );
 }
@@ -1473,6 +1484,8 @@ const styles = StyleSheet.create({
   baleActionText: { fontSize: 13 },
   paragraph: { color: "#475569", lineHeight: 22 },
   paidNote: { padding: 10, borderRadius: 10, backgroundColor: "#dcfce7", color: "#166534", fontWeight: "900" },
+  appFooter: { position: "absolute", left: 0, right: 0, bottom: 2, alignItems: "center", paddingHorizontal: 10, paddingVertical: 5 },
+  appFooterText: { color: "#64748b", fontSize: 10, fontWeight: "800", textAlign: "center" },
   baleCard: { padding: 12, backgroundColor: "#f8fafc", borderRadius: 13, borderWidth: 1, borderColor: "#dbeafe", gap: 6 },
   busyOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(15,23,42,0.55)", alignItems: "center", justifyContent: "center", zIndex: 100 },
   busyText: { color: "#fff", marginTop: 10, fontWeight: "900" },
