@@ -1,4 +1,6 @@
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 import * as ScreenCapture from "expo-screen-capture";
 import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
@@ -26,6 +28,7 @@ const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 12000;
 const CUT_OPTIONS = ["THAN", "1 MTR", "2 MTR", "80 CM", "75 CM", "78 CM", "77 CM", "LUMP", "FULL LUMP", "L95 THAN"];
 const QUALITY_PRESETS = ["HI TECH", "SARA INDIA", "DULHAN", "ACTIVA", "SOFIYA"];
+const COLOR_SAMPLE_CSV = "color_no,qty\n1,20\nBLACK,50\n3,20\n";
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
@@ -42,6 +45,37 @@ function uniqueSorted(values) {
 
 function makeId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  String(text || "").replace(/^\uFEFF/, "").split("").forEach((ch, index, arr) => {
+    if (ch === '"') {
+      if (quoted && arr[index + 1] === '"') cell += '"';
+      else quoted = !quoted;
+      return;
+    }
+    if (ch === "," && !quoted) {
+      row.push(cell.trim());
+      cell = "";
+      return;
+    }
+    if ((ch === "\n" || ch === "\r") && !quoted) {
+      if (ch === "\r" && arr[index + 1] === "\n") return;
+      row.push(cell.trim());
+      if (row.some(Boolean)) rows.push(row);
+      row = [];
+      cell = "";
+      return;
+    }
+    cell += ch;
+  });
+  row.push(cell.trim());
+  if (row.some(Boolean)) rows.push(row);
+  return rows;
 }
 
 function emptyOrderRequest() {
@@ -453,6 +487,58 @@ export default function App() {
     setRequestForm((current) => ({ ...current, colors: current.colors.length === 1 ? current.colors : current.colors.filter((row) => row.key !== key) }));
   }
 
+  function clearRequestColors() {
+    Alert.alert("Clear Colors", "Are you sure you want to clear all colors?", [
+      { text: "No, Cancel", style: "cancel" },
+      { text: "Yes, Clear", style: "destructive", onPress: () => setRequestForm((current) => ({ ...current, colors: [{ key: makeId(), colorNo: "", qty: "" }] })) }
+    ]);
+  }
+
+  async function copyColorSampleCsv() {
+    await Clipboard.setStringAsync(COLOR_SAMPLE_CSV);
+    Alert.alert("Sample CSV Copied", "CSV format copied:\ncolor_no,qty");
+  }
+
+  async function importRequestColorCsv() {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["text/csv", "text/comma-separated-values", "application/csv", "text/plain"],
+        copyToCacheDirectory: true
+      });
+      if (result.canceled) return;
+      const text = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      const rows = parseCsvRows(text);
+      if (rows.length < 2) throw new Error("CSV should have headers: color_no,qty");
+      const headers = rows[0].map((header) => normalize(header).replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""));
+      const get = (row, names) => {
+        for (const name of names) {
+          const index = headers.indexOf(name);
+          if (index >= 0 && cleanText(row[index])) return cleanText(row[index]);
+        }
+        return "";
+      };
+      const merged = {};
+      rows.slice(1).forEach((row, index) => {
+        const colorNo = get(row, ["color_no", "color", "colorno", "color_name", "shade", "shade_no", "name"]);
+        const qty = Number(get(row, ["qty", "quantity", "pcs", "pieces"]));
+        if (!colorNo && !qty) return;
+        if (!colorNo) throw new Error(`Row ${index + 2}: Color No. / Color Name is required.`);
+        if (!(qty > 0)) throw new Error(`Row ${index + 2}: QTY must be greater than 0 for ${colorNo}.`);
+        const key = normalize(colorNo);
+        if (!merged[key]) merged[key] = { colorNo, qty: 0 };
+        merged[key].qty += qty;
+      });
+      const colors = Object.values(merged)
+        .sort((a, b) => String(a.colorNo).localeCompare(String(b.colorNo), undefined, { numeric: true }))
+        .map((row) => ({ key: makeId(), colorNo: row.colorNo, qty: String(row.qty) }));
+      if (!colors.length) throw new Error("No color rows found in CSV.");
+      setRequestForm((current) => ({ ...current, colors }));
+      Alert.alert("Imported", `${colors.length} color row(s) imported.`);
+    } catch (error) {
+      Alert.alert("Import Failed", error.message || "Could not import color CSV.");
+    }
+  }
+
   async function submitOrderRequest() {
     try {
       setSavingRequest(true);
@@ -767,7 +853,12 @@ export default function App() {
                 <Pressable style={styles.removeButton} onPress={() => removeRequestColor(row.key)}><Text style={styles.removeText}>X</Text></Pressable>
               </View>
             ))}
-            <AppButton title="Add Color" tone="muted" onPress={addRequestColor} />
+            <View style={styles.requestActionGrid}>
+              <AppButton title="Import Order Colors" tone="muted" onPress={importRequestColorCsv} />
+              <AppButton title="Sample CSV" tone="muted" onPress={copyColorSampleCsv} />
+              <AppButton title="Add Color Row" tone="muted" onPress={addRequestColor} />
+              <AppButton title="Clear Colors" tone="danger" onPress={clearRequestColors} />
+            </View>
             <AppButton title={savingRequest ? "Sending..." : "Send Order To Admin"} onPress={submitOrderRequest} disabled={savingRequest} />
             <AppButton title="Close" tone="muted" onPress={() => setRequestOpen(false)} />
           </ScrollView>
@@ -843,6 +934,7 @@ const styles = StyleSheet.create({
   requestColorRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   requestColorInput: { flex: 1 },
   requestQtyInput: { width: 96 },
+  requestActionGrid: { gap: 8, marginBottom: 8 },
   removeButton: { width: 42, height: 50, borderRadius: 13, backgroundColor: "#dc2626", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   removeText: { color: "#fff", fontWeight: "900" },
   menuOverlay: { flex: 1, backgroundColor: "rgba(15,23,42,0.35)", justifyContent: "flex-start", alignItems: "flex-end", padding: 16, paddingTop: 58 },

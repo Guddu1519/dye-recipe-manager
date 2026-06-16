@@ -1158,7 +1158,7 @@ export default function App() {
             <Field label="GST No." value={orderForm.gstNo} onChangeText={(value) => setForm("gstNo", value)} />
             <Field label="Agent" value={orderForm.agentName} onChangeText={(value) => setForm("agentName", value)} />
             <Field label="Address / Station" value={orderForm.partyAddress} onChangeText={(value) => setForm("partyAddress", value)} />
-            <ChoiceField label="Transport" value={orderForm.transport} options={miscOptions("transport")} onSelect={(value) => setForm("transport", value)} />
+            <SuggestInput label="Transport" value={orderForm.transport} options={miscOptions("transport")} onChangeText={(value) => setForm("transport", value)} />
             <SuggestInput label="Packing" value={orderForm.packing} options={miscOptions("packing")} onChangeText={(value) => setForm("packing", value)} />
             <SuggestInput label="Patta" value={orderForm.patta} options={miscOptions("patta")} onChangeText={(value) => setForm("patta", value)} />
             <SuggestInput label="Stamping" value={orderForm.stamping} options={miscOptions("stamping")} onChangeText={(value) => setForm("stamping", value)} />

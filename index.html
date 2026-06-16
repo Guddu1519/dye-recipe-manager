@@ -705,7 +705,11 @@ button:disabled,input:disabled,select:disabled{opacity:.55;cursor:not-allowed}
         <h3>Color Order Entry</h3>
         <div id="agentOrderColorRows" style="display:grid;gap:8px"></div>
         <div class="salesActions">
-          <button class="salesSmallBtn gray" onclick="addAgentOrderColorRow()">Add Color</button>
+          <button class="salesSmallBtn gray" onclick="addAgentOrderColorRow()">Add Color Row</button>
+          <input id="agentOrderColorCsvFile" type="file" accept=".csv" style="display:none" onchange="importAgentOrderColorCsv(event)">
+          <button class="salesSmallBtn gray" onclick="document.getElementById('agentOrderColorCsvFile').click()">Import Order Colors</button>
+          <button class="salesSmallBtn gray" onclick="downloadSalesColorSample()">Sample CSV</button>
+          <button class="salesSmallBtn gray" onclick="clearAgentOrderColorRows()">Clear Colors</button>
           <button class="salesSmallBtn green" onclick="submitAgentOrderRequest()">Send Order To Admin</button>
         </div>
       </div>
@@ -2903,6 +2907,43 @@ function collectAgentOrderColorRows(){
   return Object.values(merged).map(row => ({colorNo: row.colorNo, qty: row.qty, pendingQty: row.qty}));
 }
 
+function clearAgentOrderColorRows(){
+  if(!confirm("Are you sure you want to clear all colors?")) return;
+  let wrap = document.getElementById("agentOrderColorRows");
+  if(wrap) wrap.innerHTML = "";
+  addAgentOrderColorRow();
+}
+
+async function importAgentOrderColorCsv(event){
+  if(!isSalesAgent()) return alert("Only Agent login can import order colors.");
+  let file = event.target.files?.[0]; if(!file) return;
+  try{
+    let rows = parseSalesCsv(await file.text());
+    if(!rows.length) throw new Error("CSV should have headers: color_no,qty");
+    let merged = {};
+    rows.forEach((row, index) => {
+      let colorNo = salesCsvPick(row, ["color_no","color","colorno","color_name","shade","shade_no","name"]);
+      let qty = Number(salesCsvPick(row, ["qty","quantity","pcs","pieces"]));
+      if(!colorNo && !qty) return;
+      if(!colorNo) throw new Error("Row " + (index + 2) + ": Color No. / Color Name is required.");
+      if(!(qty > 0)) throw new Error("Row " + (index + 2) + ": QTY must be greater than 0 for " + colorNo);
+      let key = normalizeName(colorNo);
+      if(!merged[key]) merged[key] = {colorNo, qty:0};
+      merged[key].qty += qty;
+    });
+    let imported = Object.values(merged).sort((a,b)=>String(a.colorNo).localeCompare(String(b.colorNo), undefined, {numeric:true}));
+    if(!imported.length) throw new Error("No color rows found in CSV.");
+    let wrap = document.getElementById("agentOrderColorRows");
+    if(wrap) wrap.innerHTML = "";
+    imported.forEach(row => addAgentOrderColorRow(row.colorNo, row.qty));
+    showSuccessToast("Order colors imported");
+  }catch(err){
+    alert(err.message || err);
+  }finally{
+    event.target.value = "";
+  }
+}
+
 async function submitAgentOrderRequest(){
   if(!isSalesAgent()) return alert("Only Agent login can send order requests.");
   try{
@@ -4251,7 +4292,7 @@ function applySalesRoleUi(){
     let text = (el.textContent || "").trim();
     let allowed = text === "Logout" || text === "Refresh" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "salesPartySearch" || el.id === "salesAgentSearch" || el.id === "salesMiscSearch";
     if(isSalesAgent()){
-      allowed = text === "Logout" || text === "Refresh" || text === "Add Color" || text === "Remove" || text === "Send Order To Admin" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "agentOrderParty" || el.id === "agentOrderPartyNo" || el.id === "agentOrderDate" || el.id === "agentOrderQuality" || el.id === "agentOrderCut" || el.id === "agentOrderRate" || el.id === "agentOrderQtyPerBale" || el.id === "agentOrderPacking" || el.id === "agentOrderPatta" || el.id === "agentOrderStamping" || el.id === "agentOrderTransport" || el.classList.contains("agentOrderColorNo") || el.classList.contains("agentOrderColorQty");
+      allowed = text === "Logout" || text === "Refresh" || text === "Add Color" || text === "Add Color Row" || text === "Remove" || text === "Import Order Colors" || text === "Sample CSV" || text === "Clear Colors" || text === "Send Order To Admin" || el.closest(".salesTabs") || el.id === "salesStaffOrderSearch" || el.id === "salesOrderSearch" || el.id === "agentOrderColorCsvFile" || el.id === "agentOrderParty" || el.id === "agentOrderPartyNo" || el.id === "agentOrderDate" || el.id === "agentOrderQuality" || el.id === "agentOrderCut" || el.id === "agentOrderRate" || el.id === "agentOrderQtyPerBale" || el.id === "agentOrderPacking" || el.id === "agentOrderPatta" || el.id === "agentOrderStamping" || el.id === "agentOrderTransport" || el.classList.contains("agentOrderColorNo") || el.classList.contains("agentOrderColorQty");
     }
     if(isSalesStaff()){
       allowed = allowed || text === "Accept Order" || text === "Start Bale Creation" || text === "View / Print Bales" || text === "Create Bale" || text === "Update Bale" || text === "CLEAR QTY" || text === "Assortment Slip" || text === "Print This Bale" || text === "Print Selected Bales" || text === "Print All Assortment Slips" || text === "Edit Bale" || text === "Add Color" || text === "Remove" || text === "Print Temporary Slip" || el.classList.contains("salesPackQty") || el.classList.contains("salesStaffTempSlipInput") || el.type === "checkbox";
