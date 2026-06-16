@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -39,18 +38,6 @@ function cleanText(value) {
 function uniqueSorted(values) {
   return Array.from(new Set(values.map(cleanText).filter(Boolean)))
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
-}
-
-function isBalePhotoExpired(bale) {
-  const date = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
-  if (Number.isNaN(date.getTime())) return false;
-  return Date.now() - date.getTime() > 31 * 24 * 60 * 60 * 1000;
-}
-
-function balePhotoMessage(bale) {
-  return isBalePhotoExpired(bale)
-    ? "This bale was created more than 1 month ago. No photo data available."
-    : "No photo proof uploaded.";
 }
 
 function makeId() {
@@ -668,14 +655,9 @@ export default function App() {
                 <Text style={styles.subTitle}>Bale Dispatch</Text>
                 <Text style={styles.dispatchBox}>{baleSummary(selectedOrder)}</Text>
                 {(selectedOrder.bales || []).map((bale) => (
-                  <View key={bale.baleNo} style={styles.balePhotoCard}>
+                  <View key={bale.baleNo} style={styles.baleCard}>
                     <Text style={styles.pendingColor}>Bale {bale.baleNo} - {bale.totalQty || 0} pcs</Text>
                     <Text style={styles.pendingValue}>Created: {displayDate(bale.createdAt)}</Text>
-                    {bale.photoUrl && !isBalePhotoExpired(bale) ? (
-                      <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
-                    ) : (
-                      <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
-                    )}
                     <AppButton title="View Details" onPress={() => setSelectedBale(bale)} />
                   </View>
                 ))}
@@ -729,12 +711,6 @@ export default function App() {
                     </View>
                   ))}
                 </View>
-                <Text style={styles.subTitle}>Photo Proof</Text>
-                {selectedBale.photoUrl && !isBalePhotoExpired(selectedBale) ? (
-                  <Image source={{ uri: selectedBale.photoUrl }} style={styles.balePhotoLarge} resizeMode="contain" />
-                ) : (
-                  <Text style={styles.photoNote}>{balePhotoMessage(selectedBale)}</Text>
-                )}
                 <AppButton title="Close" tone="muted" onPress={() => setSelectedBale(null)} />
               </>
             )}
@@ -835,10 +811,7 @@ const styles = StyleSheet.create({
   pendingRow: { backgroundColor: "#fff", borderRadius: 14, padding: 12, borderWidth: 1, borderColor: "#dbeafe" },
   pendingColor: { color: "#1d4ed8", fontWeight: "900", fontSize: 19, marginBottom: 6 },
   pendingValue: { color: "#334155", fontWeight: "800", marginBottom: 3 },
-  balePhotoCard: { backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#dbeafe", padding: 12, marginTop: 10 },
-  balePhoto: { width: "100%", height: 220, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff" },
-  balePhotoLarge: { width: "100%", height: 320, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff" },
-  photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#f8fafc", borderRadius: 12, padding: 10 },
+  baleCard: { backgroundColor: "#fff", borderRadius: 14, borderWidth: 1, borderColor: "#dbeafe", padding: 12, marginTop: 10 },
   slipCard: { backgroundColor: "#fff", borderRadius: 16, borderWidth: 1, borderColor: "#cbd5e1", padding: 14, gap: 4 },
   slipHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: "#e2e8f0", paddingBottom: 10, marginBottom: 8 },
   slipTitle: { color: "#0f172a", fontSize: 22, fontWeight: "900" },

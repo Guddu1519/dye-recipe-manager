@@ -1,8 +1,6 @@
 import * as Notifications from "expo-notifications";
 import * as Print from "expo-print";
 import * as Clipboard from "expo-clipboard";
-import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from "expo-image-manipulator";
 import * as ScreenCapture from "expo-screen-capture";
 import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
@@ -12,7 +10,6 @@ import {
   Alert,
   BackHandler,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -37,8 +34,6 @@ Notifications.setNotificationHandler({
 const emptySalesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || Constants.manifest?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 12000;
-const BALE_PHOTO_BUCKET = "bale-photos";
-const BALE_PHOTO_DAYS = 30;
 
 function normalize(value) {
   return String(value || "").trim().toLowerCase();
@@ -75,33 +70,6 @@ function getBaleSent(order) {
 
 function isOrderLocked(order) {
   return !!(order?.adminPaidLocked || order?.manualPaidByAdmin);
-}
-
-function isBalePhotoExpired(bale) {
-  const d = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
-  if (Number.isNaN(d.getTime())) return false;
-  return Date.now() - d.getTime() > BALE_PHOTO_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function balePhotoMessage(bale) {
-  return isBalePhotoExpired(bale)
-    ? "This bale was created more than 1 month ago. No photo data available."
-    : "No photo proof uploaded.";
-}
-
-function markExpiredBalePhotos(state, expiredPaths = []) {
-  let changed = false;
-  (state.orders || []).forEach((order) => (order.bales || []).forEach((bale) => {
-    if (bale.photoUrl && isBalePhotoExpired(bale)) {
-      if (bale.photoPath) expiredPaths.push(bale.photoPath);
-      bale.expiredPhotoPath = bale.photoPath || "";
-      bale.photoUrl = "";
-      bale.photoPath = "";
-      bale.photoDeletedAt = bale.photoDeletedAt || new Date().toISOString();
-      changed = true;
-    }
-  }));
-  return changed;
 }
 
 function orderStation(order) {
@@ -256,7 +224,7 @@ function makeSlipHtml(order, bales, profile) {
   </html>`;
 }
 
-function AppButton({ title, onPress, tone = "primary", disabled = false }) {
+function AppButton({ title, onPress, tone = "primary", disabled = false, style, textStyle }) {
   return (
     <Pressable
       onPress={onPress}
@@ -267,10 +235,11 @@ function AppButton({ title, onPress, tone = "primary", disabled = false }) {
         tone === "ghost" && styles.buttonGhost,
         tone === "muted" && styles.buttonMuted,
         disabled && styles.buttonDisabled,
-        pressed && !disabled && styles.buttonPressed
+        pressed && !disabled && styles.buttonPressed,
+        style
       ]}
     >
-      <Text style={[styles.buttonText, tone === "ghost" && styles.buttonGhostText]}>{title}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.buttonText, tone === "ghost" && styles.buttonGhostText, textStyle]}>{title}</Text>
     </Pressable>
   );
 }
@@ -347,7 +316,8 @@ export default function App() {
       .eq("login_email", normalize(userEmail))
       .maybeSingle();
     if (error) throw error;
-    if (!data || data.role !== "staff") {
+    const role = normalize(data?.role);
+    if (!data || !["staff", "team", "team_member", "team member"].includes(role)) {
       await supabase.auth.signOut();
       throw new Error("Only team member accounts can use this Team app.");
     }
@@ -368,20 +338,11 @@ export default function App() {
     nextState.misc ||= [];
     nextState.agents ||= [];
     nextState.staffs ||= [];
-    const expiredPaths = [];
-    const hadExpired = markExpiredBalePhotos(nextState, expiredPaths);
-    if (expiredPaths.length) {
-      supabase.storage.from(BALE_PHOTO_BUCKET).remove(expiredPaths).catch(() => {});
-    }
-    if (hadExpired) {
-      supabase.from("sales_state").upsert({ id: "main", data: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" }).then(() => {}).catch(() => {});
-    }
     setSalesState(nextState);
     return nextState;
   }, []);
 
   const saveSalesState = useCallback(async (nextState) => {
-    markExpiredBalePhotos(nextState);
     const { error } = await supabase
       .from("sales_state")
       .upsert({ id: "main", data: nextState, updated_at: new Date().toISOString() }, { onConflict: "id" });
@@ -541,67 +502,6 @@ export default function App() {
     Alert.alert("MTM - Team", `Version ${APP_VERSION}`);
   }
 
-  async function uploadBalePhoto(orderId, baleNo, stateSource = salesState) {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Camera Permission", "Allow camera access to click live bale proof photo.");
-      return;
-    }
-    const picked = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.75,
-      allowsEditing: false
-    });
-    if (picked.canceled || !picked.assets?.[0]?.uri) return;
-    const order = (stateSource.orders || []).find((item) => String(item.id) === String(orderId));
-    const bale = (order?.bales || []).find((item) => Number(item.baleNo) === Number(baleNo));
-    if (!order || !bale) {
-      Alert.alert("Photo Upload Failed", "Bale not found.");
-      return;
-    }
-    try {
-      const compressed = await ImageManipulator.manipulateAsync(
-        picked.assets[0].uri,
-        [{ resize: { width: 1200 } }],
-        { compress: 0.68, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      const response = await fetch(compressed.uri);
-      const arrayBuffer = await response.arrayBuffer();
-      const safeOrder = String(order.mtmOrderNo || order.id || "order").replace(/[^a-z0-9_-]/gi, "_");
-      const path = `${safeOrder}/bale-${bale.baleNo}-${Date.now()}.jpg`;
-      const { error } = await supabase.storage.from(BALE_PHOTO_BUCKET).upload(path, arrayBuffer, {
-        contentType: "image/jpeg",
-        upsert: true
-      });
-      if (error) throw error;
-      const { data } = supabase.storage.from(BALE_PHOTO_BUCKET).getPublicUrl(path);
-      const nextState = {
-        ...stateSource,
-        orders: (stateSource.orders || []).map((item) => {
-          if (String(item.id) !== String(orderId)) return item;
-          return {
-            ...item,
-            bales: (item.bales || []).map((existing) =>
-              Number(existing.baleNo) === Number(baleNo)
-                ? {
-                    ...existing,
-                    photoUrl: data?.publicUrl || "",
-                    photoPath: path,
-                    photoUploadedAt: new Date().toISOString(),
-                    photoDeletedAt: ""
-                  }
-                : existing
-            )
-          };
-        })
-      };
-      await saveSalesState(nextState);
-      Alert.alert("Photo Uploaded", "Bale photo proof saved.");
-    } catch (error) {
-      Alert.alert("Photo Upload Failed", (error.message || "Could not upload photo.") + "\nCreate Supabase Storage bucket: bale-photos");
-    }
-  }
-
   async function updateOrderStatus(orderId, status) {
     const order = salesState.orders.find((item) => String(item.id) === String(orderId));
     if (isOrderLocked(order)) {
@@ -668,10 +568,7 @@ export default function App() {
       if (isEditing) {
         Alert.alert("Bale Updated", `Bale ${nextBale.baleNo} updated successfully.`);
       } else {
-        Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`, [
-          { text: "Upload Photo", onPress: () => uploadBalePhoto(selectedOrder.id, nextBale.baleNo, nextState) },
-          { text: "Later" }
-        ]);
+        Alert.alert("Bale Created", `Bale ${nextBale.baleNo} saved successfully.`);
       }
     } catch (error) {
       Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
@@ -821,13 +718,13 @@ export default function App() {
               </View>
               <View style={styles.rowActions}>
                 {locked ? (
-                  <AppButton title="View / Print Bales" tone="muted" onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} />
+                  <AppButton title="View / Print Bales" tone="muted" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} />
                 ) : status === "Assigned" ? (
-                  <AppButton title="Accept Order" onPress={() => updateOrderStatus(item.id, "Accepted")} />
+                  <AppButton title="Accept Order" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => updateOrderStatus(item.id, "Accepted")} />
                 ) : (
-                  <AppButton title="Start Bale Creation" onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} />
+                  <AppButton title="Start Bale Creation" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => { setSelectedOrderId(String(item.id)); setEditingBaleNo(null); setPackingQty({}); }} />
                 )}
-                <AppButton title="Pending Report" onPress={() => showPendingReport(item)} tone="ghost" />
+                <AppButton title="Pending Report" onPress={() => showPendingReport(item)} tone="ghost" style={styles.actionButton} textStyle={styles.actionButtonText} />
               </View>
             </Pressable>
           );
@@ -900,11 +797,6 @@ export default function App() {
                     <Text style={styles.metaStrong}>Bale {bale.baleNo}: {bale.totalQty} pcs</Text>
                     <Text style={styles.meta}>Created: {displayDate(bale.createdAt)}</Text>
                     <Text style={styles.meta}>{(bale.colors || []).map((row) => `${row.colorNo}: ${row.qty}`).join(", ")}</Text>
-                    {bale.photoUrl && !isBalePhotoExpired(bale) ? (
-                      <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
-                    ) : (
-                      <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
-                    )}
                     <AppButton title="Print This Bale" onPress={() => printBales(selectedOrder, bale.baleNo)} tone="ghost" />
                     {!isOrderLocked(selectedOrder) && (
                       <AppButton
@@ -984,7 +876,9 @@ const styles = StyleSheet.create({
   metaStrong: { color: "#0f172a", fontWeight: "900", marginTop: 8 },
   metaValue: { color: "#475569", fontWeight: "700" },
   lockNote: { color: "#166534", backgroundColor: "#dcfce7", borderRadius: 12, padding: 10, fontWeight: "900", marginTop: 10 },
-  rowActions: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 12 },
+  rowActions: { flexDirection: "row", gap: 8, flexWrap: "nowrap", marginTop: 12, width: "100%" },
+  actionButton: { flex: 1, minWidth: 0, paddingHorizontal: 8 },
+  actionButtonText: { fontSize: 13 },
   button: { backgroundColor: "#16a34a", borderRadius: 16, paddingVertical: 13, paddingHorizontal: 16, alignItems: "center", justifyContent: "center" },
   buttonDanger: { backgroundColor: "#dc2626" },
   buttonGhost: { backgroundColor: "#e0edff" },
@@ -1015,8 +909,6 @@ const styles = StyleSheet.create({
   qtyInput: { borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 14, padding: 14, color: "#0f172a", fontSize: 24, fontWeight: "900", backgroundColor: "#fff" },
   baleHistory: { padding: 16, paddingBottom: 140 },
   baleCard: { backgroundColor: "#fff", borderWidth: 1, borderColor: "#bfdbfe", borderRadius: 16, padding: 12, marginTop: 10, gap: 8 },
-  balePhoto: { width: "100%", height: 220, borderRadius: 14, marginTop: 4, borderWidth: 1, borderColor: "#bfdbfe", backgroundColor: "#fff" },
-  photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#f8fafc", borderRadius: 12, padding: 10 },
   fixedActions: { position: "absolute", left: 12, right: 12, bottom: 12, backgroundColor: "#fff", borderRadius: 22, padding: 12, gap: 8, shadowColor: "#0f172a", shadowOpacity: 0.18, shadowRadius: 18, elevation: 10 },
   floatingTotals: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10, paddingBottom: 2 },
   floatingLabel: { color: "#475569", fontWeight: "900", fontSize: 15 },

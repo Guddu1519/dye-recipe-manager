@@ -13,7 +13,6 @@ import {
   Alert,
   BackHandler,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -31,7 +30,6 @@ import { supabase } from "./src/supabase";
 const EMPTY_STATE = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
 const CLOUD_TIMEOUT_MS = 15000;
-const BALE_PHOTO_BUCKET = "bale-photos";
 const CUT_OPTIONS = ["THAN", "1 MTR", "2 MTR", "80 CM", "75 CM", "78 CM", "77 CM", "LUMP", "FULL LUMP", "L95 THAN"];
 const NAV_ITEMS = [
   ["dashboard", "Dashboard"],
@@ -56,18 +54,6 @@ function clean(value) {
 
 function htmlEscape(value) {
   return clean(value).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
-}
-
-function isBalePhotoExpired(bale) {
-  const date = new Date(bale?.photoUploadedAt || bale?.createdAt || "");
-  if (Number.isNaN(date.getTime())) return false;
-  return Date.now() - date.getTime() > 31 * 24 * 60 * 60 * 1000;
-}
-
-function balePhotoMessage(bale) {
-  return isBalePhotoExpired(bale)
-    ? "This bale was created more than 1 month ago. No photo data available."
-    : "No photo proof uploaded.";
 }
 
 function clone(value) {
@@ -149,7 +135,7 @@ function orderSearchText(order) {
   ].join(" ").toLowerCase();
 }
 
-function AppButton({ title, onPress, tone = "primary", disabled = false, compact = false }) {
+function AppButton({ title, onPress, tone = "primary", disabled = false, compact = false, style, textStyle }) {
   return (
     <Pressable
       onPress={onPress}
@@ -161,10 +147,11 @@ function AppButton({ title, onPress, tone = "primary", disabled = false, compact
         tone === "muted" && styles.buttonMuted,
         tone === "success" && styles.buttonSuccess,
         disabled && styles.buttonDisabled,
-        pressed && !disabled && styles.buttonPressed
+        pressed && !disabled && styles.buttonPressed,
+        style
       ]}
     >
-      <Text style={styles.buttonText}>{title}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.buttonText, textStyle]}>{title}</Text>
     </Pressable>
   );
 }
@@ -832,23 +819,9 @@ export default function App() {
   const printBale = async (order, bale) => {
     const rows = getBaleRows(bale);
     const colorRows = rows.map((row) => `<tr><td>${htmlEscape(row.colorNo)}</td><td>${htmlEscape(row.qty)} pcs</td></tr>`).join("");
-    const html = `
-      <html>
-        <head>
-          <style>
-            @page{size:A5 landscape;margin:6mm}
-            body{font-family:Arial,sans-serif;color:#111;margin:0}
-            .copy{border:2px solid #111;padding:7px;height:92%;box-sizing:border-box}
-            .top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #111;padding-bottom:5px;margin-bottom:6px}
-            h1{font-size:18px;margin:0}.bale{font-size:18px;font-weight:800}
-            .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;font-size:12px;margin-bottom:6px}
-            b{font-weight:800} table{width:100%;border-collapse:collapse;font-size:12px}
-            th,td{border:1px solid #777;padding:3px 5px;text-align:left}
-            th{background:#dbeafe}.foot{text-align:center;font-weight:800;font-size:11px;margin-top:5px}
-          </style>
-        </head>
-        <body>
+    const makeCopy = (label) => `
           <div class="copy">
+            <div class="copyLabel">${htmlEscape(label).toUpperCase()}</div>
             <div class="top"><h1>Assortment Slip</h1><div><b>Bale No :</b></div><div class="bale">Bale ${htmlEscape(bale.baleNo)}</div></div>
             <div class="grid">
               <div><b>Party:</b> ${htmlEscape(order.partyName)}</div>
@@ -866,36 +839,30 @@ export default function App() {
             </div>
             <table><tr><th>Color No.</th><th>Pieces</th></tr>${colorRows}<tr><td><b>Grand Total</b></td><td><b>${htmlEscape(bale.totalQty || 0)} pcs</b></td></tr></table>
             <div class="foot">Monica Textile Mills, Pali</div>
-          </div>
+          </div>`;
+    const html = `
+      <html>
+        <head>
+          <style>
+            @page{size:A5 landscape;margin:6mm}
+            body{font-family:Arial,sans-serif;color:#111;margin:0}
+            .page{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+            .copy{border:2px solid #111;padding:7px;height:92%;box-sizing:border-box}
+            .copyLabel{text-align:right;font-size:13px;margin-bottom:3px}
+            .top{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #111;padding-bottom:5px;margin-bottom:6px}
+            h1{font-size:18px;margin:0}.bale{font-size:18px;font-weight:800}
+            .grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;font-size:12px;margin-bottom:6px}
+            b{font-weight:800} table{width:100%;border-collapse:collapse;font-size:12px}
+            th,td{border:1px solid #777;padding:3px 5px;text-align:left}
+            th{background:#dbeafe}.foot{text-align:center;font-weight:800;font-size:11px;margin-top:5px}
+          </style>
+        </head>
+        <body>
+          <div class="page">${makeCopy("Office Copy")}${makeCopy("Party Copy")}</div>
         </body>
       </html>`;
     await Print.printAsync({ html });
   };
-
-  const deleteBalePhoto = (order, baleNo) => Alert.alert("Delete Photo", `Delete photo for Bale ${baleNo}?`, [
-    { text: "Cancel", style: "cancel" },
-    {
-      text: "Delete",
-      style: "destructive",
-      onPress: async () => {
-        const next = clone(salesState);
-        const target = next.orders.find((item) => item.id === order.id);
-        const bale = (target?.bales || []).find((item) => Number(item.baleNo) === Number(baleNo));
-        if (!bale || (!bale.photoUrl && !bale.photoPath)) {
-          Alert.alert("No Photo", "No photo found for this bale.");
-          return;
-        }
-        if (bale.photoPath) {
-          await supabase.storage.from(BALE_PHOTO_BUCKET).remove([bale.photoPath]);
-        }
-        bale.photoUrl = "";
-        bale.photoPath = "";
-        bale.photoDeletedAt = new Date().toISOString();
-        await saveState(next, "Bale photo deleted");
-        setSelectedOrder(target);
-      }
-    }
-  ]);
 
   const printPending = async (order) => {
     const rows = (order.colors || []).filter((row) => Number(row.pendingQty ?? row.qty ?? 0) !== 0);
@@ -1300,15 +1267,9 @@ export default function App() {
                   <Text style={styles.orderTitle}>Bale {bale.baleNo} - {bale.totalQty} QTY</Text>
                   <Text style={styles.detail}>{displayDate(bale.createdAt, true)} | By: {clean(bale.staff || selectedOrder.assignedStaffName || "-").replace(/@.*/, "")}</Text>
                   <Text style={styles.detail}>{getBaleRows(bale).map((row) => `${row.colorNo}: ${row.qty}`).join(", ")}</Text>
-                  {bale.photoUrl && !isBalePhotoExpired(bale) ? (
-                    <Image source={{ uri: bale.photoUrl }} style={styles.balePhoto} resizeMode="contain" />
-                  ) : (
-                    <Text style={styles.photoNote}>{balePhotoMessage(bale)}</Text>
-                  )}
                   <View style={styles.rowActions}>
-                    <AppButton title="Print Bale" compact onPress={() => printBale(selectedOrder, bale)} />
-                    <AppButton title="Delete Photo" compact tone="muted" onPress={() => deleteBalePhoto(selectedOrder, bale.baleNo)} />
-                    <AppButton title="Delete Bale" compact tone="danger" onPress={() => deleteBale(selectedOrder, bale.baleNo)} />
+                    <AppButton title="Print Bale" compact style={styles.baleActionBtn} textStyle={styles.baleActionText} onPress={() => printBale(selectedOrder, bale)} />
+                    <AppButton title="Delete Bale" compact tone="danger" style={styles.baleActionBtn} textStyle={styles.baleActionText} onPress={() => deleteBale(selectedOrder, bale.baleNo)} />
                   </View>
                 </View>
               ))}
@@ -1504,12 +1465,12 @@ const styles = StyleSheet.create({
   teamStats: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   miniOrder: { padding: 12, backgroundColor: "#f8fafc", borderRadius: 12, borderWidth: 1, borderColor: "#e2e8f0" },
   masterCard: { backgroundColor: "#fff", borderRadius: 16, padding: 15, borderWidth: 1, borderColor: "#e2e8f0", gap: 6 },
-  rowActions: { flexDirection: "row", gap: 8, justifyContent: "flex-end" },
+  rowActions: { flexDirection: "row", gap: 8, justifyContent: "flex-end", flexWrap: "nowrap", width: "100%" },
+  baleActionBtn: { flex: 1, minWidth: 0, paddingHorizontal: 8 },
+  baleActionText: { fontSize: 13 },
   paragraph: { color: "#475569", lineHeight: 22 },
   paidNote: { padding: 10, borderRadius: 10, backgroundColor: "#dcfce7", color: "#166534", fontWeight: "900" },
   baleCard: { padding: 12, backgroundColor: "#f8fafc", borderRadius: 13, borderWidth: 1, borderColor: "#dbeafe", gap: 6 },
-  balePhoto: { width: "100%", height: 220, borderRadius: 14, borderWidth: 1, borderColor: "#cbd5e1", backgroundColor: "#fff", marginTop: 6 },
-  photoNote: { marginTop: 4, color: "#64748b", fontWeight: "800", backgroundColor: "#fff", borderRadius: 12, padding: 10, borderWidth: 1, borderColor: "#e2e8f0" },
   busyOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(15,23,42,0.55)", alignItems: "center", justifyContent: "center", zIndex: 100 },
   busyText: { color: "#fff", marginTop: 10, fontWeight: "900" },
   drawerShade: { flex: 1, backgroundColor: "rgba(15,23,42,0.45)", flexDirection: "row" },
