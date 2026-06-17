@@ -545,23 +545,31 @@ export default function App() {
       const isEditing = !!editingBale;
       try {
         setBaleSaving(true);
+        const latestState = await loadSalesState();
+        const latestOrder = (latestState.orders || []).find((order) => String(order.id) === String(selectedOrder.id));
+        if (!latestOrder) throw new Error("Order was changed or deleted. Please refresh and try again.");
+        if (isOrderLocked(latestOrder)) throw new Error("This order is manually paid by admin. You can view and print bales only.");
+        const latestEditingBale = isEditing
+          ? (latestOrder.bales || []).find((bale) => Number(bale.baleNo) === Number(editingBaleNo))
+          : null;
+        if (isEditing && !latestEditingBale) throw new Error("This bale was changed or deleted by admin. Please refresh and try again.");
         const nextBale = {
-          ...(editingBale || {}),
-          baleNo: editingBale?.baleNo || (selectedOrder.bales || []).length + 1,
+          ...(latestEditingBale || {}),
+          baleNo: latestEditingBale?.baleNo || (latestOrder.bales || []).length + 1,
           totalQty: selectedTotal,
           colors: packed,
-          createdAt: editingBale?.createdAt || new Date().toISOString(),
+          createdAt: latestEditingBale?.createdAt || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          staff: editingBale?.staff || profile?.full_name || profile?.username || session?.user?.email
+          staff: latestEditingBale?.staff || profile?.full_name || profile?.username || session?.user?.email
         };
-        const total = getOrderTotal(selectedOrder);
-        const oldEditingQty = editingBale ? Number(editingBale.totalQty || 0) : 0;
-        const sentAfter = getBaleSent(selectedOrder) - oldEditingQty + selectedTotal;
+        const total = getOrderTotal(latestOrder);
+        const oldEditingQty = latestEditingBale ? Number(latestEditingBale.totalQty || 0) : 0;
+        const sentAfter = getBaleSent(latestOrder) - oldEditingQty + selectedTotal;
         const nextStatus = sentAfter >= total ? "Packed" : "In Packing";
         const nextState = {
-          ...salesState,
-          orders: (salesState.orders || []).map((order) =>
-            String(order.id) === String(selectedOrder.id)
+          ...latestState,
+          orders: (latestState.orders || []).map((order) =>
+            String(order.id) === String(latestOrder.id)
               ? {
                   ...order,
                   status: nextStatus,

@@ -864,9 +864,12 @@ export default function App() {
       text: "Delete",
       style: "destructive",
       onPress: async () => {
-        const next = clone(salesState);
+        const latestState = await loadSalesState();
+        const next = clone(latestState);
         const target = next.orders.find((item) => item.id === order.id);
+        if (!target) return Alert.alert("Order Missing", "Order was changed or deleted. Please refresh.");
         const bale = (target.bales || []).find((item) => Number(item.baleNo) === Number(baleNo));
+        if (!bale) return Alert.alert("Bale Missing", "This bale was already deleted. Please refresh.");
         getBaleRows(bale).forEach((packed) => {
           const color = target.colors.find((row) => normalize(row.colorNo) === normalize(packed.colorNo));
           if (color) color.pendingQty = Number(color.pendingQty || 0) + Number(packed.qty || 0);

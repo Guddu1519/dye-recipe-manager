@@ -3987,6 +3987,18 @@ async function finishSalesBale(){
     if(total > order.qtyPerBale){
       if(!confirm("Ordered quantity was " + order.qtyPerBale + " per bale, but you are saving " + total + ". Are you sure you want to save?")) return;
     }
+    await loadSalesCloudState({silent:true});
+    order = salesState.orders.find(o => o.id === salesSelectedOrderId);
+    if(!order) return alert("Order not found after cloud refresh.");
+    if(isSalesOrderLocked(order)) return alert("This order is locked: manually paid by admin.");
+    editingBale = getSalesEditingBale(order);
+    let latestOverPacked = [];
+    packed.forEach(p => {
+      let color = order.colors.find(c => sameSalesColor(c.colorNo, p.colorNo));
+      let availableQty = (Number(color?.pendingQty) || 0) + getSalesBaleColorQty(editingBale, p.colorNo);
+      if(p.qty > availableQty) latestOverPacked.push(`Color No. ${p.colorNo}: available ${availableQty}, saving ${p.qty}`);
+    });
+    if(latestOverPacked.length && !confirm("Latest cloud data changed. You are packing more than pending QTY:\n" + latestOverPacked.join("\n") + "\n\nClick OK to save anyway.")) return;
     if(editingBale){
       (editingBale.colors || []).forEach(item => {
         let color = order.colors.find(c => sameSalesColor(c.colorNo, item.colorNo));
@@ -4035,6 +4047,7 @@ function printSelectedSalesBales(orderId){
 async function deleteSalesBale(orderId, baleNo){
   if(isTrialUser()) return alert("Trial login can only view. Delete is disabled.");
   if(!isSalesAdmin()) return alert("Only Sales Admin can delete bales.");
+  await loadSalesCloudState({silent:true});
   let order = salesState.orders.find(o => o.id === orderId);
   if(!order) return alert("Order not found.");
   let index = (order.bales || []).findIndex(b => Number(b.baleNo) === Number(baleNo));
