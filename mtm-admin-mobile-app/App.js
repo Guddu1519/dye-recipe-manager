@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Notifications from "expo-notifications";
 import * as Print from "expo-print";
 import * as ScreenCapture from "expo-screen-capture";
 import * as Sharing from "expo-sharing";
@@ -26,6 +27,15 @@ import {
   View
 } from "react-native";
 import { supabase } from "./src/supabase";
+import { registerPushToken, sendPushToUsers } from "./src/pushNotifications";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true
+  })
+});
 
 const EMPTY_STATE = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
@@ -409,7 +419,8 @@ export default function App() {
         const current = data.session || null;
         setSession(current);
         if (current?.user?.email) {
-          await withTimeout(loadProfile(current.user.email), "Admin profile load timed out.");
+          const loadedProfile = await withTimeout(loadProfile(current.user.email), "Admin profile load timed out.");
+          registerPushToken(supabase, { role: "admin", appName: "MTM", profile: loadedProfile, session: current });
           await withTimeout(loadSalesState(), "Sales data load timed out.");
         }
       } catch (error) {
@@ -460,7 +471,8 @@ export default function App() {
     try {
       const { data, error } = await withTimeout(supabase.auth.signInWithPassword({ email: normalize(email), password }), "Login timed out.");
       if (error) throw error;
-      await loadProfile(data.user.email);
+      const loadedProfile = await loadProfile(data.user.email);
+      registerPushToken(supabase, { role: "admin", appName: "MTM", profile: loadedProfile, session: data.session });
       await loadSalesState();
       setSession(data.session);
     } catch (error) {
@@ -833,7 +845,7 @@ export default function App() {
     }
   ]);
 
-  const assignOrder = (order, staffEmail) => {
+  const assignOrder = async (order, staffEmail) => {
     const staff = salesState.staffs.find((item) => normalize(item.email) === normalize(staffEmail));
     const next = clone(salesState);
     const target = next.orders.find((item) => item.id === order.id);
@@ -842,7 +854,16 @@ export default function App() {
     target.assignmentStatus = staff ? "Assigned" : "Not Assigned Yet";
     if (!["Packed", "Completed", "Cancelled"].includes(target.status)) target.status = staff ? "Assigned" : "Not Assigned Yet";
     target.assignedAt = staff ? new Date().toISOString() : "";
-    saveState(next, staff ? `Assigned to ${staff.name}` : "Moved to Not Assigned Yet");
+    await saveState(next, staff ? `Assigned to ${staff.name}` : "Moved to Not Assigned Yet");
+    if (staff?.email) {
+      sendPushToUsers(supabase, {
+        role: "team",
+        emails: [staff.email],
+        title: "New Order Assigned",
+        body: `${target.mtmOrderNo || "Order"} - ${target.partyName || "Party"}`,
+        data: { orderId: target.id }
+      });
+    }
     setSelectedOrder(target);
   };
 
@@ -855,6 +876,13 @@ export default function App() {
     target.manualPaidAt = locked ? new Date().toISOString() : "";
     target.manualPaidBy = locked ? session.user.email : "";
     await saveState(next, locked ? "Order marked completed by admin" : "Order unlocked");
+    sendPushToUsers(supabase, {
+      role: "agent",
+      emails: [target.agentEmail],
+      title: locked ? "Order Completed" : "Order Reopened",
+      body: `${target.mtmOrderNo || "Order"} - ${target.partyName || "Party"}`,
+      data: { orderId: target.id }
+    });
     setSelectedOrder(target);
   };
 

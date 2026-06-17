@@ -22,6 +22,7 @@ import {
   View
 } from "react-native";
 import { supabase } from "./src/supabase";
+import { registerPushToken, sendPushToUsers } from "./src/pushNotifications";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -395,7 +396,8 @@ export default function App() {
         if (!mounted) return;
         setSession(data.session || null);
         if (data.session?.user?.email) {
-          await withTimeout(loadProfile(data.session.user.email), "Profile load is taking too long. Please check internet.");
+          const loadedProfile = await withTimeout(loadProfile(data.session.user.email), "Profile load is taking too long. Please check internet.");
+          registerPushToken(supabase, { role: "team", appName: "MTM - Team", profile: loadedProfile, session: data.session });
           await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
         }
       } catch (error) {
@@ -409,7 +411,8 @@ export default function App() {
       setSession(nextSession);
       if (nextSession?.user?.email) {
         try {
-          await withTimeout(loadProfile(nextSession.user.email), "Profile load is taking too long. Please check internet.");
+          const loadedProfile = await withTimeout(loadProfile(nextSession.user.email), "Profile load is taking too long. Please check internet.");
+          registerPushToken(supabase, { role: "team", appName: "MTM - Team", profile: loadedProfile, session: nextSession });
           await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
         } catch (error) {
           Alert.alert("Access Blocked", error.message);
@@ -488,7 +491,8 @@ export default function App() {
         password
       });
       if (error) throw error;
-      await withTimeout(loadProfile(data.user.email), "Profile load is taking too long. Please check internet.");
+      const loadedProfile = await withTimeout(loadProfile(data.user.email), "Profile load is taking too long. Please check internet.");
+      registerPushToken(supabase, { role: "team", appName: "MTM - Team", profile: loadedProfile, session: data.session });
       await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
     } catch (error) {
       Alert.alert("Login Failed", error.message || "Could not login.");
@@ -582,6 +586,19 @@ export default function App() {
           )
         };
         await saveSalesState(nextState);
+        sendPushToUsers(supabase, {
+          role: "admin",
+          title: isEditing ? "Bale Updated" : "Bale Created",
+          body: `${latestOrder.mtmOrderNo || "Order"} - Bale ${nextBale.baleNo} (${selectedTotal} pcs)`,
+          data: { orderId: latestOrder.id, baleNo: nextBale.baleNo }
+        });
+        sendPushToUsers(supabase, {
+          role: "agent",
+          emails: [latestOrder.agentEmail],
+          title: isEditing ? "Bale Updated" : "Bale Packed",
+          body: `${latestOrder.partyName || "Your party"} - Bale ${nextBale.baleNo} packed`,
+          data: { orderId: latestOrder.id, baleNo: nextBale.baleNo }
+        });
         setPackingQty({});
         setEditingBaleNo(null);
         if (isEditing) {

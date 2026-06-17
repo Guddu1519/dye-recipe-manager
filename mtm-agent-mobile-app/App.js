@@ -1,6 +1,7 @@
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system";
+import * as Notifications from "expo-notifications";
 import * as ScreenCapture from "expo-screen-capture";
 import Constants from "expo-constants";
 import { StatusBar } from "expo-status-bar";
@@ -22,6 +23,15 @@ import {
   View
 } from "react-native";
 import { supabase } from "./src/supabase";
+import { registerPushToken, sendPushToUsers } from "./src/pushNotifications";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true
+  })
+});
 
 const emptySalesState = { parties: [], misc: [], orders: [], agents: [], staffs: [] };
 const APP_VERSION = Constants.expoConfig?.version || "1.0.0";
@@ -312,7 +322,8 @@ export default function App() {
         if (!mounted) return;
         setSession(data.session || null);
         if (data.session?.user?.email) {
-          await withTimeout(loadProfile(data.session.user.email), "Profile load is taking too long. Please check internet.");
+          const loadedProfile = await withTimeout(loadProfile(data.session.user.email), "Profile load is taking too long. Please check internet.");
+          registerPushToken(supabase, { role: "agent", appName: "MTM - Agents", profile: loadedProfile, session: data.session });
           await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
         }
       } catch (error) {
@@ -330,7 +341,8 @@ export default function App() {
       if (nextSession?.user?.email) {
         try {
           setLoading(true);
-          await withTimeout(loadProfile(nextSession.user.email), "Profile load is taking too long. Please check internet.");
+          const loadedProfile = await withTimeout(loadProfile(nextSession.user.email), "Profile load is taking too long. Please check internet.");
+          registerPushToken(supabase, { role: "agent", appName: "MTM - Agents", profile: loadedProfile, session: nextSession });
           await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
         } catch (error) {
           Alert.alert("Login Failed", error.message || "Please login again.");
@@ -456,7 +468,8 @@ export default function App() {
         password
       });
       if (error) throw error;
-      await withTimeout(loadProfile(data.user.email), "Profile load is taking too long. Please check internet.");
+      const loadedProfile = await withTimeout(loadProfile(data.user.email), "Profile load is taking too long. Please check internet.");
+      registerPushToken(supabase, { role: "agent", appName: "MTM - Agents", profile: loadedProfile, session: data.session });
       await withTimeout(loadSalesState(), "Order load is taking too long. Please check internet.");
     } catch (error) {
       Alert.alert("Login Failed", error.message || "Could not login.");
@@ -639,6 +652,12 @@ export default function App() {
         "Order request save is taking too long. Please check internet."
       );
       if (error) throw error;
+      sendPushToUsers(supabase, {
+        role: "admin",
+        title: "New Agent Order",
+        body: `${party.partyName || "Party"} sent ${totalQty} pcs order`,
+        data: { partyName: party.partyName, agentEmail: party.agentEmail }
+      });
       setSalesState(nextState);
       setRequestForm(emptyOrderRequest());
       setRequestOpen(false);
