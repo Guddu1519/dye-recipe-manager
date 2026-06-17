@@ -265,6 +265,7 @@ export default function App() {
   const [notifications, setNotifications] = useState([]);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [baleSaving, setBaleSaving] = useState(false);
   const previousAssignedIds = useRef(new Set());
 
   const staffEmail = normalize(session?.user?.email);
@@ -527,6 +528,7 @@ export default function App() {
   }
 
   async function createBale() {
+    if (baleSaving) return;
     if (!selectedOrder) return;
     if (isOrderLocked(selectedOrder)) {
       Alert.alert("Order Locked", "This order is manually paid by admin. You can view and print bales only.");
@@ -540,36 +542,37 @@ export default function App() {
       return;
     }
     const saveBaleNow = async () => {
-    const isEditing = !!editingBale;
-    const nextBale = {
-      ...(editingBale || {}),
-      baleNo: editingBale?.baleNo || (selectedOrder.bales || []).length + 1,
-      totalQty: selectedTotal,
-      colors: packed,
-      createdAt: editingBale?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      staff: editingBale?.staff || profile?.full_name || profile?.username || session?.user?.email
-    };
-    const total = getOrderTotal(selectedOrder);
-    const oldEditingQty = editingBale ? Number(editingBale.totalQty || 0) : 0;
-    const sentAfter = getBaleSent(selectedOrder) - oldEditingQty + selectedTotal;
-    const nextStatus = sentAfter >= total ? "Packed" : "In Packing";
-    const nextState = {
-      ...salesState,
-      orders: (salesState.orders || []).map((order) =>
-        String(order.id) === String(selectedOrder.id)
-          ? {
-              ...order,
-              status: nextStatus,
-              bales: isEditing
-                ? (order.bales || []).map((bale) => Number(bale.baleNo) === Number(editingBaleNo) ? nextBale : bale)
-                : [...(order.bales || []), nextBale],
-              updatedAt: new Date().toISOString()
-            }
-          : order
-      )
-    };
+      const isEditing = !!editingBale;
       try {
+        setBaleSaving(true);
+        const nextBale = {
+          ...(editingBale || {}),
+          baleNo: editingBale?.baleNo || (selectedOrder.bales || []).length + 1,
+          totalQty: selectedTotal,
+          colors: packed,
+          createdAt: editingBale?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          staff: editingBale?.staff || profile?.full_name || profile?.username || session?.user?.email
+        };
+        const total = getOrderTotal(selectedOrder);
+        const oldEditingQty = editingBale ? Number(editingBale.totalQty || 0) : 0;
+        const sentAfter = getBaleSent(selectedOrder) - oldEditingQty + selectedTotal;
+        const nextStatus = sentAfter >= total ? "Packed" : "In Packing";
+        const nextState = {
+          ...salesState,
+          orders: (salesState.orders || []).map((order) =>
+            String(order.id) === String(selectedOrder.id)
+              ? {
+                  ...order,
+                  status: nextStatus,
+                  bales: isEditing
+                    ? (order.bales || []).map((bale) => Number(bale.baleNo) === Number(editingBaleNo) ? nextBale : bale)
+                    : [...(order.bales || []), nextBale],
+                  updatedAt: new Date().toISOString()
+                }
+              : order
+          )
+        };
         await saveSalesState(nextState);
         setPackingQty({});
         setEditingBaleNo(null);
@@ -580,6 +583,8 @@ export default function App() {
         }
       } catch (error) {
         Alert.alert("Bale Save Failed", error.message || "Could not save bale.");
+      } finally {
+        setBaleSaving(false);
       }
     };
     const baleSize = Number(selectedOrder.qtyPerBale || 0);
@@ -847,7 +852,7 @@ export default function App() {
               <Text style={styles.floatingLabel}>Selected Total: <Text style={styles.floatingTotalNo}>{selectedTotal}</Text></Text>
             </View>
             <AppButton title="Clear QTY" onPress={() => Alert.alert("Clear Quantities", "Are you sure you want to clear all quantities?", [{ text: "No, Cancel", style: "cancel" }, { text: "Yes, Clear", style: "destructive", onPress: () => setPackingQty({}) }])} tone="ghost" />
-            {!isOrderLocked(selectedOrder) && <AppButton title={editingBale ? "Update Bale" : "Create Bale"} onPress={createBale} />}
+            {!isOrderLocked(selectedOrder) && <AppButton title={baleSaving ? (editingBale ? "Updating..." : "Saving...") : (editingBale ? "Update Bale" : "Create Bale")} onPress={createBale} disabled={baleSaving} />}
           </View>
         </View>
       )}
