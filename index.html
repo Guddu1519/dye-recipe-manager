@@ -3461,10 +3461,11 @@ async function saveSalesOrder(){
       updatedBy: getSalesUserEmail(),
       updatedAt: new Date().toISOString()
     };
+    let createdOrderForPush = null;
     if(existing){
       Object.assign(existing, orderData);
     }else{
-      salesState.orders.push({
+      createdOrderForPush = {
         id: Date.now().toString(),
         ...orderData,
         assignedStaff: "",
@@ -3474,9 +3475,23 @@ async function saveSalesOrder(){
         bales: [],
         createdBy: getSalesUserEmail(),
         createdAt: new Date().toISOString()
-      });
+      };
+      salesState.orders.push(createdOrderForPush);
     }
     await saveSalesState();
+    if(createdOrderForPush?.agentEmail){
+      sendSalesPushToUsers({
+        role: "agent",
+        emails: [createdOrderForPush.agentEmail],
+        title: "New Order Received",
+        body: `${createdOrderForPush.mtmOrderNo || "Order"} - ${createdOrderForPush.partyName || "Party"}`,
+        data: {
+          orderId: createdOrderForPush.id,
+          mtmOrderNo: createdOrderForPush.mtmOrderNo || "",
+          partyName: createdOrderForPush.partyName || ""
+        }
+      });
+    }
     clearSalesOrderForm();
     renderSalesManager();
     showSuccessToast(existing ? "Sales order updated" : "Sales order created");
@@ -5019,6 +5034,53 @@ async function saveMajorBackupToCloud(){
   }), ["program_no","chemical_name","qty_used_grams","created_at"]);
   if(canUseSalesCloud()) await saveSalesState();
   localStorage.setItem(SALES_STORAGE_KEY, JSON.stringify(salesState));
+}
+
+function normalizeSalesPushEmail(value){
+  return String(value || "").trim().toLowerCase();
+}
+
+async function sendSalesPushToUsers({role="", emails=[], title="", body="", data={}}={}){
+  try{
+    if(!supabaseClient) return;
+    let cleanEmails = (emails || []).map(normalizeSalesPushEmail).filter(Boolean);
+    let query = supabaseClient
+      .from("sales_push_tokens")
+      .select("expo_push_token,user_email,role,active")
+      .eq("active", true);
+    if(role) query = query.eq("role", role);
+    let {data: rows, error} = await query;
+    if(error){
+      console.warn("Sales push token load skipped:", error.message || error);
+      return;
+    }
+    let tokens = (rows || [])
+      .filter(row => !cleanEmails.length || cleanEmails.includes(normalizeSalesPushEmail(row.user_email)))
+      .map(row => row.expo_push_token)
+      .filter(Boolean);
+    tokens = Array.from(new Set(tokens));
+    if(!tokens.length){
+      console.warn("No sales push tokens found for", role || "all", cleanEmails);
+      return;
+    }
+    let messages = tokens.map(to => ({
+      to,
+      sound: "default",
+      title,
+      body,
+      data: data || {}
+    }));
+    for(let i = 0; i < messages.length; i += 100){
+      let response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(messages.slice(i, i + 100))
+      });
+      if(!response.ok) console.warn("Sales push send failed:", await response.text());
+    }
+  }catch(err){
+    console.warn("Sales push send skipped:", err.message || err);
+  }
 }
 
 async function importMajorWebsiteBackup(event){

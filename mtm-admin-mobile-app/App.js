@@ -786,8 +786,10 @@ export default function App() {
         updatedAt: new Date().toISOString(),
         updatedBy: session.user.email
       };
+      let createdOrderForPush = null;
       if (old) Object.assign(old, data);
-      else next.orders.push({
+      else {
+        createdOrderForPush = {
         id: makeId(),
         ...data,
         assignedStaff: "",
@@ -797,8 +799,23 @@ export default function App() {
         bales: [],
         createdAt: new Date().toISOString(),
         createdBy: session.user.email
-      });
+        };
+        next.orders.push(createdOrderForPush);
+      }
       await saveState(next, old ? "Order updated" : "Order created");
+      if (createdOrderForPush?.agentEmail) {
+        sendPushToUsers(supabase, {
+          role: "agent",
+          emails: [createdOrderForPush.agentEmail],
+          title: "New Order Received",
+          body: `${createdOrderForPush.mtmOrderNo || "Order"} - ${createdOrderForPush.partyName || "Party"}`,
+          data: {
+            orderId: createdOrderForPush.id,
+            mtmOrderNo: createdOrderForPush.mtmOrderNo || "",
+            partyName: createdOrderForPush.partyName || ""
+          }
+        });
+      }
       setOrderForm(emptyOrderForm());
       setScreen("orders");
     } catch (error) {
