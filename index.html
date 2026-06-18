@@ -5042,6 +5042,17 @@ function normalizeSalesPushEmail(value){
 
 async function sendSalesPushToUsers({role="", emails=[], title="", body="", data={}}={}){
   try{
+    let serverResponse = await fetch("/api/send-sales-push", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({role, emails, title, body, data})
+    });
+    if(serverResponse.ok){
+      let result = await serverResponse.json();
+      if(!result.sent) console.warn("Sales push server sent no notifications:", result.message || result);
+      return result;
+    }
+    console.warn("Sales push server failed, trying browser fallback:", await serverResponse.text());
     if(!supabaseClient) return;
     let cleanEmails = (emails || []).map(normalizeSalesPushEmail).filter(Boolean);
     let query = supabaseClient
