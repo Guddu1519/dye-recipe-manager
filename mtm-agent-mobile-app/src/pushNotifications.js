@@ -2,6 +2,8 @@ import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
+const SALES_PUSH_API = "https://mtmdyeing.onrender.com/api/send-sales-push";
+
 function clean(value) {
   return String(value || "").trim();
 }
@@ -48,6 +50,14 @@ export async function registerPushToken(supabase, { role, appName, profile, sess
 
 export async function sendPushToUsers(supabase, { role, emails = [], title, body, data = {} }) {
   try {
+    const serverResponse = await fetch(SALES_PUSH_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role, emails, title, body, data })
+    });
+    if (serverResponse.ok) return;
+    console.warn("Push server failed, trying Supabase fallback:", await serverResponse.text());
+
     const cleanEmails = emails.map(normalize).filter(Boolean);
     let query = supabase.from("sales_push_tokens").select("expo_push_token,user_email").eq("active", true);
     if (role) query = query.eq("role", role);

@@ -3288,6 +3288,7 @@ async function assignSalesOrderToStaff(orderId){
   if(order.status === "Not Assigned Yet") order.status = "Assigned";
   order.assignedAt = new Date().toISOString();
   await saveSalesState();
+  notifySalesOrderAssignedToTeam(order, staff);
   renderSalesManager();
   showSuccessToast("Order assigned to " + staff.name);
 }
@@ -4036,8 +4037,9 @@ async function finishSalesBale(){
       order.status = "In Packing";
     }
     await saveSalesState();
-    clearSalesBaleDraft(order.id);
     let wasEditing = !!editingBale;
+    if(!wasEditing) notifySalesBaleCreatedForAgent(order, nextBale);
+    clearSalesBaleDraft(order.id);
     salesEditingBaleNo = null;
     renderSalesManager(false);
     renderSalesBaleWorkArea();
@@ -5092,6 +5094,39 @@ async function sendSalesPushToUsers({role="", emails=[], title="", body="", data
   }catch(err){
     console.warn("Sales push send skipped:", err.message || err);
   }
+}
+
+function notifySalesOrderAssignedToTeam(order, staff){
+  if(!order || !staff?.email) return;
+  sendSalesPushToUsers({
+    role: "team",
+    emails: [staff.email],
+    title: "New Order Assigned",
+    body: `${order.mtmOrderNo || "Order"} - ${order.partyName || "Party"}`,
+    data: {
+      type: "order_assigned",
+      orderId: order.id,
+      mtmOrderNo: order.mtmOrderNo || "",
+      partyName: order.partyName || ""
+    }
+  });
+}
+
+function notifySalesBaleCreatedForAgent(order, bale){
+  if(!order?.agentEmail || !bale) return;
+  sendSalesPushToUsers({
+    role: "agent",
+    emails: [order.agentEmail],
+    title: "Bale Packed",
+    body: `${order.partyName || "Your party"} - Bale ${bale.baleNo || ""} packed`,
+    data: {
+      type: "bale_created",
+      orderId: order.id,
+      baleNo: bale.baleNo || "",
+      mtmOrderNo: order.mtmOrderNo || "",
+      partyName: order.partyName || ""
+    }
+  });
 }
 
 async function importMajorWebsiteBackup(event){
